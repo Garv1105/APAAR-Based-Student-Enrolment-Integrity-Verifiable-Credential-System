@@ -184,6 +184,8 @@ Rules run in layers: schema → format → referential → registry (mock) → b
 | E001 | Field missing or not parseable | error |
 | E101 / E101W | APAAR missing with no reason / with REFUSED, NOT_GENERATED or PENDING (row still counted) | error / warning |
 | E102 / E103 / E104 | Bad APAAR format / not in registry / name or DOB mismatch | error / error / warning |
+| E105 | Institution student ID blank (it is printed on certificates, Req 10) | error |
+| E205 | Student ID already used in this file or by an active enrolment at the same institution (case- and space-insensitive) | error |
 | E201 / E202 | Duplicate within the file / already enrolled at this institution | error |
 | E203 | Active enrolment at another institution (neutral notice to both sides) | flag |
 | E301 / E302 | Regular seats over approved intake / supernumerary cap or CIWG sub-cap exceeded | flag |

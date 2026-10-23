@@ -9,7 +9,7 @@ import json
 from datetime import date
 from pathlib import Path
 
-from app.validation import Ctx, validate_batch
+from app.validation import Ctx, student_id_key, validate_batch
 
 DATA = Path(__file__).resolve().parent.parent / "data"
 SEED = json.loads((DATA / "seed/registry.json").read_text())
@@ -23,7 +23,7 @@ def run_scenario():
     cats = {c["code"]: c for c in SEED["seat_categories"]}
     y = SEED["academic_years"][0]
     year = {"code": y["code"], "window_start": date.fromisoformat(y["window_start"]), "window_end": date.fromisoformat(y["window_end"])}
-    active, counters, predicted = {}, {}, {}   # bi -> (institution, programme_id, counter_keys)
+    active, counters, predicted = {}, {}, {}   # bi -> (institution, programme_id, counter_keys, student_id_key)
     by_apaar = {}
     for step in json.loads((DATA / "synthetic/scenario.json").read_text())["steps"]:
         if step["op"] == "upload":
@@ -35,16 +35,20 @@ def run_scenario():
                       seat_categories=cats, registry_lookup=reg.get,
                       own_active_bi={b for b, v in active.items() if v[0] == inst},
                       other_active_bi={b for b, v in active.items() if v[0] != inst},
+                      own_active_student_ids={v[3] for v in active.values() if v[0] == inst},
                       counters=counters)
             with open(DATA / "synthetic" / step["file"], encoding="utf-8") as f:
                 rows = list(csv.DictReader(f))
             for o in validate_batch(rows, ctx):
                 predicted[(step["file"], o["row_no"])] = {i["code"] for i in o["issues"]}
-                if o["accepted"] and o["bi"]:
-                    active[o["bi"]] = (inst, o["programme_id"], o["counter_keys"])
-                    by_apaar[rows[o["row_no"] - 1]["apaar_id"]] = o["bi"]
+                if o["accepted"]:
+                    # no-APAAR rows still hold a student ID (and seats); key them by row
+                    k = o["bi"] or ("row", step["file"], o["row_no"])
+                    active[k] = (inst, o["programme_id"], o["counter_keys"], student_id_key(o["data"]["institution_student_id"]))
+                    if o["bi"]:
+                        by_apaar[rows[o["row_no"] - 1]["apaar_id"]] = o["bi"]
         elif step["op"] == "patch" and step["body"].get("status") in ("withdrawn", "migrated"):
-            inst, pid, keys = active.pop(by_apaar[step["apaar"]])
+            inst, pid, keys, _ = active.pop(by_apaar[step["apaar"]])
             for k in keys:
                 counters[(pid, k)] -= 1
     return predicted

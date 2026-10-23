@@ -12,7 +12,7 @@ from psycopg.types.json import Jsonb
 from . import crypto, ledger
 from .auth import audit
 from .mocks import apaar_registry
-from .validation import Ctx, counter_keys, validate_batch
+from .validation import Ctx, counter_keys, student_id_key, validate_batch
 
 NOTICE = "A record in batch #{batch} needs AICTE review (case #{case})"  # F4: no other-institution data
 
@@ -61,10 +61,15 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
         for r in conn.execute("SELECT * FROM active_enrolment_owners(%s, %s)", (bis, year["code"])):
             (own if r["own"] else other).add(r["apaar_bi"])
 
+        # own institution only (RLS); same-institution batches are already serialised by the counter locks above
+        own_sids = {student_id_key(r["institution_student_id"]) for r in conn.execute(
+            "SELECT e.institution_student_id FROM enrolments e JOIN programmes p ON p.id=e.programme_id "
+            "WHERE p.institution_id=%s AND e.academic_year=%s AND e.status='active'", (inst_id, year["code"]))}
+
         ctx = Ctx(institution_id=inst_id, institution_status=inst["status"],
                   year={"code": year["code"], "window_start": year["window_start"], "window_end": year["window_end"]},
                   programmes=progs, seat_categories=cats, registry_lookup=apaar_registry().lookup,
-                  own_active_bi=own, other_active_bi=other, counters=dict(counters))
+                  own_active_bi=own, other_active_bi=other, own_active_student_ids=own_sids, counters=dict(counters))
         outcomes = validate_batch(rows, ctx)
 
         issues = [(b["id"], i["row_no"], i["code"], i["severity"], i["field"], Jsonb(i["params"])) for o in outcomes for i in o["issues"]]

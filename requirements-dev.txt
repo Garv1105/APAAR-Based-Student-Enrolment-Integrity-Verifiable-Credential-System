@@ -1,0 +1,4 @@
+# Dev / script-only dependencies (not needed to run the API).
+# Install: .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+-r requirements.txt
+PyYAML==6.0.3  # synthetic/ generator + selfcheck (always yaml.safe_load / safe_dump)

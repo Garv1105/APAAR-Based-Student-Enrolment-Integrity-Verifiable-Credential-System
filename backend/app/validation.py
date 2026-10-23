@@ -34,7 +34,13 @@ class Ctx:
     registry_lookup: callable       # apaar -> {name, dob: 'YYYY-MM-DD'} | None   (MOCK APAAR registry)
     own_active_bi: set = field(default_factory=set)
     other_active_bi: set = field(default_factory=set)
+    own_active_student_ids: set = field(default_factory=set)  # student_id_key() of own active enrolments
     counters: dict = field(default_factory=dict)  # (programme_id, key) -> filled
+
+
+def student_id_key(sid: str) -> str:
+    """Comparison key for institution student IDs: case- and whitespace-insensitive."""
+    return " ".join(sid.split()).casefold()
 
 
 def caps_for(intake: int, seat_categories: dict) -> dict:
@@ -104,7 +110,7 @@ def missing_columns(header: list[str]) -> list[str]:
 def parse_row(row_no: int, raw: dict) -> tuple[dict | None, list[dict]]:
     out, issues = {}, []
     for col in REQUIRED_COLUMNS:
-        if col not in PARSERS and not _str(raw.get(col)):
+        if col not in PARSERS and col != "institution_student_id" and not _str(raw.get(col)):  # blank ID → E105
             issues.append(issue(row_no, "E001", col, "required"))
     for col, fn in PARSERS.items():
         try:
@@ -132,7 +138,7 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
     """rows: raw dicts (CSV strings or JSON values). Returns one outcome per row:
     {row_no, data, issues, accepted, apaar_status, programme_id, counter_keys}.
     Mutates ctx.counters for accepted rows (caller persists them in the same transaction)."""
-    outcomes, seen, declared_flagged = [], {}, set()
+    outcomes, seen, seen_sid, declared_flagged = [], {}, {}, set()
     for i, raw in enumerate(rows, start=1):
         data, issues = parse_row(i, raw)
         o = {"row_no": i, "data": data, "issues": issues, "accepted": False,
@@ -141,7 +147,10 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         if data is None:
             continue
 
-        # Layer 2: format
+        # Layer 2: format (student ID required, Req 10)
+        sid = student_id_key(data["institution_student_id"])
+        if not sid:
+            issues.append(issue(i, "E105", "institution_student_id"))
         apaar, apaar_ok = data["apaar_id"], False
         if not apaar:
             if data["apaar_reason"] in APAAR_REASONS:
@@ -209,8 +218,13 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
             issues.append(issue(i, "E201", "apaar_id", str(seen[key])))
         elif bi and bi in ctx.own_active_bi:
             issues.append(issue(i, "E202", "apaar_id"))
+        if sid and sid in seen_sid:
+            issues.append(issue(i, "E205", "institution_student_id", f"row {seen_sid[sid]} of this file"))
+        elif sid and sid in ctx.own_active_student_ids:
+            issues.append(issue(i, "E205", "institution_student_id", "an active enrolment at this institution"))
         if not any(x["severity"] == "error" for x in issues):
             seen.setdefault(key, i)
+            seen_sid.setdefault(sid, i)
 
         if any(x["severity"] == "error" for x in issues):
             continue
