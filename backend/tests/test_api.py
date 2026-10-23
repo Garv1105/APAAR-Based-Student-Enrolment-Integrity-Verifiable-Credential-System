@@ -59,6 +59,9 @@ def test_idempotency_key_replays_without_duplicating(client, dbconn):
     assert r1.status_code == 201 and r2.status_code == 200 and r2.json()["replayed"]
     assert r1.json()["batch_id"] == r2.json()["batch_id"]
     assert dbconn.execute("SELECT count(*) n FROM enrolments").fetchone()["n"] == r1.json()["counts"]["accepted"]
+    r3 = upload(client, "inst-a", "C1.csv", key="k1")  # same key, different content
+    assert r3.status_code == 422 and r3.headers["content-type"] == "application/problem+json"
+    assert upload(client, "inst-b", "A1.csv", key="k1").status_code == 201  # keys are per institution
 
 
 def test_institution_isolation(client):

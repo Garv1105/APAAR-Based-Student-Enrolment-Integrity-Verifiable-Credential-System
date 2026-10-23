@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS upload_batches (
   status          text NOT NULL CHECK (status IN ('processing','completed','failed')),
   row_counts_json jsonb NOT NULL DEFAULT '{}',
   idempotency_key text,
+  request_hash    text NOT NULL,                -- SHA-256 of the uploaded content; key reuse with other content → 422
   created_by      text NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (institution_id, idempotency_key)

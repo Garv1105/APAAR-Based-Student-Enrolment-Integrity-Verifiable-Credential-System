@@ -1,4 +1,4 @@
-"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
+﻿"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
 import csv
 import io
 import uuid
@@ -47,8 +47,8 @@ async def validation_problem(_, exc: RequestValidationError):
     return problem(422, "Request validation failed", exc.errors())
 
 
-@app.exception_handler(ingest.PatchError)
-async def patch_problem(_, exc: ingest.PatchError):
+@app.exception_handler(ingest.ApiError)
+async def api_problem(_, exc: ingest.ApiError):
     return problem(exc.status, exc.detail)
 
 
@@ -79,8 +79,9 @@ async def create_batch(request: Request, idempotency_key: str | None = Header(No
                        user=Depends(require("institution_admin")), conn=Depends(get_conn)):
     ctype = request.headers.get("content-type", "")
     if ctype.startswith("application/json"):
+        raw = await request.body()
         try:
-            rows = [r.model_dump() for r in BatchJsonIn.model_validate_json(await request.body()).rows]
+            rows = [r.model_dump() for r in BatchJsonIn.model_validate_json(raw).rows]
         except ValidationError as e:
             return problem(422, "Invalid JSON batch", e.errors(include_url=False, include_context=False))
         channel = "api_json"
@@ -108,7 +109,7 @@ async def create_batch(request: Request, idempotency_key: str | None = Header(No
         return problem(422, "Batch has no rows")
     if len(rows) > MAX_ROWS:
         return problem(413, "Too many rows", f"Limit is {MAX_ROWS}")
-    out = ingest.process_batch(conn, user, rows, channel, idempotency_key, request)
+    out = ingest.process_batch(conn, user, rows, channel, idempotency_key, crypto.sha256_hex(raw), request)
     return JSONResponse(BatchOut(**out).model_dump(mode="json"), status_code=200 if out["replayed"] else 201)
 
 
