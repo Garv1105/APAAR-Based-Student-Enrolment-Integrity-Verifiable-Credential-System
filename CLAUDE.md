@@ -39,7 +39,7 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 ## Testing
 - Every endpoint has a wrong-role and a wrong-institution case (`tests/test_access_matrix.py`).
 - Don't weaken tests to pass; fix the code, or fix a test only when its expectation was demonstrably wrong (say so).
-- Security-relevant changes: run the `security-reviewer` agent (`.claude/agents/security-reviewer.md`) on the diff before finishing.
+- Run the `security-reviewer` agent (`.claude/agents/security-reviewer.md`) only when asked; after security-relevant changes, offer it in one line.
 - Show test output as evidence.
 
 ## Git
