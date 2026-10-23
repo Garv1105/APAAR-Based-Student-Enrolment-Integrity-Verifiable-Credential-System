@@ -3,7 +3,7 @@
 @config "../tailwind.config.js";
 
 @theme {
-  --font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --font-sans: "Manrope", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif;
 
   /* Redesign Design Tokens */
   --color-primary-blue: #2563ff;
