@@ -142,6 +142,54 @@ def public_from_multikey(mk: str) -> Ed25519PublicKey:
     return Ed25519PublicKey.from_public_bytes(raw[2:])
 
 
+ED25519_PRIV_PREFIX = b"\x80\x26"  # multicodec ed25519-priv
+
+
+def private_from_multikey(mk: str) -> Ed25519PrivateKey:
+    raw = from_multibase_b58(mk)
+    if raw[:2] != ED25519_PRIV_PREFIX or len(raw) != 34:
+        raise ValueError("not an Ed25519 private Multikey")
+    return Ed25519PrivateKey.from_private_bytes(raw[2:])
+
+
+# ---------- W3C Data Integrity, cryptosuite eddsa-jcs-2022 (vc-di-eddsa §3.3) ----------
+def _jcs_proof_config(document: dict, proof: dict) -> dict:
+    cfg = {k: v for k, v in proof.items() if k != "proofValue"}
+    if "@context" in document and "@context" not in cfg:
+        cfg["@context"] = document["@context"]
+    return cfg
+
+
+def _jcs_hash_data(document: dict, proof_config: dict) -> bytes:
+    unsecured = {k: v for k, v in document.items() if k != "proof"}
+    return hashlib.sha256(jcs(proof_config)).digest() + hashlib.sha256(jcs(unsecured)).digest()
+
+
+def eddsa_jcs_2022_sign(document: dict, proof_options: dict, priv: Ed25519PrivateKey) -> dict:
+    """Returns a copy of `document` with a DataIntegrityProof. proof_options: type, cryptosuite,
+    created, verificationMethod, proofPurpose. The document's @context is copied into the proof."""
+    cfg = _jcs_proof_config(document, proof_options)
+    sig = priv.sign(_jcs_hash_data(document, cfg))
+    return {**{k: v for k, v in document.items() if k != "proof"}, "proof": {**cfg, "proofValue": multibase_b58(sig)}}
+
+
+def eddsa_jcs_2022_verify(secured: dict, pub: Ed25519PublicKey) -> bool:
+    proof = secured.get("proof")
+    if not isinstance(proof, dict) or proof.get("type") != "DataIntegrityProof" or proof.get("cryptosuite") != "eddsa-jcs-2022":
+        return False
+    ctx = proof.get("@context")
+    if ctx is not None:  # document @context must start with the proof's @context, in order
+        doc_ctx = secured.get("@context") or []
+        if not isinstance(ctx, list) or list(doc_ctx[:len(ctx)]) != ctx:
+            return False
+    try:
+        sig = from_multibase_b58(proof["proofValue"])
+        pub.verify(sig, _jcs_hash_data(secured, _jcs_proof_config(secured, proof)))
+        return True
+    except Exception:  # bad encoding or InvalidSignature
+        return False
+
+
 def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
