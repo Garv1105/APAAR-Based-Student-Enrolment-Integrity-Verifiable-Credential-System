@@ -1,4 +1,4 @@
-"""Batch ingestion and enrolment updates: one transaction per batch (PRD §7, §9.2, §10).
+﻿"""Batch ingestion and enrolment updates: one transaction per batch (PRD Â§7, Â§9.2, Â§10).
 
 Concurrency (F11): counter rows for the institution's programmes are locked FOR UPDATE, and
 every APAAR blind index in the batch takes a transaction advisory lock, so two parallel batches
@@ -30,14 +30,16 @@ def batch_out(b: dict, replayed=False) -> dict:
             "created_at": b["created_at"], "counts": b["row_counts_json"], "replayed": replayed}
 
 
-def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: str | None, request=None) -> dict:
+def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: str | None, request_hash: str, request=None) -> dict:
     inst_id = user["institution_id"]
     with conn.transaction():
-        b = conn.execute("INSERT INTO upload_batches (institution_id, channel, status, idempotency_key, created_by) "
-                         "VALUES (%s,%s,'processing',%s,%s) ON CONFLICT (institution_id, idempotency_key) DO NOTHING RETURNING *",
-                         (inst_id, channel, idem_key, user["id"])).fetchone()
+        b = conn.execute("INSERT INTO upload_batches (institution_id, channel, status, idempotency_key, request_hash, created_by) "
+                         "VALUES (%s,%s,'processing',%s,%s,%s) ON CONFLICT (institution_id, idempotency_key) DO NOTHING RETURNING *",
+                         (inst_id, channel, idem_key, request_hash, user["id"])).fetchone()
         if b is None:  # Idempotency-Key replay: return the original batch, insert nothing
             prev = conn.execute("SELECT * FROM upload_batches WHERE institution_id=%s AND idempotency_key=%s", (inst_id, idem_key)).fetchone()
+            if prev["request_hash"] != request_hash:
+                raise ApiError(422, "Idempotency-Key was already used with a different request body")
             return batch_out(prev, replayed=True)
 
         inst = conn.execute("SELECT * FROM institutions WHERE id=%s", (inst_id,)).fetchone()
@@ -55,10 +57,9 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
         for bi in bis:
             conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (bi,))
         own, other = set(), set()
-        for r in conn.execute("SELECT s.apaar_bi, p.institution_id FROM enrolments e JOIN students s ON s.id=e.student_id "
-                              "JOIN programmes p ON p.id=e.programme_id "
-                              "WHERE s.apaar_bi = ANY(%s) AND e.academic_year=%s AND e.status='active'", (bis, year["code"])):
-            (own if r["institution_id"] == inst_id else other).add(r["apaar_bi"])
+        # RLS hides other institutions' rows; this definer function answers only own / someone-else
+        for r in conn.execute("SELECT * FROM active_enrolment_owners(%s, %s)", (bis, year["code"])):
+            (own if r["own"] else other).add(r["apaar_bi"])
 
         ctx = Ctx(institution_id=inst_id, institution_status=inst["status"],
                   year={"code": year["code"], "window_start": year["window_start"], "window_end": year["window_end"]},
@@ -66,7 +67,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                   own_active_bi=own, other_active_bi=other, counters=dict(counters))
         outcomes = validate_batch(rows, ctx)
 
-        issues = [(b["id"], i["row_no"], i["code"], i["severity"], i["field"], i["message"]) for o in outcomes for i in o["issues"]]
+        issues = [(b["id"], i["row_no"], i["code"], i["severity"], i["field"], Jsonb(i["params"])) for o in outcomes for i in o["issues"]]
         new_cases = []
         for o in outcomes:
             if not o["accepted"]:
@@ -85,7 +86,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                 new_cases.append(_open_case(conn, sid, year["code"]))
         if issues:
             with conn.cursor() as cur:
-                cur.executemany("INSERT INTO validation_issues (batch_id, row_no, code, severity, field, message) VALUES (%s,%s,%s,%s,%s,%s)", issues)
+                cur.executemany("INSERT INTO validation_issues (batch_id, row_no, code, severity, field, params) VALUES (%s,%s,%s,%s,%s,%s)", issues)
         for (pid, key), filled in ctx.counters.items():
             if counters.get((pid, key)) != filled:
                 conn.execute("UPDATE programme_category_counters SET filled=%s WHERE programme_id=%s AND academic_year=%s AND category_code=%s",
@@ -102,33 +103,29 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
 
 
 def _student_id(conn, d: dict, o: dict) -> int:
-    if o["bi"]:
-        s = conn.execute("SELECT id FROM students WHERE apaar_bi=%s", (o["bi"],)).fetchone()
-        if s:
+    if o["bi"]:  # the person row is shared across institutions; RLS hides it until we enrol them
+        s = conn.execute("SELECT student_id_by_bi(%s) id", (o["bi"],)).fetchone()
+        if s["id"]:
             return s["id"]
-    return conn.execute(
-        "INSERT INTO students (apaar_enc, apaar_bi, apaar_masked, apaar_status, provisional_id, name_enc, dob_enc, "
-        "guardian_name_enc, bi_dob_bucket, bi_name_phon) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-        (crypto.encrypt("apaar", d["apaar_id"]) if o["bi"] else None, o["bi"],
+    sid = conn.execute("SELECT nextval('students_id_seq') id").fetchone()["id"]  # id first: it is part of the AAD
+    enc = lambda col, v: crypto.encrypt("students", col, sid, v)  # noqa: E731
+    conn.execute(
+        "INSERT INTO students (id, apaar_enc, apaar_bi, apaar_masked, apaar_status, provisional_id, name_enc, dob_enc, "
+        "guardian_name_enc, bi_dob_bucket, bi_name_phon) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (sid, enc("apaar", d["apaar_id"]) if o["bi"] else None, o["bi"],
          crypto.mask_apaar(d["apaar_id"]) if o["bi"] else None, o["apaar_status"],
          None if o["bi"] else f"PROV-{secrets.token_hex(6).upper()}",
-         crypto.encrypt("name", d["student_name"]), crypto.encrypt("dob", d["dob"].isoformat()),
-         crypto.encrypt("guardian_name", d["guardian_name"]) if d["guardian_name"] else None,
-         crypto.dob_bucket(d["dob"].isoformat()), crypto.name_phonetic(d["student_name"]))).fetchone()["id"]
+         enc("name", d["student_name"]), enc("dob", d["dob"].isoformat()),
+         enc("guardian_name", d["guardian_name"]) if d["guardian_name"] else None,
+         crypto.dob_bucket(d["dob"].isoformat()), crypto.name_phonetic(d["student_name"])))
+    return sid
 
 
 def _open_case(conn, student_id: int, year: str) -> int:
-    ids = [r["id"] for r in conn.execute("SELECT id FROM enrolments WHERE student_id=%s AND academic_year=%s AND status='active' ORDER BY id",
-                                         (student_id, year))]
-    case = conn.execute("SELECT id FROM duplicate_cases WHERE student_id=%s AND status IN ('flagged','under_investigation')", (student_id,)).fetchone()
-    if case:
-        conn.execute("UPDATE duplicate_cases SET enrolment_ids=%s WHERE id=%s", (ids, case["id"]))
-        return case["id"]
-    return conn.execute("INSERT INTO duplicate_cases (student_id, enrolment_ids, status) VALUES (%s,%s,'flagged') RETURNING id",
-                        (student_id, ids)).fetchone()["id"]
+    return conn.execute("SELECT open_duplicate_case(%s, %s) id", (student_id, year)).fetchone()["id"]
 
 
-class PatchError(Exception):
+class ApiError(Exception):
     def __init__(self, status: int, detail: str):
         self.status, self.detail = status, detail
 
@@ -138,10 +135,10 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
         e = conn.execute("SELECT e.* FROM enrolments e JOIN programmes p ON p.id=e.programme_id "
                          "WHERE e.id=%s AND p.institution_id=%s FOR UPDATE OF e", (enrolment_id, user["institution_id"])).fetchone()
         if e is None:
-            raise PatchError(404, "Enrolment not found")  # same answer for "not yours" (no oracle)
+            raise ApiError(404, "Enrolment not found")  # same answer for "not yours" (no oracle)
         new_status = body.get("status") or e["status"]
         if e["status"] != "active" and new_status == "active":
-            raise PatchError(422, "Re-admission must go through a new upload so it is validated against intake")
+            raise ApiError(422, "Re-admission must go through a new upload so it is validated against intake")
         flags = []
         year = conn.execute("SELECT * FROM academic_years WHERE code=%s", (e["academic_year"],)).fetchone()
         if datetime.now(timezone.utc) > year["deadline"]:

@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS upload_batches (
   status          text NOT NULL CHECK (status IN ('processing','completed','failed')),
   row_counts_json jsonb NOT NULL DEFAULT '{}',
   idempotency_key text,
+  request_hash    text NOT NULL,                -- SHA-256 of the uploaded content; key reuse with other content → 422
   created_by      text NOT NULL,
   created_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (institution_id, idempotency_key)
@@ -119,7 +120,7 @@ CREATE TABLE IF NOT EXISTS validation_issues (
   code      text   NOT NULL,
   severity  text   NOT NULL CHECK (severity IN ('error','warning','flag')),
   field     text,
-  message   text   NOT NULL
+  params    jsonb  NOT NULL DEFAULT '{}'      -- message rendered from i18n/<locale>.json on read
 );
 CREATE INDEX IF NOT EXISTS validation_issues_batch_idx ON validation_issues (batch_id);
 
@@ -197,7 +198,7 @@ CREATE TABLE IF NOT EXISTS ledger_entries (      -- D1 hash chain
   payload_hash   text NOT NULL,
   prev_hash      text NOT NULL,
   entry_hash     text NOT NULL,
-  ts             timestamptz NOT NULL DEFAULT now()
+  ts             text NOT NULL                  -- UTC ISO-8601 exactly as hashed
 );
 
 CREATE TABLE IF NOT EXISTS ledger_checkpoints (

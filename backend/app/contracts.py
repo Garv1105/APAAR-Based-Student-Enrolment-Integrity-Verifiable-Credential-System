@@ -63,7 +63,8 @@ class Issue(BaseModel):
     code: str
     severity: Severity
     field: str | None = None
-    message: str
+    message: str = Field(description="rendered from i18n/<locale>.json for the requested locale")
+    fix_hint: str
 
 
 class BatchOut(BaseModel):

@@ -47,6 +47,9 @@ def seed(conn) -> None:
 
 def main(name: str = db.DB_NAME) -> None:
     db.create_database(name)
+    if "--reset" in sys.argv:  # demo DB only: rebuild schema so it tracks schema.sql
+        with db.connect(name) as conn:
+            conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
     db.load_schema(name)
     with db.connect(name) as conn:
         if "--reset" in sys.argv or not conn.execute("select 1 from institutions limit 1").fetchone():

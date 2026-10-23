@@ -43,7 +43,10 @@ def test_upload_clean_file_stores_encrypted(client, dbconn):
     c = r.json()["counts"]
     n = sum(1 for _ in csv.DictReader(open(SYN / "A1.csv", encoding="utf-8")))
     assert c["rows"] == n and c["accepted"] == n and c["rejected"] == 0 and c["warnings"] == 2
-    raw = dbconn.execute("SELECT apaar_enc, name_enc, apaar_bi, apaar_masked FROM students").fetchall()
+    raw = dbconn.execute("SELECT id, apaar_enc, name_enc, apaar_bi, apaar_masked FROM students").fetchall()
+    from app import crypto
+    s = raw[0]
+    assert len(crypto.decrypt("students", "name", s["id"], s["name_enc"])) > 0  # decrypts only with its own row id
     first = next(csv.DictReader(open(SYN / "A1.csv", encoding="utf-8")))
     blob = b"".join(bytes(x["apaar_enc"] or b"") + bytes(x["name_enc"]) for x in raw)
     assert first["apaar_id"].encode() not in blob and first["student_name"].encode() not in blob
@@ -56,6 +59,9 @@ def test_idempotency_key_replays_without_duplicating(client, dbconn):
     assert r1.status_code == 201 and r2.status_code == 200 and r2.json()["replayed"]
     assert r1.json()["batch_id"] == r2.json()["batch_id"]
     assert dbconn.execute("SELECT count(*) n FROM enrolments").fetchone()["n"] == r1.json()["counts"]["accepted"]
+    r3 = upload(client, "inst-a", "C1.csv", key="k1")  # same key, different content
+    assert r3.status_code == 422 and r3.headers["content-type"] == "application/problem+json"
+    assert upload(client, "inst-b", "A1.csv", key="k1").status_code == 201  # keys are per institution
 
 
 def test_institution_isolation(client):
@@ -86,7 +92,7 @@ def test_error_report_and_dashboards(client):
     bid = upload(client, "inst-b", "B1.csv").json()["batch_id"]
     hb = login(client, "inst-b")
     report = client.get(f"/v1/batches/{bid}/report.csv", headers=hb)
-    assert report.status_code == 200 and report.text.startswith("row_no,code,severity,field,message")
+    assert report.status_code == 200 and report.text.startswith("row_no,code,severity,field,message,fix_hint")
     codes = {r["code"] for r in csv.DictReader(io.StringIO(report.text))}
     assert {"E101", "E102", "E103", "E201", "E203", "E301", "E302", "E303", "E401"} <= codes
     d = client.get("/v1/dashboard/institution", headers=hb).json()

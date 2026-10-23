@@ -51,15 +51,18 @@ def test_jcs_rfc8785_section_3_2_2_example():
     assert rfc8785.dumps(json.loads(src)).decode() == expected
 
 
-def test_field_encryption_roundtrip_and_column_binding():
-    blob = crypto.encrypt("name", "Asha R")
-    assert crypto.decrypt("name", blob) == "Asha R"
+def test_field_encryption_roundtrip_and_row_column_binding():
+    from cryptography.exceptions import InvalidTag
+    blob = crypto.encrypt("students", "name", 7, "Asha R")
+    assert crypto.decrypt("students", "name", 7, blob) == "Asha R"
     assert b"Asha" not in blob
-    try:
-        crypto.decrypt("dob", blob)
-        raise AssertionError("ciphertext moved to another column must not decrypt")
-    except Exception as e:
-        assert type(e).__name__ == "InvalidTag"
+    assert crypto.encrypt("students", "name", 7, "Asha R") != blob  # fresh nonce each time
+    for moved in (("students", "dob", 7), ("students", "name", 8), ("enrolments", "name", 7)):
+        try:
+            crypto.decrypt(*moved, blob)
+            raise AssertionError(f"ciphertext moved to {moved} must not decrypt")
+        except InvalidTag:
+            pass
 
 
 def test_blind_indexes_are_deterministic_and_key_separated():

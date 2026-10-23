@@ -11,35 +11,17 @@ from datetime import date
 from rapidfuzz import fuzz
 
 from . import crypto
+from .codes import severity
 from .contracts import APAAR_REASONS, REQUIRED_COLUMNS
 
-CATALOGUE = {  # code: (name, severity, English template)
-    "E001": ("SCHEMA_INVALID", "error", "Field '{field}' is missing or not valid: {detail}"),
-    "E101": ("MISSING_APAAR_NO_REASON", "error", "APAAR ID is blank and no reason code was given (use REFUSED, NOT_GENERATED or PENDING)"),
-    "E101W": ("MISSING_APAAR_WITH_REASON", "warning", "No APAAR ID ({detail}). Row accepted with provisional ID and counted toward intake"),
-    "E102": ("INVALID_APAAR_FORMAT", "error", "APAAR ID must be exactly 12 digits"),
-    "E103": ("APAAR_NOT_FOUND_IN_REGISTRY", "error", "APAAR ID not found in the APAAR registry (MOCK)"),
-    "E104": ("APAAR_DETAILS_MISMATCH", "warning", "{detail} does not match the APAAR registry (MOCK) after normalisation"),
-    "E201": ("DUPLICATE_IN_FILE", "error", "Same student already appears in row {detail} of this file"),
-    "E202": ("DUPLICATE_IN_INSTITUTION", "error", "Student already has an active enrolment at this institution for this year; use PATCH to correct it"),
-    "E203": ("CROSS_INSTITUTION_DUPLICATE", "flag", "A record in this batch needs AICTE review"),
-    "E301": ("EXCESS_OVER_APPROVED_INTAKE", "flag", "Regular seats filled ({detail}) exceed AICTE approved intake"),
-    "E302": ("CATEGORY_CAP_EXCEEDED", "flag", "Supernumerary cap exceeded for {detail}"),
-    "E303": ("INTAKE_DECLARATION_MISMATCH", "flag", "Declared intake {detail} differs from AICTE registry; registry value is used"),
-    "E304": ("INSTITUTION_NOT_APPROVED", "error", "{detail}"),
-    "E401": ("INCONSISTENT_CATEGORY", "error", "{detail}"),
-    "E402": ("IMPLAUSIBLE_AGE", "warning", "Age {detail} at admission is outside 16-35"),
-    "E403": ("ADMISSION_DATE_OUTSIDE_WINDOW", "warning", "Admission date {detail} is outside the admission window"),
-    "E404": ("LATERAL_ENTRY_YEAR_MISMATCH", "error", "Lateral entry is only valid in year 2 (got year {detail})"),
-    "E501": ("POST_DEADLINE_MUTATION", "flag", "Change made after the submission deadline; recorded in the seat ledger"),
-}
 NAME_MATCH_THRESHOLD = 85  # rapidfuzz token_sort_ratio on normalised names
 AGE_RANGE = (16, 35)
 
 
 def issue(row_no: int, code: str, field_: str | None = None, detail: str = "") -> dict:
-    _, sev, tmpl = CATALOGUE[code]
-    return {"row_no": row_no, "code": code, "severity": sev, "field": field_, "message": tmpl.format(detail=detail, field=field_)}
+    """Issues carry code + params only; text is rendered from i18n templates on read."""
+    return {"row_no": row_no, "code": code, "severity": severity(code), "field": field_,
+            "params": {"field": field_ or "", "detail": detail}}
 
 
 @dataclass

@@ -1,4 +1,4 @@
-"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
+﻿"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
 import csv
 import io
 import uuid
@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, crypto, dashboards, db, ingest, ledger
+from . import auth, crypto, dashboards, db, i18n, ingest, ledger
 from .auth import require
 from .contracts import (AicteDashboard, BatchJsonIn, BatchOut, EnrolmentOut, EnrolmentPatch, InstitutionDashboard, IssuesPage,
                         LoginIn, LoginOut, ProgrammeSeats)
@@ -47,14 +47,15 @@ async def validation_problem(_, exc: RequestValidationError):
     return problem(422, "Request validation failed", exc.errors())
 
 
-@app.exception_handler(ingest.PatchError)
-async def patch_problem(_, exc: ingest.PatchError):
+@app.exception_handler(ingest.ApiError)
+async def api_problem(_, exc: ingest.ApiError):
     return problem(exc.status, exc.detail)
 
 
-def get_conn():
-    # ponytail: connection per request; add psycopg_pool if load testing shows connect cost matters
-    with db.connect() as conn:
+def get_conn(user=Depends(auth.optional_user)):
+    """Non-owner app_user connection with RLS settings for the caller.
+    ponytail: connection per request; add psycopg_pool if load testing shows connect cost matters"""
+    with db.app_connect(user) as conn:
         yield conn
 
 
@@ -79,8 +80,9 @@ async def create_batch(request: Request, idempotency_key: str | None = Header(No
                        user=Depends(require("institution_admin")), conn=Depends(get_conn)):
     ctype = request.headers.get("content-type", "")
     if ctype.startswith("application/json"):
+        raw = await request.body()
         try:
-            rows = [r.model_dump() for r in BatchJsonIn.model_validate_json(await request.body()).rows]
+            rows = [r.model_dump() for r in BatchJsonIn.model_validate_json(raw).rows]
         except ValidationError as e:
             return problem(422, "Invalid JSON batch", e.errors(include_url=False, include_context=False))
         channel = "api_json"
@@ -108,7 +110,7 @@ async def create_batch(request: Request, idempotency_key: str | None = Header(No
         return problem(422, "Batch has no rows")
     if len(rows) > MAX_ROWS:
         return problem(413, "Too many rows", f"Limit is {MAX_ROWS}")
-    out = ingest.process_batch(conn, user, rows, channel, idempotency_key, request)
+    out = ingest.process_batch(conn, user, rows, channel, idempotency_key, crypto.sha256_hex(raw), request)
     return JSONResponse(BatchOut(**out).model_dump(mode="json"), status_code=200 if out["replayed"] else 201)
 
 
@@ -127,14 +129,19 @@ def get_batch(batch_id: int, user=Depends(require(*READERS)), conn=Depends(get_c
     return ingest.batch_out(_own_batch(conn, user, batch_id))
 
 
+def _rendered(rows, lang):
+    return [{**r, **i18n.render(r["code"], r["params"], lang)} for r in rows]
+
+
 @app.get("/v1/batches/{batch_id}/issues", response_model=IssuesPage)
-def get_issues(batch_id: int, cursor: int = 0, limit: int = 200, user=Depends(require(*READERS)), conn=Depends(get_conn)):
+def get_issues(batch_id: int, cursor: int = 0, limit: int = 200, lang: str = "en",
+               user=Depends(require(*READERS)), conn=Depends(get_conn)):
     _own_batch(conn, user, batch_id)
     limit = min(max(limit, 1), 1000)
-    rows = conn.execute("SELECT id, row_no, code, severity, field, message FROM validation_issues WHERE batch_id=%s AND id > %s "
+    rows = conn.execute("SELECT id, row_no, code, severity, field, params FROM validation_issues WHERE batch_id=%s AND id > %s "
                         "ORDER BY id LIMIT %s", (batch_id, cursor, limit + 1)).fetchall()
     nxt = rows[limit - 1]["id"] if len(rows) > limit else None
-    return {"items": rows[:limit], "next_cursor": nxt}
+    return {"items": _rendered(rows[:limit], lang), "next_cursor": nxt}
 
 
 def csv_safe(v) -> str:
@@ -153,13 +160,14 @@ def csv_response(header: list[str], rows, filename: str) -> Response:
 
 
 @app.get("/v1/batches/{batch_id}/report.csv")
-def batch_report(batch_id: int, request: Request, user=Depends(require(*READERS)), conn=Depends(get_conn)):
+def batch_report(batch_id: int, request: Request, lang: str = "en", user=Depends(require(*READERS)), conn=Depends(get_conn)):
     _own_batch(conn, user, batch_id)
-    rows = conn.execute("SELECT row_no, code, severity, field, message FROM validation_issues WHERE batch_id=%s ORDER BY row_no, id",
+    rows = conn.execute("SELECT row_no, code, severity, field, params FROM validation_issues WHERE batch_id=%s ORDER BY row_no, id",
                         (batch_id,)).fetchall()
     auth.audit(conn, user, "report.export", "upload_batch", batch_id, request=request)
     conn.commit()
-    return csv_response(["row_no", "code", "severity", "field", "message"], rows, f"batch-{batch_id}-issues.csv")
+    return csv_response(["row_no", "code", "severity", "field", "message", "fix_hint"], _rendered(rows, lang),
+                        f"batch-{batch_id}-issues.csv")
 
 
 # ---------- enrolments ----------

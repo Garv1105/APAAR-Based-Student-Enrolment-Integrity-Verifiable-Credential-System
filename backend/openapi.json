@@ -19,7 +19,12 @@
        }
       }
      }
-    }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
    }
   },
   "/v1/auth/login": {
@@ -57,7 +62,12 @@
        }
       }
      }
-    }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
    }
   },
   "/v1/batches": {
@@ -194,6 +204,16 @@
        "default": 200,
        "title": "Limit"
       }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "en",
+       "title": "Lang"
+      }
      }
     ],
     "responses": {
@@ -237,6 +257,16 @@
       "schema": {
        "type": "integer",
        "title": "Batch Id"
+      }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "en",
+       "title": "Lang"
       }
      }
     ],
@@ -534,7 +564,12 @@
        }
       }
      }
-    }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
    }
   }
  },
@@ -892,7 +927,12 @@
      },
      "message": {
       "type": "string",
-      "title": "Message"
+      "title": "Message",
+      "description": "rendered from i18n/<locale>.json for the requested locale"
+     },
+     "fix_hint": {
+      "type": "string",
+      "title": "Fix Hint"
      }
     },
     "type": "object",
@@ -900,7 +940,8 @@
      "row_no",
      "code",
      "severity",
-     "message"
+     "message",
+     "fix_hint"
     ],
     "title": "Issue"
    },

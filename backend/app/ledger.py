@@ -1,13 +1,12 @@
 """D1 Seat Ledger: hash-chained enrolment events + AICTE-signed head checkpoints (PRD §19 D1).
 Not a blockchain: append-only hashes, one signer.
 
-entry_hash   = SHA256(prev_hash | seq | institution_id | event_type | entity_id | payload_hash | ts)
-payload_hash = SHA256(JCS(enrolment state after the event))
-verify() checks the chain, the latest checkpoint signature, and that every enrolment row
-matches the payload of its latest ledger event (catches silent edits, inserts and deletes).
+Appends go through the SECURITY DEFINER function ledger_append() in rls.sql, which computes
+entry_hash = SHA256(prev_hash | seq | institution_id | event_type | entity_id | payload_hash | ts).
+payload_hash = SHA256(JCS(enrolment state after the event)), computed here.
+verify() recomputes the chain, checks the latest checkpoint signature, and checks every
+enrolment row against the payload of its latest ledger event (catches silent edits, inserts, deletes).
 """
-from datetime import datetime, timezone
-
 from . import crypto
 
 GENESIS = "0" * 64
@@ -24,22 +23,8 @@ def _state_hash(e: dict) -> str:
     return crypto.sha256_hex(crypto.jcs(enrolment_state(e)))
 
 
-def _entry_hash(prev, seq, inst, event, entity, payload_hash, ts):
-    return crypto.sha256_hex(f"{prev}|{seq}|{inst}|{event}|{entity}|{payload_hash}|{ts}".encode())
-
-
 def append(conn, institution_id: str, event_type: str, enrolment: dict) -> None:
-    # ponytail: one global advisory lock serialises ledger writes; shard per institution if throughput matters
-    conn.execute("SELECT pg_advisory_xact_lock(42)")
-    last = conn.execute("SELECT seq, entry_hash FROM ledger_entries ORDER BY seq DESC LIMIT 1").fetchone()
-    seq = (last["seq"] + 1) if last else 1
-    prev = last["entry_hash"] if last else GENESIS
-    ts = datetime.now(timezone.utc).isoformat()
-    ph = _state_hash(enrolment)
-    conn.execute("INSERT INTO ledger_entries (seq, institution_id, event_type, entity_id, payload_hash, prev_hash, entry_hash, ts) "
-                 "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                 (seq, institution_id, event_type, enrolment["id"], ph, prev,
-                  _entry_hash(prev, seq, institution_id, event_type, enrolment["id"], ph, ts), ts))
+    conn.execute("SELECT ledger_append(%s, %s, %s, %s)", (institution_id, event_type, enrolment["id"], _state_hash(enrolment)))
 
 
 def checkpoint(conn) -> dict | None:
@@ -52,14 +37,15 @@ def checkpoint(conn) -> dict | None:
 
 
 def verify(conn) -> dict:
+    """Needs a regulator (or admin) connection: it reads every ledger entry and enrolment."""
     problems, prev, latest = [], GENESIS, {}
     rows = conn.execute("SELECT * FROM ledger_entries ORDER BY seq").fetchall()
     for i, r in enumerate(rows, start=1):
-        ts = r["ts"].astimezone(timezone.utc).isoformat()
         if r["seq"] != i:
             problems.append(f"gap or reorder at seq {r['seq']}")
-        if r["prev_hash"] != prev or r["entry_hash"] != _entry_hash(prev, r["seq"], r["institution_id"], r["event_type"],
-                                                                     r["entity_id"], r["payload_hash"], ts):
+        expect = crypto.sha256_hex("|".join(map(str, (prev, r["seq"], r["institution_id"], r["event_type"], r["entity_id"],
+                                                       r["payload_hash"], r["ts"]))).encode())
+        if r["prev_hash"] != prev or r["entry_hash"] != expect:
             problems.append(f"hash mismatch at seq {r['seq']}")
         prev = r["entry_hash"]
         latest[r["entity_id"]] = r["payload_hash"]
