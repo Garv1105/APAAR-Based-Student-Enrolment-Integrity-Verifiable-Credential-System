@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { ApiError, getJson, sendJson, type S } from "../api/client";
+import { useEffect, useState } from "react";
+import { ApiError, approveWithPasskey, getJson, sendJson, type S } from "../api/client";
+import { passkeyError } from "../webauthn";
 import { CertificateButton, CredentialCard, downloadJson } from "../credentials";
 import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, Table, Td, Updated, usePoll } from "../ui";
 
@@ -7,7 +8,9 @@ const ACTION_LABEL: Record<string, string> = {
   "credential.verify": "Verified a credential", "credential.issue": "Issued a credential", "credential.read": "Viewed your credentials",
   "credential.certificate": "Opened a certificate", "consent.request": "Requested your consent", "consent.grant": "Consent granted",
   "consent.deny": "Consent denied", "consent.revoke": "Consent revoked", "enrolment.read": "Looked up your enrolment",
-  "enrolment.update": "Updated your enrolment",
+  "enrolment.update": "Updated your enrolment", "activation_code.issue": "Issued a passkey activation code",
+  "passkey.register": "Registered a passkey", "passkey.sign_in": "Signed in with a passkey", "passkey.revoke": "Revoked a passkey",
+  "case.unmask": "Unmasked your record for a duplicate case",
 };
 
 export default function StudentHome() {
@@ -26,13 +29,21 @@ export default function StudentHome() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">My academic record</h1>
+          <h1 className="text-2xl font-semibold">{me.data.viewer === "guardian" ? "Guardian view: student's academic record" : "My academic record"}</h1>
           <p className="text-sm text-slate-500">
             APAAR {me.data.apaar_masked ?? `not linked (provisional ${me.data.provisional_id})`} · status {me.data.apaar_status}
           </p>
         </div>
         <Updated at={consents.updatedAt} />
       </div>
+
+      {me.data.passkey_cooldown_until && (
+        <div role="alert" className="rounded-lg border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
+          A new passkey was registered for this account. As a safety measure it can approve consent requests only from
+          {" "}{fmtTime(me.data.passkey_cooldown_until)}. If this wasn't you, contact your institution and AICTE: every activation
+          code, with its reason, is listed under "Who accessed my data".
+        </div>
+      )}
 
       <Card title="Enrolments">
         {me.data.enrolments.length === 0 ? <Empty>No enrolments.</Empty> : (
@@ -99,42 +110,46 @@ export default function StudentHome() {
 }
 
 function PendingConsent({ c, onDone }: { c: S["ConsentOut"]; onDone: () => void }) {
+  const [demo, setDemo] = useState(false);
   const [otp, setOtp] = useState("");
   const [guardian, setGuardian] = useState(false);
   const [gotp, setGotp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => { getJson<S["AuthConfig"]>("/v1/auth/config").then((x) => setDemo(x.demo_mode)).catch(() => {}); }, []);
 
-  async function act(path: string, body?: unknown) {
+  async function act(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
-    try { await sendJson(path, "POST", body); onDone(); } catch (e) { setError(e instanceof ApiError ? e.text : "Request failed"); } finally { setBusy(false); }
+    try { await fn(); onDone(); } catch (e) { setError(passkeyError(e) ?? (e instanceof ApiError ? e.text : "Request failed")); } finally { setBusy(false); }
   }
 
   return (
     <div className="rounded-xl border border-flag/30 bg-flag-bg/40 p-4">
       <p className="text-sm"><strong>{c.requester}</strong> asks to see <strong>{c.fields.join(", ")}</strong></p>
       <p className="mt-1 text-sm text-slate-600">Purpose: {c.purpose} · until {fmtTime(c.expires_at)}</p>
-      <p className="mt-1 text-xs text-slate-500">They will receive a signed credential with only these fields. You can revoke it at any time.</p>
+      <p className="mt-1 text-xs text-slate-500">They will receive a signed credential with only these fields. You can revoke it at any time.
+        Your passkey signs exactly this request.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="block text-xs text-slate-600">OTP (MOCK: 123456)</span>
-          <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" />
-        </label>
-        <label className="flex items-center gap-2 text-xs text-slate-600">
-          <input type="checkbox" checked={guardian} onChange={(e) => setGuardian(e.target.checked)} className="accent-brand-600" />
-          I am under 18: my guardian approves
-        </label>
-        {guardian && (
-          <label className="text-sm">
-            <span className="block text-xs text-slate-600">Guardian OTP (MOCK)</span>
-            <input value={gotp} onChange={(e) => setGotp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" />
-          </label>
-        )}
-        <Button disabled={busy || !otp} onClick={() => act(`/v1/consents/${c.id}/approve`,
-          { otp, approved_by: guardian ? "guardian" : "student", guardian_otp: guardian ? gotp : null })}>Approve</Button>
-        <Button variant="secondary" disabled={busy} onClick={() => act(`/v1/consents/${c.id}/deny`)}>Deny</Button>
+        <Button disabled={busy} onClick={() => act(() => approveWithPasskey(c.id))}>{busy ? "Waiting for passkey…" : "Approve with passkey"}</Button>
+        <Button variant="secondary" disabled={busy} onClick={() => act(() => sendJson(`/v1/consents/${c.id}/deny`, "POST"))}>Deny</Button>
       </div>
+      {demo && (
+        <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-amber-900">Demo fallback: approve with MOCK OTP (DEMO_MODE)</summary>
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            <label className="text-sm"><span className="block text-xs text-slate-600">OTP (MOCK: 123456)</span>
+              <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" /></label>
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <input type="checkbox" checked={guardian} onChange={(e) => setGuardian(e.target.checked)} className="accent-brand-600" />
+              Under 18: guardian approves (self-asserted, MOCK)</label>
+            {guardian && <label className="text-sm"><span className="block text-xs text-slate-600">Guardian OTP (MOCK)</span>
+              <input value={gotp} onChange={(e) => setGotp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" /></label>}
+            <Button variant="secondary" disabled={busy || !otp} onClick={() => act(() => sendJson(`/v1/consents/${c.id}/approve`, "POST",
+              { otp, approved_by: guardian ? "guardian" : "student", guardian_otp: guardian ? gotp : null }))}>Approve (MOCK)</Button>
+          </div>
+        </details>
+      )}
       {error && <div className="mt-2"><ErrorNote>{error}</ErrorNote></div>}
     </div>
   );

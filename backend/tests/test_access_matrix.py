@@ -45,6 +45,18 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/cases", {}, expect({"inst-a": 200, "inst-b": 200} | REG)),
         ("POST", "/v1/cases/999999/resolve", {"json": {"status": "false_positive", "note": "test"}}, expect({"aicte": 404})),
         ("POST", "/v1/cases/999999/unmask", {"json": {"reason": "access matrix test"}}, expect({"aicte": 404})),
+        # passkeys (P1): sign-in endpoints are public and anonymous (a token sent along is ignored)
+        ("GET", "/v1/auth/config", {}, {u: 200 for u in USERS}),
+        ("POST", "/v1/auth/activate", {"json": {"apaar_id": "not-an-apaar", "code": "AAAA-AAAA-AA"}}, {u: 401 for u in USERS}),
+        ("POST", "/v1/auth/passkey/options", {}, {u: 200 for u in USERS}),
+        ("POST", "/v1/auth/passkey/verify", {"json": {"credential": {}}}, {u: 400 for u in USERS}),
+        ("POST", "/v1/passkeys/register/options", {}, expect({})),       # setup sessions only
+        ("POST", "/v1/passkeys/register/verify", {"json": {"credential": {}}}, expect({})),
+        ("GET", "/v1/passkeys", {}, expect({"student": 200})),
+        ("DELETE", "/v1/passkeys/999999", {}, expect({"student": 404})),
+        ("POST", f"/v1/enrolments/{eid}/activation-code", {"json": {"kind": "student", "reason": "access matrix test"}},
+         expect(INST, 404)),
+        ("POST", "/v1/consents/999999/approve/options", {}, expect({"student": 404})),
         # webhooks (Req 7): institutions manage their own; 404 for anything that isn't theirs (public IP literal: no DNS)
         ("POST", "/v1/webhooks", {"json": {"url": "https://93.184.216.34/hook", "events": ["batch.validated"]}},
          expect({"inst-a": 201, "inst-b": 201})),

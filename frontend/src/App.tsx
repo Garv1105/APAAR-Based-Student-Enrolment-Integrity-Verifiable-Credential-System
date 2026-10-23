@@ -24,12 +24,12 @@ function useHash() {
 
 const HOME: Record<Role, string> = {
   institution_admin: "/inst", aicte_officer: "/aicte", auditor: "/aicte",
-  verifier: "/verifier", university_registrar: "/registrar", student: "/student",
+  verifier: "/verifier", university_registrar: "/registrar", student: "/student", guardian: "/student",
 };
 const CAN_VERIFY: Role[] = ["institution_admin", "aicte_officer", "auditor", "university_registrar"];
 const ROLE_LABEL: Record<Role, string> = {
   institution_admin: "Institution", aicte_officer: "AICTE officer", auditor: "Auditor (read-only)",
-  verifier: "Verifier", university_registrar: "University registrar", student: "Student",
+  verifier: "Verifier", university_registrar: "University registrar", student: "Student", guardian: "Guardian",
 };
 
 export default function App() {
@@ -45,7 +45,7 @@ export default function App() {
   const cert = hash.match(/^\/certificate\?id=(.+)$/);
   const r = session.role;
   let page;
-  if (cert && ["student", "institution_admin", "university_registrar"].includes(r)) page = <Certificate id={decodeURIComponent(cert[1])} />;
+  if (cert && ["student", "guardian", "institution_admin", "university_registrar"].includes(r)) page = <Certificate id={decodeURIComponent(cert[1])} />;
   else if (hash === "/verify" && CAN_VERIFY.includes(r)) page = <VerifyTool allowForgedDemo={r === "aicte_officer" || r === "auditor"} />;
   else if (r === "institution_admin" && batch) page = <BatchDetail id={Number(batch[1])} />;
   else if (r === "institution_admin") page = <InstitutionHome />;

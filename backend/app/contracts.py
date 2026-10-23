@@ -30,7 +30,7 @@ REQUIRED_COLUMNS = [c for c in CSV_COLUMNS if c not in ("apaar_id", "apaar_reaso
 APAAR_REASONS = ("REFUSED", "NOT_GENERATED", "PENDING")
 
 Severity = Literal["error", "warning", "flag"]
-Role = Literal["institution_admin", "aicte_officer", "auditor", "verifier", "student", "university_registrar"]
+Role = Literal["institution_admin", "aicte_officer", "auditor", "verifier", "student", "guardian", "university_registrar"]
 
 
 class StudentRow(BaseModel):
@@ -181,6 +181,7 @@ class ComplianceRow(BaseModel):
     status: str
     last_upload: datetime | None
     batches: int
+    activation_reissues: int = Field(0, description="activation codes reissued (insider-impersonation signal, P1)")
 
 
 class AicteDashboard(BaseModel):
@@ -287,9 +288,11 @@ class ConsentOut(BaseModel):
 
 
 class ConsentApprove(BaseModel):
-    otp: str = Field(description="MOCK OTP; demo value is 123456")
-    approved_by: Literal["student", "guardian"] = "student"
-    guardian_otp: str | None = Field(None, description="required when the student is under 18 (MOCK OTP 123456)")
+    credential: dict | None = Field(None, description="WebAuthn assertion (PublicKeyCredential JSON) answering "
+                                    "POST /v1/consents/{id}/approve/options")
+    otp: str | None = Field(None, description="DEMO_MODE only: MOCK OTP 123456")
+    approved_by: Literal["student", "guardian"] = Field("student", description="DEMO_MODE only")
+    guardian_otp: str | None = Field(None, description="DEMO_MODE only: for students under 18 (MOCK OTP 123456)")
 
 
 class ConsentCredentialOut(BaseModel):
@@ -310,6 +313,10 @@ class StudentProfile(BaseModel):
     provisional_id: str | None
     apaar_status: str
     enrolments: list[StudentEnrolment]
+    passkey_cooldown_until: datetime | None = Field(None, description="a new passkey (first activation: "
+                                                    "PASSKEY_FIRST_COOLDOWN_HOURS; reissued code: 24 h) can't "
+                                                    "approve consent until then; the portal shows a notice")
+    viewer: Literal["student", "guardian"] = "student"
 
 
 class VerifyIn(BaseModel):
@@ -456,3 +463,50 @@ class WebhookDelivery(BaseModel):
 class WebhookDeliveriesPage(BaseModel):
     items: list[WebhookDelivery]
     next_cursor: int | None
+
+
+# ---------- passkeys (P1) ----------
+class AuthConfig(BaseModel):
+    demo_mode: bool = Field(description="true: the MOCK APAAR + DOB sign-in and OTP consent approval are enabled")
+    rp_id: str
+
+
+class ActivateIn(BaseModel):
+    apaar_id: str
+    code: str = Field(max_length=20, description="one-time activation code from the institution, e.g. 7K3M-Q9TB-2X")
+
+
+class SetupOut(BaseModel):
+    setup_token: str = Field(description="15-minute session that can only register a passkey")
+    kind: Literal["student", "guardian"]
+    reissue: bool = Field(description="code was a reissue: the new passkey can't approve consent for 24 h")
+    expires_in: int
+
+
+class PasskeyCredentialIn(BaseModel):
+    credential: dict = Field(description="PublicKeyCredential JSON from navigator.credentials.create()/get()")
+
+
+class PasskeyOut(BaseModel):
+    id: int
+    kind: Literal["student", "guardian"]
+    created_at: datetime
+    last_used_at: datetime | None
+    approve_after: datetime
+    revoked: bool
+
+
+class ActivationCodeIn(BaseModel):
+    kind: Literal["student", "guardian"] = "student"
+    reason: str = Field(min_length=10, max_length=300, description="audited and shown in the student's access log")
+
+
+class ActivationCodeOut(BaseModel):
+    status: Literal["issued", "already_issued"]
+    code: str | None = Field(description="shown once; never stored (a replay returns null)")
+    kind: Literal["student", "guardian"]
+    expires_at: datetime | None
+    revoked_passkeys: int
+    reissue: bool
+    cooldown_hours: int = Field(description="hours before the passkey registered from this code can approve consent")
+    detail: str | None = None

@@ -14,7 +14,10 @@ $$ SELECT app_role() IN ('aicte_officer', 'auditor') $$;
 CREATE OR REPLACE FUNCTION app_owns_programme(pid text) RETURNS boolean LANGUAGE sql STABLE AS
 $$ SELECT app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM programmes p WHERE p.id = pid AND p.institution_id = app_inst()) $$;
 CREATE OR REPLACE FUNCTION app_student() RETURNS bigint LANGUAGE sql STABLE AS
-$$ SELECT CASE WHEN app_role() = 'student' THEN nullif(current_setting('app.student_id', true), '')::bigint END $$;
+$$ SELECT CASE WHEN app_role() IN ('student', 'guardian') THEN nullif(current_setting('app.student_id', true), '')::bigint END $$;
+-- a guardian (P1) acts for a minor and sees what the student sees
+CREATE OR REPLACE FUNCTION app_scope() RETURNS text LANGUAGE sql STABLE AS
+$$ SELECT coalesce(current_setting('app.scope', true), '') $$;
 CREATE OR REPLACE FUNCTION app_registrar_did() RETURNS text LANGUAGE sql STABLE AS
 $$ SELECT CASE WHEN app_role() = 'university_registrar' THEN nullif(current_setting('app.issuer_did', true), '') END $$;
 -- issuer DIDs the caller may sign for: its own institution's DID, or the registrar's university DID
@@ -35,6 +38,9 @@ GRANT SELECT ON institutions, programmes, approved_intake, seat_categories, acad
 GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, students, programme_category_counters,
   duplicate_cases, anomaly_flags, consents TO app_user;
 GRANT SELECT, INSERT, UPDATE ON webhook_endpoints TO app_user;
+GRANT SELECT ON passkeys TO app_user;
+GRANT UPDATE (sign_count, last_used_at) ON passkeys TO app_user;  -- insert/revoke only via register_passkey / revoke_own_passkey
+-- activation_codes and webauthn_challenges: no grants, functions only
 GRANT SELECT, UPDATE ON webhook_deliveries TO app_user;   -- inserts only via enqueue_event() / enqueue_case_event()
 GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints, credentials, batch_features TO app_user;
 GRANT SELECT ON ledger_entries TO app_user;            -- writes only via ledger_append()
@@ -106,6 +112,17 @@ CREATE POLICY sel ON webhook_deliveries FOR SELECT USING (app_is_regulator() OR 
   OR EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id));   -- endpoints RLS decides (own institution)
 CREATE POLICY upd ON webhook_deliveries FOR UPDATE USING (app_role() = 'webhook_dispatcher'
   OR (app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id)));
+
+
+-- passkeys (P1): the owner (student, or the guardian for guardian keys) sees its own keys and may update the sign
+-- counter. New keys only via register_passkey() (one per redeemed code, cooldown set there); revocation via revoke_own_passkey().
+ALTER TABLE passkeys ENABLE ROW LEVEL SECURITY; ALTER TABLE passkeys FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON passkeys; DROP POLICY IF EXISTS ins ON passkeys; DROP POLICY IF EXISTS upd ON passkeys;
+CREATE POLICY sel ON passkeys FOR SELECT USING (student_id = app_student() AND kind = app_role());
+CREATE POLICY upd ON passkeys FOR UPDATE USING (student_id = app_student() AND kind = app_role() AND app_scope() = '')
+  WITH CHECK (student_id = app_student() AND kind = app_role());
+ALTER TABLE activation_codes ENABLE ROW LEVEL SECURITY; ALTER TABLE activation_codes FORCE ROW LEVEL SECURITY;
+ALTER TABLE webauthn_challenges ENABLE ROW LEVEL SECURITY; ALTER TABLE webauthn_challenges FORCE ROW LEVEL SECURITY;
 
 -- anomaly_flags (incl. E501)
 ALTER TABLE anomaly_flags ENABLE ROW LEVEL SECURITY; ALTER TABLE anomaly_flags FORCE ROW LEVEL SECURITY;
@@ -447,15 +464,161 @@ BEGIN
   RETURN n;
 END $$;
 
+-- ---------- passkeys (P1) ----------
+-- Institution issues a one-time activation code for its own active student. Voids that student's unused codes of the
+-- kind and revokes that kind's passkeys (lost-device recovery). Any code after the very first one is a REISSUE: a passkey
+-- registered from it can't approve consent for 24 h (insider-impersonation cooldown). The plaintext code never reaches
+-- the database; an Idempotency-Key replay returns replay=true and no code.
+CREATE OR REPLACE FUNCTION issue_activation_code(p_enrolment bigint, p_kind text, p_code_hash text, p_idem text, p_req_hash text)
+RETURNS TABLE (code_id bigint, student_id bigint, revoked int, reissue boolean, replay boolean, expires_at timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE e record; prev record; n int; rei boolean; cid bigint; exp timestamptz;
+BEGIN
+  SELECT en.* INTO e FROM enrolments en WHERE en.id = p_enrolment;
+  IF e.id IS NULL OR app_role() <> 'institution_admin' OR NOT app_owns_programme(e.programme_id) OR e.status <> 'active'
+     OR p_kind NOT IN ('student', 'guardian') THEN
+    RAISE EXCEPTION 'issue_activation_code: not allowed' USING ERRCODE = 'P0002';
+  END IF;
+  IF p_idem IS NOT NULL THEN
+    SELECT * INTO prev FROM activation_codes a WHERE a.institution_id = app_inst() AND a.idempotency_key = p_idem;
+    IF prev.id IS NOT NULL THEN
+      IF prev.request_hash <> p_req_hash THEN RAISE EXCEPTION 'idempotency key reused' USING ERRCODE = 'P0003'; END IF;
+      RETURN QUERY SELECT prev.id, prev.student_id, 0, prev.reissue, true, prev.expires_at;
+      RETURN;
+    END IF;
+  END IF;
+  -- H1: no codes for a person who is active at another institution or in an open duplicate case: an institution
+  -- uploading someone else's APAAR must not be able to take over that student's passkey identity.
+  -- A case AICTE resolved as a false positive lifts the "active elsewhere" block for that person.
+  IF (EXISTS (SELECT 1 FROM enrolments o JOIN programmes op ON op.id = o.programme_id
+               WHERE o.student_id = e.student_id AND o.status = 'active' AND op.institution_id <> app_inst())
+      AND NOT EXISTS (SELECT 1 FROM duplicate_cases d WHERE d.student_id = e.student_id AND d.status = 'false_positive'))
+     OR EXISTS (SELECT 1 FROM duplicate_cases d WHERE d.student_id = e.student_id AND d.status IN ('flagged', 'under_investigation')) THEN
+    RAISE EXCEPTION 'issue_activation_code: record under review' USING ERRCODE = 'P0004';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('activation:' || e.student_id || ':' || p_kind, 0));
+  -- M1: everything below looks only at THIS institution's codes and the passkeys they created
+  rei := EXISTS (SELECT 1 FROM activation_codes a WHERE a.student_id = e.student_id AND a.kind = p_kind AND a.institution_id = app_inst());
+  UPDATE activation_codes a SET voided_at = now()
+   WHERE a.student_id = e.student_id AND a.kind = p_kind AND a.institution_id = app_inst() AND a.used_at IS NULL AND a.voided_at IS NULL;
+  UPDATE passkeys k SET revoked_at = now() FROM activation_codes a
+   WHERE a.id = k.activation_code_id AND a.institution_id = app_inst() AND k.student_id = e.student_id AND k.kind = p_kind
+     AND k.revoked_at IS NULL;
+  GET DIAGNOSTICS n = ROW_COUNT;
+  exp := now() + interval '7 days';
+  INSERT INTO activation_codes (student_id, kind, code_hash, institution_id, issued_by, reissue, idempotency_key, request_hash, expires_at)
+  VALUES (e.student_id, p_kind, p_code_hash, app_inst(), current_setting('app.user_id', true), rei, p_idem, p_req_hash, exp)
+  RETURNING id INTO cid;
+  RETURN QUERY SELECT cid, e.student_id, n, rei, false, exp;
+END $$;
+
+-- Anonymous: redeem (burn) a code for the student with this APAAR. Nothing comes back for any kind of mismatch.
+CREATE OR REPLACE FUNCTION redeem_activation_code(p_bi text, p_code_hash text)
+RETURNS TABLE (code_id bigint, student_id bigint, kind text, reissue boolean)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> '' THEN RAISE EXCEPTION 'redeem_activation_code: not allowed'; END IF;
+  RETURN QUERY UPDATE activation_codes a SET used_at = now()
+    FROM students s
+   WHERE s.id = a.student_id AND s.apaar_bi = p_bi AND a.code_hash = p_code_hash
+     AND a.used_at IS NULL AND a.voided_at IS NULL AND a.expires_at > now()
+     AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id   -- L4: still enrolled there
+                  WHERE e.student_id = a.student_id AND e.status = 'active' AND p.institution_id = a.institution_id)
+  RETURNING a.id, a.student_id, a.kind, a.reissue;
+END $$;
+
+-- Single-use WebAuthn challenges (5 min). Login: anonymous. Register: a passkey-setup session. Consent: the student or
+-- guardian whose inbox holds the request; the challenge is stored with the request id and a hash of its terms.
+CREATE OR REPLACE FUNCTION store_challenge(p_challenge bytea, p_purpose text, p_consent bigint, p_terms_hash text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT ((p_purpose = 'login' AND app_role() = '')
+       OR (p_purpose = 'register' AND app_scope() = 'passkey_setup' AND app_student() IS NOT NULL)
+       OR (p_purpose = 'consent' AND app_scope() = '' AND app_student() IS NOT NULL
+           AND EXISTS (SELECT 1 FROM consents c WHERE c.id = p_consent AND c.student_id = app_student()))) THEN
+    RAISE EXCEPTION 'store_challenge: not allowed';
+  END IF;
+  DELETE FROM webauthn_challenges w WHERE w.expires_at < now() - interval '1 hour';
+  INSERT INTO webauthn_challenges (challenge, purpose, student_id, kind, consent_id, terms_hash, expires_at)
+  VALUES (p_challenge, p_purpose, app_student(), CASE WHEN p_purpose = 'login' THEN NULL ELSE app_role() END,
+          p_consent, p_terms_hash, now() + interval '5 minutes');
+END $$;
+
+CREATE OR REPLACE FUNCTION take_challenge(p_challenge bytea, p_purpose text) RETURNS TABLE (consent_id bigint, terms_hash text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  RETURN QUERY UPDATE webauthn_challenges w SET used_at = now()
+   WHERE w.challenge = p_challenge AND w.purpose = p_purpose AND w.used_at IS NULL AND w.expires_at > now()
+     AND w.student_id IS NOT DISTINCT FROM app_student()
+     AND w.kind IS NOT DISTINCT FROM (CASE WHEN p_purpose = 'login' THEN NULL ELSE app_role() END)
+  RETURNING w.consent_id, w.terms_hash;
+END $$;
+
+-- Anonymous passkey sign-in: find an unrevoked key by credential id. The sign count is updated afterwards on a
+-- connection opened as the signed-in student/guardian (RLS), so there is no anonymous write path.
+CREATE OR REPLACE FUNCTION passkey_for_login(p_credential bytea)
+RETURNS TABLE (id bigint, student_id bigint, kind text, public_key bytea, sign_count bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> '' THEN RAISE EXCEPTION 'passkey_for_login: not allowed'; END IF;
+  RETURN QUERY SELECT k.id, k.student_id, k.kind, k.public_key, k.sign_count FROM passkeys k
+   WHERE k.credential_id = p_credential AND k.revoked_at IS NULL;
+END $$;
+
+-- L1/L2: the only way to add a passkey. Bound to the setup session's own redeemed code (app.code_id comes from the
+-- signed setup token); one passkey per code; the 24 h cooldown is set here from the code row, not by the caller.
+DROP FUNCTION IF EXISTS register_passkey(bytea, bytea, bigint, text[]);
+CREATE OR REPLACE FUNCTION register_passkey(p_credential bytea, p_public_key bytea, p_sign_count bigint, p_transports text[],
+                                            p_first_cooldown_hours int)
+RETURNS SETOF passkeys
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE c record;
+BEGIN
+  IF app_scope() <> 'passkey_setup' OR app_student() IS NULL THEN RAISE EXCEPTION 'register_passkey: not allowed'; END IF;
+  SELECT * INTO c FROM activation_codes a WHERE a.id = nullif(current_setting('app.code_id', true), '')::bigint
+     AND a.student_id = app_student() AND a.kind = app_role() AND a.used_at IS NOT NULL FOR UPDATE;
+  IF c.id IS NULL THEN RAISE EXCEPTION 'register_passkey: no redeemed code for this session'; END IF;
+  IF c.registered_at IS NOT NULL THEN RAISE EXCEPTION 'register_passkey: code already used' USING ERRCODE = 'P0005'; END IF;
+  UPDATE activation_codes SET registered_at = now() WHERE id = c.id;
+  RETURN QUERY INSERT INTO passkeys (student_id, kind, credential_id, public_key, sign_count, transports, approve_after, activation_code_id)
+    VALUES (c.student_id, c.kind, p_credential, p_public_key, p_sign_count, p_transports,
+            -- reissued codes always wait 24 h; every new passkey waits PASSKEY_FIRST_COOLDOWN_HOURS (M2), whichever is longer
+            now() + make_interval(hours => GREATEST(CASE WHEN c.reissue THEN 24 ELSE 0 END, GREATEST(p_first_cooldown_hours, 0))), c.id)
+    RETURNING *;
+END $$;
+
+-- L1: revocation is one-way (no UPDATE grant on revoked_at, so a key can't be un-revoked).
+CREATE OR REPLACE FUNCTION revoke_own_passkey(p_id bigint) RETURNS SETOF passkeys
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_scope() <> '' OR app_student() IS NULL THEN RAISE EXCEPTION 'revoke_own_passkey: not allowed'; END IF;
+  RETURN QUERY UPDATE passkeys k SET revoked_at = coalesce(k.revoked_at, now())
+   WHERE k.id = p_id AND k.student_id = app_student() AND k.kind = app_role() RETURNING *;
+END $$;
+
+-- Regulators: activation-code reissues per institution (insider-impersonation signal on the AICTE dashboard).
+CREATE OR REPLACE FUNCTION activation_reissue_counts() RETURNS TABLE (institution_id text, reissues bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT app_is_regulator() THEN RAISE EXCEPTION 'activation_reissue_counts: not allowed'; END IF;
+  RETURN QUERY SELECT a.institution_id, count(*) FROM activation_codes a WHERE a.reissue GROUP BY a.institution_id;
+END $$;
+
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
   request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint),
-  enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb) FROM PUBLIC;
+  enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb),
+  issue_activation_code(bigint, text, text, text, text), redeem_activation_code(text, text),
+  store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
+  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
   request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint),
-  enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb) TO app_user;
+  enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb),
+  issue_activation_code(bigint, text, text, text, text), redeem_activation_code(text, text),
+  store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
+  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint) TO app_user;

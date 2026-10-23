@@ -286,3 +286,48 @@ CREATE TABLE IF NOT EXISTS webhook_deliveries (
   delivered_at     timestamptz
 );
 CREATE INDEX IF NOT EXISTS webhook_deliveries_due_idx ON webhook_deliveries (next_attempt_at) WHERE status = 'pending';
+
+-- Passkeys (P1, Req 5/8): one-time activation codes from the institution, WebAuthn passkeys, single-use challenges.
+CREATE TABLE IF NOT EXISTS activation_codes (
+  id             bigserial PRIMARY KEY,
+  student_id     bigint NOT NULL REFERENCES students(id),
+  kind           text NOT NULL CHECK (kind IN ('student','guardian')),
+  code_hash      text NOT NULL UNIQUE,            -- HMAC(k_activation, code); the plaintext is never stored
+  institution_id text NOT NULL REFERENCES institutions(id),
+  issued_by      text NOT NULL,
+  reissue        boolean NOT NULL,                -- true when issuing it revoked earlier passkeys (insider-impersonation cooldown)
+  idempotency_key text,
+  request_hash   text,
+  expires_at     timestamptz NOT NULL,
+  used_at        timestamptz,
+  registered_at  timestamptz,                    -- one passkey per code (L2)
+  voided_at      timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (institution_id, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS passkeys (
+  id            bigserial PRIMARY KEY,
+  student_id    bigint NOT NULL REFERENCES students(id),
+  kind          text NOT NULL CHECK (kind IN ('student','guardian')),
+  credential_id bytea NOT NULL UNIQUE,
+  public_key    bytea NOT NULL,                   -- COSE key
+  sign_count    bigint NOT NULL,
+  transports    text[],
+  approve_after timestamptz NOT NULL DEFAULT now(), -- registered from a reissued code: no consent approval for 24 h
+  activation_code_id bigint REFERENCES activation_codes(id), -- which institution's code created it (H1: revoke own only)
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  last_used_at  timestamptz,
+  revoked_at    timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+  challenge   bytea PRIMARY KEY,
+  purpose     text NOT NULL CHECK (purpose IN ('register','login','consent')),
+  student_id  bigint,
+  kind        text,
+  consent_id  bigint,
+  terms_hash  text,
+  expires_at  timestamptz NOT NULL,
+  used_at     timestamptz
+);

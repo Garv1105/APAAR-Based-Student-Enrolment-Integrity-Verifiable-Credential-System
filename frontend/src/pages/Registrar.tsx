@@ -84,6 +84,7 @@ function EnrolmentPanel({ e, mode, onChange }: { e: S["EnrolmentOut"]; mode: "re
         <Button variant="ghost" onClick={load}>Show credentials</Button>
       </div>
       {msg && <p className={`mt-2 text-sm ${msg.ok ? "text-ok" : "text-err"}`} role="status">{msg.text}</p>}
+      {mode === "institution" && e.status === "active" && <ActivationCodeBox enrolmentId={e.id} />}
       {creds && (creds.length === 0 ? <p className="mt-3 text-sm text-slate-500">No credentials you issued for this enrolment.</p> : (
         <div className="mt-3 grid gap-3 lg:grid-cols-2">
           {creds.map((c) => (
@@ -96,6 +97,50 @@ function EnrolmentPanel({ e, mode, onChange }: { e: S["EnrolmentOut"]; mode: "re
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+
+/** P1: one-time passkey activation code for the student (or a minor's guardian). Shown once, never stored. */
+function ActivationCodeBox({ enrolmentId }: { enrolmentId: number }) {
+  const [open, setOpen] = useState(false);
+  const [kind, setKind] = useState<"student" | "guardian">("student");
+  const [reason, setReason] = useState("");
+  const [out, setOut] = useState<S["ActivationCodeOut"] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  if (!open) return <div className="mt-2"><Button variant="ghost" onClick={() => setOpen(true)}>Passkey activation code…</Button></div>;
+  async function issue() {
+    setBusy(true);
+    setError(null);
+    try { setOut(await sendJson<S["ActivationCodeOut"]>(`/v1/enrolments/${enrolmentId}/activation-code`, "POST", { kind, reason })); }
+    catch (err) { setError(err instanceof ApiError ? err.text : "Failed"); } finally { setBusy(false); }
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+      {out?.code ? (
+        <div>
+          <p className="text-xs text-slate-600">One-time {out.kind} code (shown once, valid until {new Date(out.expires_at ?? "").toLocaleDateString()}):</p>
+          <p className="mt-1 font-mono text-2xl tracking-widest">{out.code}</p>
+          {out.revoked_passkeys > 0 && <p className="mt-1 text-xs text-err">Revoked {out.revoked_passkeys} earlier passkey(s).</p>}
+          {out.reissue && <p className="mt-1 text-xs text-warn">Reissued code: the new passkey can't approve consent for 24 h, and the student is notified.</p>}
+          <p className="mt-1 text-xs text-slate-500">Prototype: hand it to the student. Production: delivered via DigiLocker or the registered mobile number.</p>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs text-slate-600">For
+            <select value={kind} onChange={(ev) => setKind(ev.target.value as "student" | "guardian")} className="mt-1 block rounded-lg border border-slate-300 px-2 py-1 text-sm">
+              <option value="student">Student</option><option value="guardian">Guardian (students under 18)</option>
+            </select>
+          </label>
+          <label className="text-xs text-slate-600">Reason (recorded, shown to the student)
+            <input value={reason} onChange={(ev) => setReason(ev.target.value)} className="mt-1 block w-72 max-w-full rounded-lg border border-slate-300 px-2 py-1 text-sm" />
+          </label>
+          <Button disabled={busy || reason.trim().length < 10} onClick={issue}>Issue code</Button>
+        </div>
+      )}
+      {error && <div className="mt-2"><ErrorNote>{error}</ErrorNote></div>}
     </div>
   );
 }

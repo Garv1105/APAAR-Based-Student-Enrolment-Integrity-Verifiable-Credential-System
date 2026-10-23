@@ -1,6 +1,7 @@
 // Typed API client. Types come from src/api/schema.d.ts, generated from backend/openapi.json
 // (`npm run gen:api`); never hand-write API shapes here.
 import type { components } from "./schema";
+import { createPasskey, getPasskey } from "../webauthn";
 
 export type S = components["schemas"];
 export type Role = S["LoginOut"]["role"];
@@ -54,7 +55,7 @@ export function setUnauthorizedHandler(fn: () => void) {
 async function request(path: string, init: RequestInit = {}): Promise<Response> {
   const s = loadSession();
   const headers = new Headers(init.headers);
-  if (s) headers.set("Authorization", `Bearer ${s.token}`);
+  if (s && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${s.token}`);
   const res = await fetch(path, { ...init, headers });
   if (!res.ok) {
     let title = res.statusText, detail: unknown = null;
@@ -97,6 +98,33 @@ export async function studentLogin(apaar_id: string, dob: string): Promise<Sessi
   const s: Session = { token: out.access_token, role: out.role, institution_id: null, display_name: out.display_name, user_id: "student" };
   saveSession(s);
   return s;
+}
+
+/** Passkeys (P1): redeem a one-time activation code, then register a passkey with the 15-minute setup session. */
+export async function activateAndRegister(apaar_id: string, code: string): Promise<S["SetupOut"]> {
+  const setup = await sendJson<S["SetupOut"]>("/v1/auth/activate", "POST", { apaar_id, code });
+  const h = { Authorization: `Bearer ${setup.setup_token}` };
+  const options = await sendJson<unknown>("/v1/passkeys/register/options", "POST", undefined, h);
+  const credential = await createPasskey(options);
+  await sendJson("/v1/passkeys/register/verify", "POST", { credential }, h);
+  return setup;
+}
+
+/** Discoverable passkey sign-in: no APAAR typed; the device picks the account. */
+export async function passkeyLogin(): Promise<Session> {
+  const options = await sendJson<unknown>("/v1/auth/passkey/options", "POST");
+  const credential = await getPasskey(options);
+  const out = await sendJson<S["LoginOut"]>("/v1/auth/passkey/verify", "POST", { credential });
+  const s: Session = { token: out.access_token, role: out.role, institution_id: null, display_name: out.display_name, user_id: out.role };
+  saveSession(s);
+  return s;
+}
+
+/** Approve a consent request with a passkey assertion whose challenge commits to that request. */
+export async function approveWithPasskey(consentId: number) {
+  const options = await sendJson<unknown>(`/v1/consents/${consentId}/approve/options`, "POST");
+  const credential = await getPasskey(options);
+  return sendJson(`/v1/consents/${consentId}/approve`, "POST", { credential });
 }
 
 /** Upload a CSV. Idempotency-Key = SHA-256 of the file, so re-uploading the same file replays the original batch. */

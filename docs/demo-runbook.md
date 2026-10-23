@@ -1,7 +1,9 @@
 # Demo runbook (T8.2), about 6 minutes
 
-All data is synthetic, and the APAAR registry, AICTE registry, OTP and logins are MOCK. Say so at the start; the yellow banner shows it too.
-Staff password: `demo`. Student sign-in: APAAR `328865551724` with DOB `2006-11-05` (Asha Joshi). OTP: `123456`.
+All data is synthetic, and the APAAR registry, AICTE registry and staff logins are MOCK. Say so at the start; the yellow banner shows it too.
+Staff password: `demo`. Student: Asha Joshi, APAAR `328865551724`. She signs in with a **passkey**: the demo seed prints her one-time activation code.
+
+**Rehearse the passkey steps on the presentation laptop itself.** Windows Hello (or a phone passkey) must be set up there, and the browser must open `http://localhost:5173`, not `127.0.0.1`. The fallback is to restart the API with `DEMO_MODE=true` (`$env:DEMO_MODE="true"` before uvicorn). That brings back the MOCK sign-in (APAAR + DOB `2006-11-05`) and OTP approval (`123456`); both are clearly labelled MOCK in the UI.
 
 ## Before the judges arrive (10 min)
 1. **Start the API:** in `backend/`, run `..\.venv\Scripts\python.exe -m uvicorn app.main:app`.
@@ -27,7 +29,8 @@ Reset between rehearsals by running step 3 again. Sign out of both windows first
 | 4 | W2 `aicte` | **Risk-based inspection queue**: click *Example School of Management* | DQS breakdown; ENROLMENT_SPIKE flag with its evidence numbers | "Risk indicator for review, not proof. Every rank is explainable." |
 | | | Excess admissions card | B.Tech CSE 125/120 regular, 22/18 supernumerary | |
 | 5 | W1 `employer` | **My consent requests** | A pending request for Asha (name, programme, institution, status) | "Employers can't look anyone up. They ask; the student decides." |
-| | W1 student (APAAR + DOB) | **Consent requests**: OTP `123456`, **Approve** | Request approved | |
+| | W1 sign-in page | **Activate and register passkey** with APAAR `328865551724` + the printed code, confirm with Windows Hello, then **Sign in with passkey** | Student portal | "The DOB no longer gets anyone in. The institution hands the student a one-time code, and the student registers a passkey." |
+| | W1 student | **Consent requests**: **Approve with passkey** | Request approved | "The passkey signs exactly this request: its verifier, fields and expiry." |
 | | W1 `employer` | **Fetch & verify credential** | **VALID**, with only the 4 approved fields. Also click **Download JSON** (used in step 7) | "W3C VC 2.0, eddsa-jcs-2022, checked against the official W3C test vectors." |
 | | W1 `inst-a` | **Student records and credentials**: search `328865551724`, then **Certificate & QR** | Certificate with APAAR ID + student ID + QR (Req 10) | |
 | 6 | W1 `inst-a` | Same record: **Withdraw**, then confirm | Enrolment withdrawn | |
@@ -41,6 +44,8 @@ Reset between rehearsals by running step 3 again. Sign out of both windows first
 - **API not reachable:** check the uvicorn window, then rerun `app.demo --live`.
 - **Upload fails or shows unexpected numbers:** rerun the seed *without* `--live` (`python -m app.demo`). B is then already uploaded and every later step still works; show the batch from **Upload history → View issues →**.
 - **Consent fetch fails:** sign in as the student, check that the request shows as approved, then fetch again as the employer.
+- **Passkey prompt fails or the laptop has no authenticator:** restart the API with `DEMO_MODE=true`, use the MOCK date-of-birth sign-in and the MOCK OTP, and say it's the demo fallback.
+- **Activation code already used** (for example after a rehearsal): sign in as `inst-a`, open **Student records** for `328865551724`, then **Passkey activation code…**. This is a reissue, so the new passkey can't approve for 24 h. Rerun `python -m app.demo --live` instead to get a fresh first-time code.
 - **Anything else:** say "this is the pre-recorded run" and switch to the backup video.
 
 ## Not in this demo (say so if asked)

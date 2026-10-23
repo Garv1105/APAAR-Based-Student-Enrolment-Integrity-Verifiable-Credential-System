@@ -1,15 +1,16 @@
 """Consent service (PRD §13, Req 8) and consent-scoped VerificationCredentials (D5, Req 5).
 
 A verifier requests specific fields for a purpose; the student (or the guardian, if the student is
-under 18) approves with an OTP (MOCK); the platform signs the consent artifact and mints a short-lived
+under 18) approves with a passkey assertion bound to that request (P1; MOCK OTP only in DEMO_MODE); the platform
+signs the consent artifact and mints a short-lived
 VerificationCredential holding only the approved fields, issued by the student's institution.
 Revoking the consent revokes that credential through the status list.
 """
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 import psycopg
 
-from . import credentials, crypto
+from . import credentials, crypto, passkeys
 from .credentials import CredentialError
 from .mocks import MOCK_OTP
 
@@ -17,7 +18,6 @@ CONSENT_SIGNER = "aicte-consent"
 # request field -> credentialSubject claim (data minimisation: nothing else is ever included)
 FIELD_CLAIMS = {"name": "name", "programme": "programme", "institution": "institution", "academic_year": "academicYear",
                 "status": "status", "apaar_id": "apaarId", "student_id": "studentId"}
-ADULT_AGE = 18  # DPDP treats under-18s as children: a guardian must consent
 
 
 def consent_out(r: dict, credential_id: str | None = None, role: str = "student") -> dict:
@@ -54,8 +54,28 @@ def verifier_requests(conn) -> list[dict]:
     return conn.execute("SELECT * FROM my_consent_requests()").fetchall()
 
 
-def _age_on(dob: date, on: date) -> int:
-    return on.year - dob.year - ((on.month, on.day) < (dob.month, dob.day))
+def _visible_pending(conn, consent_id: int) -> dict:
+    k = conn.execute("SELECT * FROM consents WHERE id=%s", (consent_id,)).fetchone()  # RLS: own inbox (student or guardian)
+    if k is None:
+        raise CredentialError(404, "Consent request not found")
+    if effective_status(k) != "pending":
+        raise CredentialError(409, f"Consent request is {effective_status(k)}")
+    return k
+
+
+def _required_kind(conn, user: dict, k: dict) -> str:
+    need = "guardian" if passkeys.is_minor(conn, k["student_id"]) else "student"
+    if user["role"] != need:
+        raise CredentialError(403, "Student is under 18: the guardian approves with the guardian's passkey" if need == "guardian"
+                              else "The student is 18 or over and approves with their own passkey")
+    return need
+
+
+def approve_options(conn, user: dict, consent_id: int) -> dict:
+    """WebAuthn options whose challenge commits to this request's terms (P1)."""
+    k = _visible_pending(conn, consent_id)
+    _required_kind(conn, user, k)
+    return passkeys.consent_options(conn, k)
 
 
 def _own_pending(conn, user: dict, consent_id: int) -> dict:
@@ -68,26 +88,36 @@ def _own_pending(conn, user: dict, consent_id: int) -> dict:
     return k
 
 
-def approve(conn, user: dict, consent_id: int, otp: str, approved_by: str, guardian_otp: str | None) -> tuple[dict, dict]:
+def approve(conn, user: dict, consent_id: int, body: dict) -> tuple[dict, dict]:
+    """Passkey assertion bound to this request (P1). The MOCK OTP path exists only with DEMO_MODE=true."""
+    k0 = _visible_pending(conn, consent_id)
+    if body.get("credential") is not None:
+        granted_by = _required_kind(conn, user, k0)
+        passkeys.verify_consent_assertion(conn, user, k0, body["credential"])
+        authentication = f"webauthn-passkey ({granted_by})"
+    elif passkeys.demo_mode():
+        if user["role"] != "student" or body.get("otp") != MOCK_OTP:
+            raise CredentialError(401, "Invalid OTP")
+        minor = passkeys.is_minor(conn, k0["student_id"])
+        if minor and (body.get("approved_by") != "guardian" or body.get("guardian_otp") != MOCK_OTP):
+            raise CredentialError(403, "Student is under 18: a guardian must approve (approved_by=guardian with the guardian's OTP)")
+        granted_by = "guardian" if minor else "student"
+        # ponytail: DEMO_MODE only; the guardian is self-asserted here (the passkey path has a real guardian key)
+        authentication = "MOCK-OTP (DEMO_MODE)" + ("; guardian self-asserted (MOCK)" if minor else "")
+    else:
+        raise CredentialError(400, "Approve with your passkey (OTP approval exists only in DEMO_MODE)")
     k = _own_pending(conn, user, consent_id)
-    if otp != MOCK_OTP:
-        raise CredentialError(401, "Invalid OTP")
-    s = conn.execute("SELECT id, dob_enc FROM students WHERE id=%s", (k["student_id"],)).fetchone()
-    minor = _age_on(date.fromisoformat(crypto.decrypt("students", "dob", s["id"], s["dob_enc"])), date.today()) < ADULT_AGE
-    if minor and (approved_by != "guardian" or guardian_otp != MOCK_OTP):
-        raise CredentialError(403, "Student is under 18: a guardian must approve (approved_by=guardian with the guardian's OTP)")
+    if crypto.consent_terms_hash(passkeys.consent_terms(k)) != crypto.consent_terms_hash(passkeys.consent_terms(k0)):
+        raise CredentialError(409, "The consent request changed during approval; start again")
     e = conn.execute("SELECT * FROM enrolments WHERE student_id=%s AND status='active' ORDER BY id DESC LIMIT 1",
                      (k["student_id"],)).fetchone()
     if e is None:
         raise CredentialError(409, "No active enrolment to verify")
 
     granted_at = datetime.now(timezone.utc).replace(microsecond=0)
-    granted_by = "guardian" if minor else "student"
     artifact = {"consentId": k["id"], "requester": k["requester_id"], "purpose": k["purpose"], "fields": k["scope_fields"],
                 "grantedBy": granted_by, "grantedAt": credentials.iso(granted_at), "expiresAt": credentials.iso(k["expires_at"]),
-                # ponytail: guardian identity is NOT verified (the minor's own session supplies a MOCK OTP);
-                # production needs a guardian account linked to the student
-                "authentication": "MOCK-OTP" + ("; guardian self-asserted (MOCK)" if minor else "")}
+                "authentication": authentication}
     sig = crypto.multibase_b58(crypto.signing_key(CONSENT_SIGNER).sign(crypto.jcs(artifact)))
     k = conn.execute("UPDATE consents SET status='granted', granted_at=%s, granted_by=%s, artifact_sig=%s WHERE id=%s RETURNING *",
                      (granted_at, granted_by, sig, k["id"])).fetchone()

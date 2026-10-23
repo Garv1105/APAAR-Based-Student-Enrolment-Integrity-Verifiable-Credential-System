@@ -977,6 +977,373 @@
     }
    }
   },
+  "/v1/auth/config": {
+   "get": {
+    "summary": "Auth Config",
+    "description": "Public: which sign-in paths are enabled.",
+    "operationId": "auth_config_v1_auth_config_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AuthConfig"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/activate": {
+   "post": {
+    "summary": "Activate",
+    "description": "Redeem (burn) a one-time activation code for a 15-minute session that can only register a passkey. 5 attempts per APAAR per 15 minutes.",
+    "operationId": "activate_v1_auth_activate_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActivateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SetupOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/passkeys/register/options": {
+   "post": {
+    "summary": "Passkey Register Options",
+    "description": "Setup session: WebAuthn registration options (discoverable, UV required).",
+    "operationId": "passkey_register_options_v1_passkeys_register_options_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/passkeys/register/verify": {
+   "post": {
+    "summary": "Passkey Register Verify",
+    "description": "Setup session: store the passkey.",
+    "operationId": "passkey_register_verify_v1_passkeys_register_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasskeyCredentialIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PasskeyOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/auth/passkey/options": {
+   "post": {
+    "summary": "Passkey Login Options",
+    "description": "Public: discoverable sign-in options (no APAAR needed). 30/min per client.",
+    "operationId": "passkey_login_options_v1_auth_passkey_options_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/passkey/verify": {
+   "post": {
+    "summary": "Passkey Login Verify",
+    "description": "Public: sign in as the student or guardian.",
+    "operationId": "passkey_login_verify_v1_auth_passkey_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasskeyCredentialIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LoginOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/passkeys": {
+   "get": {
+    "summary": "List Passkeys",
+    "description": "The caller's own passkeys.",
+    "operationId": "list_passkeys_v1_passkeys_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PasskeyOut"
+         },
+         "type": "array",
+         "title": "Response List Passkeys V1 Passkeys Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/passkeys/{passkey_id}": {
+   "delete": {
+    "summary": "Revoke Passkey",
+    "description": "Revoke one of the caller's own passkeys.",
+    "operationId": "revoke_passkey_v1_passkeys__passkey_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "passkey_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Passkey Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PasskeyOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/enrolments/{enrolment_id}/activation-code": {
+   "post": {
+    "summary": "Activation Code",
+    "description": "Institution issues a one-time passkey activation code (7 days). A reason is required and shown in the student's access log. Revokes earlier passkeys of that kind; any code after the first is a reissue (24 h consent cooldown). Production: delivered via DigiLocker or the registered mobile number. Accepts Idempotency-Key (a replay never returns the code).",
+    "operationId": "activation_code_v1_enrolments__enrolment_id__activation_code_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "enrolment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Enrolment Id"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActivationCodeIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ActivationCodeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/approve/options": {
+   "post": {
+    "summary": "Consent Approve Options",
+    "description": "WebAuthn options for approving this request; the challenge commits to the request's terms.",
+    "operationId": "consent_approve_options_v1_consents__consent_id__approve_options_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/webhooks": {
    "post": {
     "summary": "Create Webhook",
@@ -1758,7 +2125,7 @@
   "/v1/consents/{consent_id}/approve": {
    "post": {
     "summary": "Consent Approve",
-    "description": "Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.",
+    "description": "Student (or the guardian, if the student is under 18) approves with a passkey assertion bound to this request; mints the scoped VerificationCredential. The MOCK OTP body works only in DEMO_MODE.",
     "operationId": "consent_approve_v1_consents__consent_id__approve_post",
     "security": [
      {
@@ -2054,6 +2421,130 @@
     ],
     "title": "AccessLogEntry"
    },
+   "ActivateIn": {
+    "properties": {
+     "apaar_id": {
+      "type": "string",
+      "title": "Apaar Id"
+     },
+     "code": {
+      "type": "string",
+      "maxLength": 20,
+      "title": "Code",
+      "description": "one-time activation code from the institution, e.g. 7K3M-Q9TB-2X"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_id",
+     "code"
+    ],
+    "title": "ActivateIn"
+   },
+   "ActivationCodeIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind",
+      "default": "student"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "audited and shown in the student's access log"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "ActivationCodeIn"
+   },
+   "ActivationCodeOut": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "issued",
+       "already_issued"
+      ],
+      "title": "Status"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code",
+      "description": "shown once; never stored (a replay returns null)"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "revoked_passkeys": {
+      "type": "integer",
+      "title": "Revoked Passkeys"
+     },
+     "reissue": {
+      "type": "boolean",
+      "title": "Reissue"
+     },
+     "cooldown_hours": {
+      "type": "integer",
+      "title": "Cooldown Hours",
+      "description": "hours before the passkey registered from this code can approve consent"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "code",
+     "kind",
+     "expires_at",
+     "revoked_passkeys",
+     "reissue",
+     "cooldown_hours"
+    ],
+    "title": "ActivationCodeOut"
+   },
    "AicteDashboard": {
     "properties": {
      "totals": {
@@ -2201,6 +2692,25 @@
      "label"
     ],
     "title": "AnomalyFlag"
+   },
+   "AuthConfig": {
+    "properties": {
+     "demo_mode": {
+      "type": "boolean",
+      "title": "Demo Mode",
+      "description": "true: the MOCK APAAR + DOB sign-in and OTP consent approval are enabled"
+     },
+     "rp_id": {
+      "type": "string",
+      "title": "Rp Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "demo_mode",
+     "rp_id"
+    ],
+    "title": "AuthConfig"
    },
    "BatchCounts": {
     "properties": {
@@ -2561,6 +3071,12 @@
      "batches": {
       "type": "integer",
       "title": "Batches"
+     },
+     "activation_reissues": {
+      "type": "integer",
+      "title": "Activation Reissues",
+      "description": "activation codes reissued (insider-impersonation signal, P1)",
+      "default": 0
      }
     },
     "type": "object",
@@ -2576,10 +3092,30 @@
    },
    "ConsentApprove": {
     "properties": {
+     "credential": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credential",
+      "description": "WebAuthn assertion (PublicKeyCredential JSON) answering POST /v1/consents/{id}/approve/options"
+     },
      "otp": {
-      "type": "string",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Otp",
-      "description": "MOCK OTP; demo value is 123456"
+      "description": "DEMO_MODE only: MOCK OTP 123456"
      },
      "approved_by": {
       "type": "string",
@@ -2588,6 +3124,7 @@
        "guardian"
       ],
       "title": "Approved By",
+      "description": "DEMO_MODE only",
       "default": "student"
      },
      "guardian_otp": {
@@ -2600,13 +3137,10 @@
        }
       ],
       "title": "Guardian Otp",
-      "description": "required when the student is under 18 (MOCK OTP 123456)"
+      "description": "DEMO_MODE only: for students under 18 (MOCK OTP 123456)"
      }
     },
     "type": "object",
-    "required": [
-     "otp"
-    ],
     "title": "ConsentApprove"
    },
    "ConsentCredentialOut": {
@@ -3412,6 +3946,7 @@
        "auditor",
        "verifier",
        "student",
+       "guardian",
        "university_registrar"
       ],
       "title": "Role"
@@ -3440,6 +3975,73 @@
      "display_name"
     ],
     "title": "LoginOut"
+   },
+   "PasskeyCredentialIn": {
+    "properties": {
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential",
+      "description": "PublicKeyCredential JSON from navigator.credentials.create()/get()"
+     }
+    },
+    "type": "object",
+    "required": [
+     "credential"
+    ],
+    "title": "PasskeyCredentialIn"
+   },
+   "PasskeyOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "approve_after": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Approve After"
+     },
+     "revoked": {
+      "type": "boolean",
+      "title": "Revoked"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "created_at",
+     "last_used_at",
+     "approve_after",
+     "revoked"
+    ],
+    "title": "PasskeyOut"
    },
    "ProgrammeSeats": {
     "properties": {
@@ -3575,6 +4177,40 @@
     ],
     "title": "SeatLine"
    },
+   "SetupOut": {
+    "properties": {
+     "setup_token": {
+      "type": "string",
+      "title": "Setup Token",
+      "description": "15-minute session that can only register a passkey"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind"
+     },
+     "reissue": {
+      "type": "boolean",
+      "title": "Reissue",
+      "description": "code was a reissue: the new passkey can't approve consent for 24 h"
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In"
+     }
+    },
+    "type": "object",
+    "required": [
+     "setup_token",
+     "kind",
+     "reissue",
+     "expires_in"
+    ],
+    "title": "SetupOut"
+   },
    "StateRow": {
     "properties": {
      "state": {
@@ -3699,6 +4335,28 @@
       },
       "type": "array",
       "title": "Enrolments"
+     },
+     "passkey_cooldown_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Passkey Cooldown Until",
+      "description": "a new passkey (first activation: PASSKEY_FIRST_COOLDOWN_HOURS; reissued code: 24 h) can't approve consent until then; the portal shows a notice"
+     },
+     "viewer": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Viewer",
+      "default": "student"
      }
     },
     "type": "object",

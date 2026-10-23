@@ -29,15 +29,22 @@ def login(conn, user_id: str, password: str) -> dict | None:
                        student_id=u["student_id"], issuer_did=u["issuer_did"])
 
 
-def issue_token(sub: str, role: str, display_name: str, *, institution_id=None, student_id=None, issuer_did=None) -> dict:
+def issue_token(sub: str, role: str, display_name: str, *, institution_id=None, student_id=None, issuer_did=None,
+                scope: str | None = None, reissue: bool = False, code_id: int | None = None, ttl: timedelta = TOKEN_TTL) -> dict:
+    """scope='passkey_setup' marks a short-lived session that may only register a passkey (require() rejects it)."""
     now = datetime.now(timezone.utc)
     claims = {"sub": sub, "role": role, "inst": institution_id, "stu": student_id, "idid": issuer_did, "name": display_name,
-              "iat": now, "exp": now + TOKEN_TTL}
+              "iat": now, "exp": now + ttl}
+    if scope:
+        claims |= {"scp": scope, "rei": bool(reissue), "cid": code_id}
     return {"access_token": jwt.encode(claims, crypto.secret("k_jwt"), algorithm="HS256"),
             "role": role, "institution_id": institution_id, "display_name": display_name}
 
 
 LOGIN_MAX_FAILURES, LOGIN_WINDOW, LOGIN_MAX_KEYS = 5, 15 * 60, 100_000
+SETUP_TTL = timedelta(minutes=15)
+SETUP_EXPIRED = ("Your passkey setup session has expired. The activation code was already used, so ask your institution "
+                 "for a new code.")
 _failures: dict[str, deque] = {}   # apaar blind index -> attempt timestamps (insertion-ordered: oldest key first)
 _failures_lock = threading.Lock()
 _DUMMY_DOB = None  # ciphertext decrypted on a miss so unknown-APAAR and wrong-DOB paths do the same work
@@ -47,15 +54,17 @@ class LoginThrottled(Exception):
     pass
 
 
-def _reserve_attempt(key: str, now: float) -> None:
+def _reserve_attempt(key: str, now: float, max_n: int = LOGIN_MAX_FAILURES, window: float = LOGIN_WINDOW) -> None:
     """Count the attempt BEFORE the lookup (under the lock), so parallel guesses can't all slip past the limit.
-    Raises LoginThrottled when the APAAR already has LOGIN_MAX_FAILURES attempts in the window."""
+    Raises LoginThrottled when the key already has max_n attempts in the window. Keys are namespaced by caller
+    (APAAR blind index for sign-in, 'act:'/'apr:'/'ip:' prefixes for the passkey flows).
+    ponytail: in-process; a shared store if the API runs as several processes."""
     with _failures_lock:
         q = _failures.get(key)
         if q is not None:
-            while q and q[0] < now - LOGIN_WINDOW:
+            while q and q[0] < now - window:
                 q.popleft()
-            if len(q) >= LOGIN_MAX_FAILURES:
+            if len(q) >= max_n:
                 raise LoginThrottled()
         else:
             if len(_failures) >= LOGIN_MAX_KEYS:  # bounded memory: drop the oldest tracked APAAR
@@ -88,15 +97,30 @@ def student_login(conn, apaar_id: str, dob: str) -> dict | None:
     return issue_token(f"student:{row['id']}", "student", f"Student ({crypto.mask_apaar(apaar_id)})", student_id=row["id"])
 
 
+def throttle(key: str, max_n: int, window: float) -> None:
+    _reserve_attempt(key, time.monotonic(), max_n, window)
+
+
+def clear_throttle(key: str) -> None:
+    with _failures_lock:
+        _failures.pop(key, None)
+
+
 def current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
     if cred is None:
         raise HTTPException(401, "Missing bearer token")
     try:
         c = jwt.decode(cred.credentials, crypto.secret("k_jwt"), algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        try:  # signature still checked; only the expiry is ignored, to give setup sessions a useful message
+            c = jwt.decode(cred.credentials, crypto.secret("k_jwt"), algorithms=["HS256"], options={"verify_exp": False})
+        except jwt.PyJWTError:
+            raise HTTPException(401, "Invalid or expired token")
+        raise HTTPException(401, SETUP_EXPIRED if c.get("scp") == "passkey_setup" else "Invalid or expired token")
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid or expired token")
     return {"id": c["sub"], "role": c["role"], "institution_id": c["inst"], "student_id": c["stu"], "issuer_did": c.get("idid"),
-            "name": c.get("name") or c["sub"]}
+            "name": c.get("name") or c["sub"], "scope": c.get("scp"), "reissue": bool(c.get("rei")), "code_id": c.get("cid")}
 
 
 def optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict | None:
@@ -110,10 +134,18 @@ def optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) 
 
 def require(*roles: str):
     def dep(user: dict = Depends(current_user)) -> dict:
+        if user["scope"]:  # a passkey-setup session can only register a passkey
+            raise HTTPException(403, "This session can only register a passkey")
         if user["role"] not in roles:
             raise HTTPException(403, f"Role '{user['role']}' cannot do this")
         return user
     return dep
+
+
+def require_setup(user: dict = Depends(current_user)) -> dict:
+    if user["scope"] != "passkey_setup":
+        raise HTTPException(403, "Passkey registration needs a setup session from an activation code")
+    return user
 
 
 def audit(conn, user: dict, action: str, entity: str, entity_id=None, *, student_id=None, reason=None, request: Request | None = None):

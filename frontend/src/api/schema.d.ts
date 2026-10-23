@@ -451,6 +451,206 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Auth Config
+         * @description Public: which sign-in paths are enabled.
+         */
+        get: operations["auth_config_v1_auth_config_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate
+         * @description Redeem (burn) a one-time activation code for a 15-minute session that can only register a passkey. 5 attempts per APAAR per 15 minutes.
+         */
+        post: operations["activate_v1_auth_activate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/passkeys/register/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Passkey Register Options
+         * @description Setup session: WebAuthn registration options (discoverable, UV required).
+         */
+        post: operations["passkey_register_options_v1_passkeys_register_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/passkeys/register/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Passkey Register Verify
+         * @description Setup session: store the passkey.
+         */
+        post: operations["passkey_register_verify_v1_passkeys_register_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/passkey/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Passkey Login Options
+         * @description Public: discoverable sign-in options (no APAAR needed). 30/min per client.
+         */
+        post: operations["passkey_login_options_v1_auth_passkey_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/passkey/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Passkey Login Verify
+         * @description Public: sign in as the student or guardian.
+         */
+        post: operations["passkey_login_verify_v1_auth_passkey_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Passkeys
+         * @description The caller's own passkeys.
+         */
+        get: operations["list_passkeys_v1_passkeys_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/passkeys/{passkey_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Passkey
+         * @description Revoke one of the caller's own passkeys.
+         */
+        delete: operations["revoke_passkey_v1_passkeys__passkey_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/enrolments/{enrolment_id}/activation-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activation Code
+         * @description Institution issues a one-time passkey activation code (7 days). A reason is required and shown in the student's access log. Revokes earlier passkeys of that kind; any code after the first is a reissue (24 h consent cooldown). Production: delivered via DigiLocker or the registered mobile number. Accepts Idempotency-Key (a replay never returns the code).
+         */
+        post: operations["activation_code_v1_enrolments__enrolment_id__activation_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents/{consent_id}/approve/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consent Approve Options
+         * @description WebAuthn options for approving this request; the challenge commits to the request's terms.
+         */
+        post: operations["consent_approve_options_v1_consents__consent_id__approve_options_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/webhooks": {
         parameters: {
             query?: never;
@@ -806,7 +1006,7 @@ export interface paths {
         put?: never;
         /**
          * Consent Approve
-         * @description Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.
+         * @description Student (or the guardian, if the student is under 18) approves with a passkey assertion bound to this request; mints the scoped VerificationCredential. The MOCK OTP body works only in DEMO_MODE.
          */
         post: operations["consent_approve_v1_consents__consent_id__approve_post"];
         delete?: never;
@@ -933,6 +1133,61 @@ export interface components {
             /** Entity Id */
             entity_id: string | null;
         };
+        /** ActivateIn */
+        ActivateIn: {
+            /** Apaar Id */
+            apaar_id: string;
+            /**
+             * Code
+             * @description one-time activation code from the institution, e.g. 7K3M-Q9TB-2X
+             */
+            code: string;
+        };
+        /** ActivationCodeIn */
+        ActivationCodeIn: {
+            /**
+             * Kind
+             * @default student
+             * @enum {string}
+             */
+            kind: "student" | "guardian";
+            /**
+             * Reason
+             * @description audited and shown in the student's access log
+             */
+            reason: string;
+        };
+        /** ActivationCodeOut */
+        ActivationCodeOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "issued" | "already_issued";
+            /**
+             * Code
+             * @description shown once; never stored (a replay returns null)
+             */
+            code: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "student" | "guardian";
+            /** Expires At */
+            expires_at: string | null;
+            /** Revoked Passkeys */
+            revoked_passkeys: number;
+            /** Reissue */
+            reissue: boolean;
+            /**
+             * Cooldown Hours
+             * @description hours before the passkey registered from this code can approve consent
+             */
+            cooldown_hours: number;
+            /** Detail */
+            detail?: string | null;
+        };
         /** AicteDashboard */
         AicteDashboard: {
             totals: components["schemas"]["AicteTotals"];
@@ -990,6 +1245,16 @@ export interface components {
              * @description always: risk indicator for review, not proof of misconduct
              */
             label: string;
+        };
+        /** AuthConfig */
+        AuthConfig: {
+            /**
+             * Demo Mode
+             * @description true: the MOCK APAAR + DOB sign-in and OTP consent approval are enabled
+             */
+            demo_mode: boolean;
+            /** Rp Id */
+            rp_id: string;
         };
         /** BatchCounts */
         BatchCounts: {
@@ -1178,23 +1443,37 @@ export interface components {
             last_upload: string | null;
             /** Batches */
             batches: number;
+            /**
+             * Activation Reissues
+             * @description activation codes reissued (insider-impersonation signal, P1)
+             * @default 0
+             */
+            activation_reissues: number;
         };
         /** ConsentApprove */
         ConsentApprove: {
             /**
-             * Otp
-             * @description MOCK OTP; demo value is 123456
+             * Credential
+             * @description WebAuthn assertion (PublicKeyCredential JSON) answering POST /v1/consents/{id}/approve/options
              */
-            otp: string;
+            credential?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Otp
+             * @description DEMO_MODE only: MOCK OTP 123456
+             */
+            otp?: string | null;
             /**
              * Approved By
+             * @description DEMO_MODE only
              * @default student
              * @enum {string}
              */
             approved_by: "student" | "guardian";
             /**
              * Guardian Otp
-             * @description required when the student is under 18 (MOCK OTP 123456)
+             * @description DEMO_MODE only: for students under 18 (MOCK OTP 123456)
              */
             guardian_otp?: string | null;
         };
@@ -1516,11 +1795,45 @@ export interface components {
              * Role
              * @enum {string}
              */
-            role: "institution_admin" | "aicte_officer" | "auditor" | "verifier" | "student" | "university_registrar";
+            role: "institution_admin" | "aicte_officer" | "auditor" | "verifier" | "student" | "guardian" | "university_registrar";
             /** Institution Id */
             institution_id: string | null;
             /** Display Name */
             display_name: string;
+        };
+        /** PasskeyCredentialIn */
+        PasskeyCredentialIn: {
+            /**
+             * Credential
+             * @description PublicKeyCredential JSON from navigator.credentials.create()/get()
+             */
+            credential: {
+                [key: string]: unknown;
+            };
+        };
+        /** PasskeyOut */
+        PasskeyOut: {
+            /** Id */
+            id: number;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "student" | "guardian";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Last Used At */
+            last_used_at: string | null;
+            /**
+             * Approve After
+             * Format: date-time
+             */
+            approve_after: string;
+            /** Revoked */
+            revoked: boolean;
         };
         /** ProgrammeSeats */
         ProgrammeSeats: {
@@ -1580,6 +1893,26 @@ export interface components {
             /** Excess */
             excess: number;
         };
+        /** SetupOut */
+        SetupOut: {
+            /**
+             * Setup Token
+             * @description 15-minute session that can only register a passkey
+             */
+            setup_token: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "student" | "guardian";
+            /**
+             * Reissue
+             * @description code was a reissue: the new passkey can't approve consent for 24 h
+             */
+            reissue: boolean;
+            /** Expires In */
+            expires_in: number;
+        };
         /** StateRow */
         StateRow: {
             /** State */
@@ -1631,6 +1964,17 @@ export interface components {
             apaar_status: string;
             /** Enrolments */
             enrolments: components["schemas"]["StudentEnrolment"][];
+            /**
+             * Passkey Cooldown Until
+             * @description a new passkey (first activation: PASSKEY_FIRST_COOLDOWN_HOURS; reissued code: 24 h) can't approve consent until then; the portal shows a notice
+             */
+            passkey_cooldown_until?: string | null;
+            /**
+             * Viewer
+             * @default student
+             * @enum {string}
+             */
+            viewer: "student" | "guardian";
         };
         /** ValidationError */
         ValidationError: {
@@ -2458,6 +2802,284 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auth_config_v1_auth_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthConfig"];
+                };
+            };
+        };
+    };
+    activate_v1_auth_activate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_register_options_v1_passkeys_register_options_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    passkey_register_verify_v1_passkeys_register_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyCredentialIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    passkey_login_options_v1_auth_passkey_options_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    passkey_login_verify_v1_auth_passkey_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyCredentialIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_passkeys_v1_passkeys_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyOut"][];
+                };
+            };
+        };
+    };
+    revoke_passkey_v1_passkeys__passkey_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                passkey_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activation_code_v1_enrolments__enrolment_id__activation_code_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                enrolment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivationCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivationCodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_approve_options_v1_consents__consent_id__approve_options_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                consent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
