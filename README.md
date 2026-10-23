@@ -11,7 +11,7 @@ Institutions upload student-level records keyed by **APAAR ID**. The platform va
 > - The APAAR registry, the AICTE approval (EOA) registry, OTP and the identity provider are **mocks**, labelled `MOCK` in API responses.
 > - There is **no** integration with real APAAR, ABC, DigiLocker or AICTE systems.
 > - The design follows the principles of the DPDP Act 2023. It has **not** been assessed for compliance.
-> - The upload → validation → monitoring slice is built and tested (backend and web UI). The credential/consent features are **not built yet** (see [Status](#status)).
+> - The full flow is built and tested, from upload and validation through monitoring to verifiable credentials, consent and certificates, in both the backend and the web UI. Reports, anomaly detection and some integrations are still open (see [Status](#status)).
 
 ---
 
@@ -49,14 +49,14 @@ How far each PS requirement has got, with the evidence in the test suite:
 |---|---|---|
 | 1. Secure upload/API keyed by APAAR, and updates | ✅ Backend | CSV and JSON batch upload, `Idempotency-Key`, `PATCH` withdraw/migrate/correct |
 | 2. Approved intake, enrolment, supernumerary, NRI/OCI/FN fields | ✅ | Approved intake comes from the registry only. FN/OCI/CIWG supernumerary pool at 15% of intake, with a 1/3 CIWG sub-cap |
-| 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | ✅ | 17 validation codes, one unit test each. Labelled scenario passes 450/450 rows through the API |
+| 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | ✅ | 19 validation codes (incl. student-ID E105/E205), one unit test each. Labelled scenario passes 455/455 rows through the API |
 | 4. Real-time dashboards (AICTE + institutions) | ✅ | Institution and AICTE web dashboards that refresh every 3 s by polling (no SSE push yet) |
-| 5. Secure verification for stakeholders | ❌ Planned | W3C VC verify endpoint + consent |
-| 6. Verifiable student records | ❌ Planned | W3C VC 2.0, `eddsa-jcs-2022`, Bitstring Status List |
-| 7. Integration/API | 🟡 | REST API + OpenAPI. Webhooks and the ERP connector are deferred |
-| 8. Security, privacy, auth, RBAC, audit, consent | 🟡 | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent not built yet |
+| 5. Secure verification for stakeholders | ✅ | `POST /v1/verify`: VALID / REVOKED / SUSPENDED / UNTRUSTED_ISSUER / TAMPERED / EXPIRED. Employer access is consent-gated. AICTE and the auditor get masked data. Verifier web page |
+| 6. Verifiable student records | ✅ | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the **official W3C test vectors**. Trust registry (MOCK) and Bitstring Status Lists |
+| 7. Integration/API | 🟡 | REST API + OpenAPI, public status lists, DID documents and a signed registry snapshot. Webhooks and the ERP connector are deferred |
+| 8. Security, privacy, auth, RBAC, audit, consent | ✅ | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent with OTP (MOCK), guardian path for under-18s (MOCK, self-asserted). Student transparency log |
 | 9. Reports | 🟡 | Per-batch error report CSV. Policy/accreditation reports planned |
-| 10. APAAR ID + student ID on certificates | ❌ Planned | Printable certificate with QR |
+| 10. APAAR ID + student ID on certificates | ✅ | Printable certificate showing both IDs in full, with a QR holding the signed credential (`AV1:` + Base45(zlib), RFC 9285). Measured at 1,012 chars, which fits one QR at error-correction level M |
 
 Day-to-day progress, blockers and limitations are tracked in [`TASKS.md`](TASKS.md). What is in or out of scope is in [`MVP_SCOPE.md`](MVP_SCOPE.md).
 
@@ -121,7 +121,20 @@ npm run dev
 - **Institution:** drag-and-drop CSV upload with instant validation results, plus a downloadable template. Re-uploading the same file returns the original batch (the Idempotency-Key is the file's SHA-256). Also shows seats vs approved intake per category with over-cap highlighting, neutral AICTE notices, and upload history.
 - **Batch issues:** row-level issues with severity and code filters, fix hints, and a CSV report.
 - **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, and seat-ledger verify / sign checkpoint.
-- **Verifier and registrar:** placeholder pages for now.
+- **Institution student records:** find a student by APAAR ID or student ID, issue an enrolment credential, mark the enrolment completed or withdrawn (withdrawal revokes their credentials), and suspend a credential or lift the suspension.
+- **Student** (sign in with APAAR ID + MOCK OTP `123456`): enrolments, credential wallet, the consent inbox (approve, deny, revoke, guardian path), a printable certificate with QR, and **who accessed my data**.
+- **Verifier** (`employer`): request consent for specific fields, fetch and verify the consent-scoped credential, a verify tool (paste JSON or the certificate QR text), and a forged-credential demo.
+- **University registrar** (`univ`): award degree credentials to affiliated institutions' students whose enrolment is completed.
+- **Verify a credential:** available from the header for AICTE, the auditor, institutions and the registrar.
+
+**Credentials demo in 2 minutes:**
+1. Sign in as `inst-a`, upload `A1.csv`, find a student, and issue an enrolment credential.
+2. As `employer`, request consent with that student's APAAR ID.
+3. As the student, approve with OTP `123456`.
+4. As `employer`, fetch and verify: the result is **VALID**.
+5. As `inst-a`, withdraw the student, then verify again as `employer`: the result is **REVOKED**.
+6. As `inst-a`, mark another student completed. As `univ`, award the degree and open **Certificate & QR**.
+7. As `aicte`, open **Verify a credential** and try the forged credential: the result is **UNTRUSTED ISSUER**.
 
 API types in `frontend/src/api/schema.d.ts` are generated from `backend/openapi.json` with `npm run gen:api`. Never edit them by hand.
 
@@ -143,8 +156,9 @@ Both files are gitignored. For a production deployment, keys belong in a KMS/HSM
 | `inst-d` | institution_admin | Closed Polytechnic (not approved) |
 | `aicte` | aicte_officer | National monitoring |
 | `auditor` | auditor | Read-only regulator |
-| `employer` | verifier | Credential verification (planned) |
-| `univ` | university_registrar | Degree issuance (planned) |
+| `employer` | verifier | Consent-based credential verification |
+| `univ` | university_registrar | Degree issuance for affiliated institutions A and B |
+| *(any uploaded student)* | student | APAAR ID + MOCK OTP `123456` |
 
 ## Trying the API
 
@@ -207,9 +221,16 @@ What is implemented and tested:
 - **Auth and roles.** Passwords are hashed with Argon2. JWTs are HS256. A role guard protects every endpoint, and an access-matrix test covers every endpoint × every role, including wrong-institution access.
 - **Audit log.** Uploads, record reads, exports and updates are logged with actor, role, reason and request id.
 - **Safe exports.** CSV formula-injection characters are neutralised in exports.
+- **Verifiable credentials.**
+  - Signing uses W3C Data Integrity `eddsa-jcs-2022`, checked byte for byte against the official W3C test vectors (pinned in `backend/tests/vectors/`).
+  - An issuer is trusted only if it is in the AICTE registry and was approved when the credential was issued.
+  - Revocation and suspension use W3C Bitstring Status Lists: 131,072 entries (the spec minimum), random indexes from a CSPRNG, and signed public lists that expire after 24 h.
+  - Stored credentials are encrypted.
+  - Consent-scoped credentials carry only the fields the student approved. The issuing institution can't see them.
+  - A verification is linked to a student's access log only when the exact stored credential is presented.
 - **Crypto against standard vectors.** The primitives are checked against RFC 8032 (Ed25519), RFC 4231 (HMAC), the McGrew–Viega GCM vectors and the RFC 8785 (JCS) example.
 
-A security review of the RLS change found no high-severity issues. Its medium findings are fixed, and the open low findings are listed in [`TASKS.md`](TASKS.md).
+Security reviews of the RLS, credential and consent changes found no high-severity issues. All medium findings are fixed. The open low findings are listed in [`TASKS.md`](TASKS.md).
 
 ## Tests and evaluation
 
@@ -258,6 +279,10 @@ These are the main ones; the full list is in [`TASKS.md`](TASKS.md).
 - **Rejected rows don't count yet.** Rows rejected with errors don't count toward intake until they are corrected. Dashboards show the rejected-row total so they can't silently disappear.
 - **Latin script only.** Name matching doesn't handle Indic scripts, and fuzzy (no-APAAR) duplicate matching is deferred.
 - **No migrations.** Schema changes need `app.seed --reset`.
+- **MOCK student sign-in.** Students sign in with APAAR ID + a fixed OTP, so anyone who knows an APAAR can sign in as that student in the demo. Guardian approval for under-18s is self-asserted (labelled MOCK in the signed consent artifact). Production needs real APAAR/DigiLocker authentication and linked guardian accounts.
+- **Online verification only.** Verification uses the API. The signed registry snapshot and status lists make offline verification possible, but no offline browser verifier is built yet. There is no camera QR scanner: paste the QR text instead.
+- **APAAR existence signal.** A verifier's consent request reveals whether an APAAR ID is registered on the platform. This is accepted because verifiers are vetted, audited stakeholders.
+- **Demo DIDs.** DIDs are `did:web` style ids on a demo host. The DID documents are served by this API at `/dids/...`, not at the real `did:web` URL.
 - **Local key file.** Keys sit in a local file, not a KMS/HSM.
 
 ## Documents

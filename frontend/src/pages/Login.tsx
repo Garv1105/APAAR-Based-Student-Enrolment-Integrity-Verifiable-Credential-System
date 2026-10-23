@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ApiError, login, type Session } from "../api/client";
+import { ApiError, login, studentLogin, type Session } from "../api/client";
 import { Button, ErrorNote } from "../ui";
 
 // Seeded MOCK identities (backend/data/seed/registry.json). Shown so judges can switch roles quickly.
@@ -10,8 +10,8 @@ const DEMO_USERS = [
   { id: "inst-d", label: "Closed Polytechnic", sub: "Institution · not approved", group: "Institutions" },
   { id: "aicte", label: "AICTE Monitoring Officer", sub: "National monitoring", group: "Regulators" },
   { id: "auditor", label: "Regulator (auditor)", sub: "Read-only", group: "Regulators" },
-  { id: "employer", label: "Acme Hiring (verifier)", sub: "Planned", group: "Verification" },
-  { id: "univ", label: "University registrar", sub: "Planned", group: "Verification" },
+  { id: "employer", label: "Acme Hiring (verifier)", sub: "Employer · consent-based checks", group: "Verification" },
+  { id: "univ", label: "Demo Technological University", sub: "Registrar · awards degrees", group: "Verification" },
 ];
 
 export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
@@ -65,6 +65,47 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
         </div>
         {error && <ErrorNote>{error}</ErrorNote>}
       </form>
+      <StudentSignIn onLogin={onLogin} />
     </div>
+  );
+}
+
+function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
+  const [apaar, setApaar] = useState("");
+  const [otp, setOtp] = useState("123456");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), otp));
+    } catch (err) {
+      setError(err instanceof ApiError ? (err.status === 401 ? "Unknown APAAR ID or wrong OTP." : err.text) : "Cannot reach the API.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-semibold">Students</h2>
+      <p className="mt-1 text-xs text-slate-500">Sign in with your APAAR ID and the OTP (MOCK: always 123456). Any uploaded student can sign in.</p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="text-sm">
+          <span className="block text-slate-700">APAAR ID</span>
+          <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits"
+            className="mt-1 w-52 rounded-lg border border-slate-300 px-3 py-1.5 font-mono" />
+        </label>
+        <label className="text-sm">
+          <span className="block text-slate-700">OTP</span>
+          <input value={otp} onChange={(e) => setOtp(e.target.value)} required inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-3 py-1.5" />
+        </label>
+        <Button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in as student"}</Button>
+      </div>
+      {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+    </form>
   );
 }

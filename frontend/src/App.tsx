@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
 import { loadSession, saveSession, setUnauthorizedHandler, type Role, type Session } from "./api/client";
+import { VerifyTool } from "./credentials";
 import AicteHome from "./pages/Aicte";
 import BatchDetail from "./pages/Batch";
+import Certificate from "./pages/Certificate";
 import InstitutionHome from "./pages/Institution";
 import Login from "./pages/Login";
-import { Card, go } from "./ui";
+import RegistrarHome from "./pages/Registrar";
+import StudentHome from "./pages/Student";
+import VerifierHome from "./pages/Verifier";
+import { go } from "./ui";
 
 /** Tiny hash router: #/inst, #/inst/batch/12, #/aicte. */
 function useHash() {
@@ -19,8 +24,9 @@ function useHash() {
 
 const HOME: Record<Role, string> = {
   institution_admin: "/inst", aicte_officer: "/aicte", auditor: "/aicte",
-  verifier: "/planned", university_registrar: "/planned", student: "/planned",
+  verifier: "/verifier", university_registrar: "/registrar", student: "/student",
 };
+const CAN_VERIFY: Role[] = ["institution_admin", "aicte_officer", "auditor", "university_registrar"];
 const ROLE_LABEL: Record<Role, string> = {
   institution_admin: "Institution", aicte_officer: "AICTE officer", auditor: "Auditor (read-only)",
   verifier: "Verifier", university_registrar: "University registrar", student: "Student",
@@ -36,11 +42,17 @@ export default function App() {
   if (!session) return <Shell><Login onLogin={(s) => { setSession(s); go(HOME[s.role]); }} /></Shell>;
 
   const batch = hash.match(/^\/inst\/batch\/(\d+)$/);
+  const cert = hash.match(/^\/certificate\?id=(.+)$/);
+  const r = session.role;
   let page;
-  if (session.role === "institution_admin" && batch) page = <BatchDetail id={Number(batch[1])} />;
-  else if (session.role === "institution_admin") page = <InstitutionHome />;
-  else if (session.role === "aicte_officer" || session.role === "auditor") page = <AicteHome role={session.role} />;
-  else page = <Planned role={session.role} />;
+  if (cert && ["student", "institution_admin", "university_registrar"].includes(r)) page = <Certificate id={decodeURIComponent(cert[1])} />;
+  else if (hash === "/verify" && CAN_VERIFY.includes(r)) page = <VerifyTool allowForgedDemo={r === "aicte_officer" || r === "auditor"} />;
+  else if (r === "institution_admin" && batch) page = <BatchDetail id={Number(batch[1])} />;
+  else if (r === "institution_admin") page = <InstitutionHome />;
+  else if (r === "aicte_officer" || r === "auditor") page = <AicteHome role={r} />;
+  else if (r === "verifier") page = <VerifierHome />;
+  else if (r === "university_registrar") page = <RegistrarHome />;
+  else page = <StudentHome />;
 
   return (
     <Shell session={session} roleLabel={ROLE_LABEL[session.role]} onLogout={logout}>
@@ -66,6 +78,9 @@ function Shell({ session, roleLabel, onLogout, children }: { session?: Session; 
           </a>
           {session && (
             <div className="flex items-center gap-3 text-sm">
+              {CAN_VERIFY.includes(session.role) && (
+                <a href="#/verify" className="rounded-lg px-3 py-1.5 text-xs font-medium hover:bg-white/10">Verify a credential</a>
+              )}
               <span className="text-right leading-tight">
                 <span className="block font-medium">{session.display_name}</span>
                 <span className="block text-xs text-white/70">{roleLabel}</span>
@@ -80,16 +95,5 @@ function Shell({ session, roleLabel, onLogout, children }: { session?: Session; 
         Designed in line with the principles of the DPDP Act 2023 · not a compliance claim
       </footer>
     </div>
-  );
-}
-
-function Planned({ role }: { role: Role }) {
-  return (
-    <Card title="Coming in the next phase">
-      <p className="text-sm text-slate-600">
-        The {ROLE_LABEL[role].toLowerCase()} view (W3C Verifiable Credential issue/verify, consent, certificate QR) is planned and not built yet.
-        Sign in as an institution or AICTE user to see the working parts.
-      </p>
-    </Card>
   );
 }

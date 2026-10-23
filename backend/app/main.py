@@ -297,9 +297,10 @@ def list_credentials(request: Request, enrolment_id: int | None = None,
                      conn=Depends(get_conn)):
     rows = conn.execute("SELECT * FROM credentials WHERE (%s::bigint IS NULL OR enrolment_id = %s) ORDER BY issued_at DESC LIMIT 200",
                         (enrolment_id, enrolment_id)).fetchall()
-    for r in rows:
-        auth.audit(conn, user, "credential.read", "credential", r["id"], student_id=r["subject_student_id"], request=request)
-    conn.commit()
+    if user["role"] != "student":  # a student viewing their own wallet isn't an access by someone else (D6 log stays meaningful)
+        for r in rows:
+            auth.audit(conn, user, "credential.read", "credential", r["id"], student_id=r["subject_student_id"], request=request)
+        conn.commit()
     return [_credential_out(conn, r, user) for r in rows]
 
 

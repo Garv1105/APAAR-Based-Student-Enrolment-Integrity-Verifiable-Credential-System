@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ApiError } from "./api/client";
+import { ApiError, loadSession } from "./api/client";
 
 export const go = (path: string) => { window.location.hash = path; };
 
@@ -18,6 +18,7 @@ export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
   ref.current = fetcher;
 
   const refresh = useCallback(async () => {
+    if (!loadSession()) return;  // signed out between ticks: don't fire an unauthenticated request
     try {
       setData(await ref.current());
       setError(null);

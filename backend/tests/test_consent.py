@@ -61,6 +61,9 @@ def test_full_consent_flow_minimal_fields_and_transparency_log(client):
     assert {("consent.request", "employer"), ("credential.verify", "employer")} <= actions
     assert any(e["action"] == "consent.grant" for e in log)
     assert any(e["reason"] == "consent-credential-fetch" for e in log)
+    client.get("/v1/credentials", headers=hs)  # the student's own wallet views don't clutter their access log
+    assert not any(e["action"] == "credential.read" and e["role"] == "student"
+                   for e in client.get("/v1/students/me/access-log", headers=hs).json())
     me = client.get("/v1/students/me", headers=hs).json()
     assert me["apaar_masked"].endswith(r["apaar_id"][-4:]) and me["enrolments"][0]["institution_student_id"] == r["institution_student_id"]
 

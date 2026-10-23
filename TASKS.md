@@ -10,10 +10,21 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - **Student ID:** required and unique per institution. Codes **E105** (blank) and **E205** (duplicate in the file, or matching an active enrolment at the same institution) are done. The teammate is adding the column to `synthetic/`.
 - **Plan file:** `IMPLEMENTATION_PLAN.md` kept, with the T7.1 section merged in. The generator source is committed in `synthetic/`. `*.zip`, `/data/` and `/data_demo/` are gitignored.
 
-**Where things stand:** `main` = `36c3bf4` on GitHub, plus local commits T7.1 (generator) and T2.2 (student ID).
-- **Backend:** upload, deterministic validation (17 codes), intake engine with row locks, cross-institution duplicates, seat ledger, RLS (`app_user`), audit, typed contract.
-- **Frontend:** sign-in, upload, batch issues, institution and AICTE dashboards.
-- **Checks:** 54 backend tests green (455-row labelled scenario exact through the API); frontend build green; headless UI check passed at desktop and 390 px.
+**Where things stand:** `main` = `36c3bf4` on GitHub. Local, not yet pushed: T7.1 generator, T2.2 student ID, and T5.x credentials (branch `t5.2-vc`).
+- **Backend:**
+  - upload; deterministic validation (19 codes); intake engine with row locks; cross-institution duplicates; seat ledger; RLS (`app_user`); audit; typed contract
+  - **W3C credentials:**
+    - Enrolment, Degree and consent-scoped Verification credentials, signed with `eddsa-jcs-2022` (official W3C vectors pass byte for byte)
+    - trust registry (MOCK), Bitstring Status Lists, verify endpoint
+    - consent with a guardian path (MOCK), student transparency log, certificate QR (`AV1:` + Base45)
+- **Frontend:**
+  - sign-in (staff and students); upload; batch issues; institution and AICTE dashboards
+  - institution student records; student portal; verifier portal; registrar page; printable certificate; verify tool
+- **Checks:**
+  - 83 backend tests green
+  - frontend build green
+  - headless walkthroughs of the upload/monitoring flow and of the full credentials demo (issue → consent → VALID → withdraw → REVOKED → degree + certificate → forged = UNTRUSTED), both passing
+- **Security reviews (credentials 59d5172, consent d61a174):** no high findings. All mediums fixed; lows fixed except those listed under limitations.
 - **How to run:** README "Quick start", or the CLAUDE.md commands.
 
 **Open items (not started):**
@@ -23,10 +34,11 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - **Gemini column mapping (use case A):** headers plus synthetic samples only, behind a PII scrubber and audit, paid tier only, confirm before apply, outputs limited to enum targets. Needs a billing-enabled key and a dependency decision. Deterministic alias mapping (dataset branch) is the fallback.
 
 **Next task options:**
-- **A. Credentials (T5.1–T5.8), in progress:**
-  - Fetch the official `eddsa-jcs-2022` test vectors from the W3C spec and match them exactly before trusting the implementation.
-  - Then build the trust registry (`did:web` style), the Bitstring Status List (confirm the 131,072 minimum in the spec), consent (request → mock OTP approve → scoped VerificationCredential), the verifier page (VALID/REVOKED/UNTRUSTED/TAMPERED/EXPIRED) and the printable certificate with APAAR ID, student ID and QR.
-  - Credential, consent and issuer tables already exist with RLS deny-by-default; add policies with each feature.
+- **A. Credentials (T5.1–T5.9), done.** Remaining credential gaps:
+  - offline browser verifier (needs JS Ed25519 + JCS dependencies)
+  - camera QR scanning
+  - a real guardian identity
+  - DigiLocker mock push (T5.10)
 - **B. Dataset integration (~5–7 h), owned by the teammate on a separate branch:**
   - Deterministic header-alias and value normalisation: dates in `dd/mm/yyyy`, `dd-mm-yyyy`, `dd.mm.yyyy` and Excel serials; Y/Yes/1/TRUE booleans; APAAR with spaces or hyphens is valid; category spellings.
   - XLSX input, title rows, `;` delimiter.
@@ -73,13 +85,14 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - [x] JWT auth, role guard, audit log on writes/reads/exports
 
 ### H15–22 Verification
-- [ ] eddsa-jcs-2022 issue/verify, trust registry, status list
-- [ ] Consent request/approve, VerificationCredential
-- [ ] Verifier page
+- [x] eddsa-jcs-2022 issue/verify (official W3C vectors), trust registry, status lists (T5.1–T5.4)
+- [x] Consent request/approve/deny/revoke, consent-scoped VerificationCredential, guardian path (MOCK) (T5.5, T5.6)
+- [x] Verifier page, student portal, registrar page, institution student records
 
 ### H22–27 Outputs
-- [ ] Certificate print page + QR
-- [ ] AICTE charts, CSV reports, student access log
+- [x] Certificate print page + QR with APAAR ID and student ID (T5.7)
+- [x] Student access log (T5.9)
+- [ ] CSV policy/accreditation reports (Req 9)
 
 ### H27–30 Stretch (drop first)
 - [ ] Anomaly rules + DQS
@@ -93,11 +106,11 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 
 ## Integration risks
 1. Python 3.14 wheels — **resolved**, all deps installed.
-2. Bitstring Status List minimum length (131,072) — confirm in W3C spec before claiming herd privacy.
+2. Bitstring Status List minimum length (131,072): **resolved**. Confirmed in the W3C spec source (16KB uncompressed) and implemented.
 3. Seat caps beyond FN/OCI/CIWG (TFW, PMSSS, J&K, PwD, lateral entry) are not verified against the Handbook → not modelled.
 4. Contract drift: `contracts.py` is the single contract; `openapi.json` exported from it.
 5. OneDrive sync may lock files during npm install.
-6. eddsa-jcs-2022: interoperability depends on matching the W3C spec test vector; until checked it is "self-consistent only".
+6. eddsa-jcs-2022 interoperability: **resolved**. The official W3C vectors (w3c/vc-di-eddsa @ 13e7070) reproduce byte for byte.
 
 ## Not implemented (see MVP_SCOPE.md Deferred)
 Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy matching, Merkle checkpoints, D2 pre-check, Isolation Forest, PDF reports, guardian consent flow, SSE (stretch).
@@ -115,4 +128,10 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
 - Security review t0.6 (no high findings; M1–M3, L3–L5 fixed). Open lows: L1 student_id_by_bi tells an institution, during ingestion, whether a person row exists for a submitted APAAR; L2 an institution can read the full enrolment_ids array of a duplicate case it is part of (other side's internal ids, no PII) — fix with a scoped view when case resolution is built.
 - Schema changes need `app.seed --reset` (drops and rebuilds the demo DB); there are no migrations.
 - Name matching is Latin-script only (no Indic transliteration).
+- Credentials:
+  - Student sign-in is MOCK (APAAR + fixed OTP). Guardian approval is self-asserted, and labelled MOCK in the consent artifact.
+  - Verification is online only; there is no offline browser verifier and no camera scanner.
+  - A verifier's consent request reveals whether an APAAR is registered (accepted: vetted, audited stakeholders).
+  - Regulators see credentials masked, but there is no unmask-with-reason endpoint yet.
+  - Two requests racing with the same issuance Idempotency-Key get a 500 instead of a replay.
 - Keys come from a local `backend/.keys.json` file generated at first run (prototype only; production = KMS/HSM).

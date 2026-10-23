@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/student-login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Student Login
+         * @description MOCK student sign-in: APAAR ID + fixed demo OTP (123456). Production: APAAR/DigiLocker authentication.
+         */
+        post: operations["student_login_v1_auth_student_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/batches": {
         parameters: {
             query?: never;
@@ -138,7 +158,7 @@ export interface paths {
         };
         /**
          * Find Enrolments
-         * @description Own institution only. Lookup by APAAR or institution student id.
+         * @description Institution: own enrolments. University registrar: its affiliated institutions' enrolments (RLS). Lookup by APAAR or institution student id.
          */
         get: operations["find_enrolments_v1_enrolments_get"];
         put?: never;
@@ -271,10 +291,384 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/credentials/{enrolment_id}/issue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Credential
+         * @description EnrolmentCredential: the student's institution. DegreeCredential (completed enrolments): the affiliated university registrar. Accepts Idempotency-Key.
+         */
+        post: operations["issue_credential_v1_credentials__enrolment_id__issue_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Credentials
+         * @description Credentials visible to the caller (issuer, subject student or regulator), optionally for one enrolment.
+         */
+        get: operations["list_credentials_v1_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/credentials/certificate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Credential Certificate
+         * @description Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.
+         */
+        get: operations["credential_certificate_v1_credentials_certificate_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/credentials/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change Credential Status
+         * @description Issuer revokes/suspends (or un-suspends) one of its own credentials via the Bitstring Status List.
+         */
+        post: operations["change_credential_status_v1_credentials_status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify Credential
+         * @description Online verification helper. The same checks can be run offline with the signed registry snapshot and status lists.
+         */
+        post: operations["verify_credential_v1_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/status/{list_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Status List
+         * @description Public, cacheable: signed BitstringStatusListCredential.
+         */
+        get: operations["status_list_status__list_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/registry/issuers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Registry Issuers
+         * @description Public trust registry (MOCK, D4).
+         */
+        get: operations["registry_issuers_v1_registry_issuers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/registry/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Registry Snapshot
+         * @description Public: AICTE-signed registry snapshot for offline verifiers, plus the AICTE key.
+         */
+        get: operations["registry_snapshot_v1_registry_snapshot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dids/{path}/did.json": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Did Doc
+         * @description did:web style DID documents, e.g. /dids/inst/1-0000000001/did.json
+         */
+        get: operations["did_doc_dids__path__did_json_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/demo/forged-credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Demo Forged
+         * @description DEMO ONLY: a credential signed by an issuer outside the registry.
+         */
+        get: operations["demo_forged_v1_demo_forged_credential_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents/requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consent Request
+         * @description Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose.
+         */
+        post: operations["consent_request_v1_consents_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consent List
+         * @description Verifier: its own requests. Student: requests about them. Regulators: all.
+         */
+        get: operations["consent_list_v1_consents_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents/{consent_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consent Approve
+         * @description Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.
+         */
+        post: operations["consent_approve_v1_consents__consent_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents/{consent_id}/deny": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Consent Deny */
+        post: operations["consent_deny_v1_consents__consent_id__deny_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents/{consent_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Consent Revoke
+         * @description Student withdraws consent; the VerificationCredential is revoked via the status list.
+         */
+        post: operations["consent_revoke_v1_consents__consent_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/consents/{consent_id}/credential": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Consent Credential
+         * @description Verifier fetches the VerificationCredential for its granted consent.
+         */
+        get: operations["consent_credential_v1_consents__consent_id__credential_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Student Me */
+        get: operations["student_me_v1_students_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/me/access-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Student Access Log
+         * @description D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).
+         */
+        get: operations["student_access_log_v1_students_me_access_log_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccessLogEntry */
+        AccessLogEntry: {
+            /**
+             * Ts
+             * Format: date-time
+             */
+            ts: string;
+            /** Actor */
+            actor: string;
+            /** Role */
+            role: string;
+            /** Action */
+            action: string;
+            /** Reason */
+            reason: string | null;
+            /** Entity */
+            entity: string;
+            /** Entity Id */
+            entity_id: string | null;
+        };
         /** AicteDashboard */
         AicteDashboard: {
             totals: components["schemas"]["AicteTotals"];
@@ -384,6 +778,25 @@ export interface components {
             /** No Apaar */
             no_apaar: number;
         };
+        /** CertificateOut */
+        CertificateOut: {
+            /** Credential */
+            credential: {
+                [key: string]: unknown;
+            };
+            /**
+             * Qr Payload
+             * @description offline QR: 'AV1:' + Base45(zlib(VC JSON))
+             */
+            qr_payload: string;
+            /** Qr Payload Chars */
+            qr_payload_chars: number;
+            /**
+             * Qr Svg
+             * @description QR code image (SVG), error correction level M
+             */
+            qr_svg: string;
+        };
         /** CheckpointOut */
         CheckpointOut: {
             /** Id */
@@ -414,6 +827,129 @@ export interface components {
             last_upload: string | null;
             /** Batches */
             batches: number;
+        };
+        /** ConsentApprove */
+        ConsentApprove: {
+            /**
+             * Otp
+             * @description MOCK OTP; demo value is 123456
+             */
+            otp: string;
+            /**
+             * Approved By
+             * @default student
+             * @enum {string}
+             */
+            approved_by: "student" | "guardian";
+            /**
+             * Guardian Otp
+             * @description required when the student is under 18 (MOCK OTP 123456)
+             */
+            guardian_otp?: string | null;
+        };
+        /** ConsentCredentialOut */
+        ConsentCredentialOut: {
+            consent: components["schemas"]["ConsentOut"];
+            /**
+             * Credential
+             * @description VerificationCredential holding only the approved fields
+             */
+            credential: {
+                [key: string]: unknown;
+            };
+        };
+        /** ConsentOut */
+        ConsentOut: {
+            /** Id */
+            id: number;
+            /** Requester */
+            requester: string;
+            /** Purpose */
+            purpose: string;
+            /** Fields */
+            fields: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "granted" | "denied" | "revoked" | "expired";
+            /** Granted By */
+            granted_by: ("student" | "guardian") | null;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Credential Id */
+            credential_id?: string | null;
+        };
+        /** ConsentRequestIn */
+        ConsentRequestIn: {
+            /** Apaar Id */
+            apaar_id: string;
+            /**
+             * Purpose
+             * @description shown to the student; plain text only
+             */
+            purpose: string;
+            /** Fields */
+            fields: ("name" | "programme" | "institution" | "academic_year" | "status" | "apaar_id" | "student_id")[];
+            /**
+             * Valid Days
+             * @default 7
+             */
+            valid_days: number;
+        };
+        /** CredentialOut */
+        CredentialOut: {
+            /** Id */
+            id: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "EnrolmentCredential" | "DegreeCredential" | "VerificationCredential";
+            /** Issuer Did */
+            issuer_did: string;
+            /**
+             * Issued At
+             * Format: date-time
+             */
+            issued_at: string;
+            status: components["schemas"]["CredentialStatusFlags"];
+            /**
+             * Credential
+             * @description the signed W3C VC 2.0 document (eddsa-jcs-2022 DataIntegrityProof)
+             */
+            credential: {
+                [key: string]: unknown;
+            };
+        };
+        /** CredentialStatusFlags */
+        CredentialStatusFlags: {
+            /** Revocation */
+            revocation: boolean;
+            /** Suspension */
+            suspension: boolean;
+        };
+        /** CredentialStatusIn */
+        CredentialStatusIn: {
+            /** Credential Id */
+            credential_id: string;
+            /**
+             * Purpose
+             * @enum {string}
+             */
+            purpose: "revocation" | "suspension";
+            /** Value */
+            value: boolean;
+            /** Reason */
+            reason: string;
         };
         /** EnrolmentOut */
         EnrolmentOut: {
@@ -525,6 +1061,14 @@ export interface components {
             /** Fix Hint */
             fix_hint: string;
         };
+        /** IssueIn */
+        IssueIn: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "EnrolmentCredential" | "DegreeCredential";
+        };
         /** IssuesPage */
         IssuesPage: {
             /** Items */
@@ -586,6 +1130,34 @@ export interface components {
             /** Lines */
             lines: components["schemas"]["SeatLine"][];
         };
+        /** RegistryIssuer */
+        RegistryIssuer: {
+            /** Did */
+            did: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "institution" | "university";
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+            /** Validfrom */
+            validFrom: string;
+            /** Validuntil */
+            validUntil: string | null;
+            /** Verificationmethod */
+            verificationMethod: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Source
+             * @default mock
+             * @constant
+             */
+            source: "mock";
+        };
         /** SeatLine */
         SeatLine: {
             /** Category Code */
@@ -608,6 +1180,43 @@ export interface components {
             /** Fill Pct */
             fill_pct: number | null;
         };
+        /** StudentEnrolment */
+        StudentEnrolment: {
+            /** Programme */
+            programme: string;
+            /** Institution */
+            institution: string;
+            /** Academic Year */
+            academic_year: string;
+            /** Status */
+            status: string;
+            /** Institution Student Id */
+            institution_student_id: string;
+        };
+        /** StudentLoginIn */
+        StudentLoginIn: {
+            /**
+             * Apaar Id
+             * @description 12-digit APAAR ID
+             */
+            apaar_id: string;
+            /**
+             * Otp
+             * @description MOCK OTP; demo value is 123456
+             */
+            otp: string;
+        };
+        /** StudentProfile */
+        StudentProfile: {
+            /** Apaar Masked */
+            apaar_masked: string | null;
+            /** Provisional Id */
+            provisional_id: string | null;
+            /** Apaar Status */
+            apaar_status: string;
+            /** Enrolments */
+            enrolments: components["schemas"]["StudentEnrolment"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -620,6 +1229,54 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** VerifyChecks */
+        VerifyChecks: {
+            /** Well Formed */
+            well_formed: boolean;
+            /** Issuer Trusted */
+            issuer_trusted: boolean;
+            /** Signature Valid */
+            signature_valid: boolean;
+            /** Within Validity */
+            within_validity: boolean;
+            /** Not Revoked */
+            not_revoked: boolean;
+            /** Not Suspended */
+            not_suspended: boolean;
+        };
+        /** VerifyIn */
+        VerifyIn: {
+            /**
+             * Credential
+             * @description the VC JSON document
+             */
+            credential?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Qr
+             * @description or the scanned certificate QR text: 'AV1:' + Base45(zlib(VC))
+             */
+            qr?: string | null;
+        };
+        /** VerifyOut */
+        VerifyOut: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "VALID" | "REVOKED" | "SUSPENDED" | "UNTRUSTED_ISSUER" | "TAMPERED" | "EXPIRED" | "MALFORMED";
+            checks: components["schemas"]["VerifyChecks"];
+            /** Issuer Name */
+            issuer_name?: string | null;
+            /**
+             * Subject
+             * @description credentialSubject, omitted when the signature fails
+             */
+            subject?: {
+                [key: string]: unknown;
+            } | null;
         };
     };
     responses: never;
@@ -660,6 +1317,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_login_v1_auth_student_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StudentLoginIn"];
             };
         };
         responses: {
@@ -1027,6 +1717,514 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    issue_credential_v1_credentials__enrolment_id__issue_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                enrolment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IssueIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_credentials_v1_credentials_get: {
+        parameters: {
+            query?: {
+                enrolment_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    credential_certificate_v1_credentials_certificate_get: {
+        parameters: {
+            query: {
+                id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CertificateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_credential_status_v1_credentials_status_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CredentialStatusIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    verify_credential_v1_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VerifyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_list_status__list_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                list_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    registry_issuers_v1_registry_issuers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegistryIssuer"][];
+                };
+            };
+        };
+    };
+    registry_snapshot_v1_registry_snapshot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    did_doc_dids__path__did_json_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    demo_forged_v1_demo_forged_credential_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    consent_request_v1_consents_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_list_v1_consents_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"][];
+                };
+            };
+        };
+    };
+    consent_approve_v1_consents__consent_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                consent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsentApprove"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentCredentialOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_deny_v1_consents__consent_id__deny_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                consent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_revoke_v1_consents__consent_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                consent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    consent_credential_v1_consents__consent_id__credential_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                consent_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    student_me_v1_students_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentProfile"];
+                };
+            };
+        };
+    };
+    student_access_log_v1_students_me_access_log_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessLogEntry"][];
                 };
             };
         };
