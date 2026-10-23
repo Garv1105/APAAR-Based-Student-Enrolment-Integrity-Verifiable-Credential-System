@@ -85,7 +85,7 @@ export default function AicteHome({ role }: { role: Role }) {
           </dl>
         </Card>
         <Card title="Upload compliance" className="lg:col-span-2">
-          <Table head={["Institution", "State", "Approval", "Batches", "Last upload"]}>
+          <Table head={["Institution", "State", "Approval", "Batches", "Last upload", "Code reissues"]}>
             {data.upload_compliance.map((c) => (
               <tr key={c.id} className="hover:bg-slate-50">
                 <Td className="font-medium">{c.name}</Td>
@@ -93,6 +93,7 @@ export default function AicteHome({ role }: { role: Role }) {
                 <Td><Badge tone={c.status === "approved" ? "ok" : "error"}>{c.status}</Badge></Td>
                 <Td className="tabular-nums">{c.batches}</Td>
                 <Td>{c.batches ? fmtTime(c.last_upload) : <Badge tone="warning">not submitted</Badge>}</Td>
+                <Td className="tabular-nums" >{c.activation_reissues ? <Badge tone="warning">{c.activation_reissues}</Badge> : 0}</Td>
               </tr>
             ))}
           </Table>

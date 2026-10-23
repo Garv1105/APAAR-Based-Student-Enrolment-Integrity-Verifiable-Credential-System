@@ -11,6 +11,12 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **Credentials (Req 5, 6, 10):** W3C VCs with `eddsa-jcs-2022` (the official vectors pass); trust registry (MOCK); status lists; consent with a guardian path (MOCK); student access log; certificate QR.
 - **Reports and monitoring:** Req 9 CSV reports; D3 anomaly rules, DQS and inspection queue.
 - **UI:** institution, AICTE, student, verifier and registrar portals.
+- **P1 passkey consent (Req 5, 8):**
+  - WebAuthn passkeys from one-time institution activation codes (keyed hash only, reason audited).
+  - Discoverable sign-in. Consent assertions are bound to the request's terms, with user verification required.
+  - Guardian passkeys for minors; minor status is checked on the day of each request.
+  - Reissue cooldown (24 h) and a student notice; reissue count on the AICTE dashboard.
+  - The MOCK DOB/OTP path exists only behind `DEMO_MODE`.
 - **W1 webhooks + ERP connector (Req 7):** Standard Webhooks signing; outbox with retries and backoff; delivery log; redeliver; secret rotation (24 h overlap); max 5 endpoints; SSRF guard that pins the validated IP (Host + SNI); `tools/erp_connector/` (YAML mapping, file-hash Idempotency-Key, verifying receiver).
 - **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
@@ -60,7 +66,14 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - There are few labelled positives.
   - The duplicate-exposure component penalises both institutions in a case.
 - Credentials:
-  - Student sign-in is MOCK and **not authentication**: APAAR + DOB plus a fixed consent OTP let anyone who knows a DOB approve consent as the student.
+  - Student sign-in and consent use **passkeys** (P1). The old APAAR + DOB + fixed-OTP path exists only with `DEMO_MODE=true`, labelled MOCK.
+  - Activation codes reach the student out of band. In the prototype the institution hands them over; production delivers them via DigiLocker or the registered mobile number. Whoever holds an unused code can register the passkey; a reissued code puts a 24 h consent cooldown on the new passkey and notifies the student.
+  - Attestation is not checked (`none`): we trust that the user has *a* passkey, not a specific authenticator model.
+  - Students without an APAAR (provisional ID only) can't activate yet.
+  - The guardian's identity rests on the institution issuing the guardian code to the right person.
+  - **Open (security review M2, by design for now):** a student's *first* code (and a minor's first guardian code) has no cooldown, so an insider who intercepts a first code could approve consent at once. The planned fix is delivery through a channel the institution doesn't control (DigiLocker or the registered mobile number); the alternative is a cooldown on every new passkey.
+  - No activation codes while the person is active at another institution or in an open duplicate case. A case resolved as a false positive with both enrolments still active keeps blocking codes until AICTE intervenes.
+  - Throttles: activation 5 per APAAR + 20 per client per 15 min; sign-in options 30 per client per minute; approvals 10 per student per 15 min. All in-process.
   - The lockout (5 tries per APAAR per 15 min) is in-process only, can be abused to lock out a known APAAR, and has no per-IP throttle.
   - Guardian approval is self-asserted and labelled MOCK.
   - No audit row records an IP hash.

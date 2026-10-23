@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { ApiError, login, studentLogin, type Session } from "../api/client";
+import { useEffect, useState } from "react";
+import { activateAndRegister, ApiError, getJson, login, passkeyLogin, studentLogin, type S, type Session } from "../api/client";
+import { passkeyError, passkeysSupported } from "../webauthn";
 import { Button, ErrorNote } from "../ui";
 
 // Seeded MOCK identities (backend/data/seed/registry.json). Shown so judges can switch roles quickly.
@@ -71,6 +72,72 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
 }
 
 function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
+  const [demo, setDemo] = useState(false);
+  useEffect(() => { getJson<S["AuthConfig"]>("/v1/auth/config").then((c) => setDemo(c.demo_mode)).catch(() => {}); }, []);
+  return (
+    <div className="mt-8 space-y-4">
+      <PasskeySignIn onLogin={onLogin} />
+      {demo && <DobSignIn onLogin={onLogin} />}
+    </div>
+  );
+}
+
+function PasskeySignIn({ onLogin }: { onLogin: (s: Session) => void }) {
+  const [apaar, setApaar] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try { await fn(); } catch (err) {
+      setError(passkeyError(err) ?? (err instanceof ApiError ? err.text : "Cannot reach the API."));
+    } finally { setBusy(false); }
+  }
+  const signIn = () => run(async () => onLogin(await passkeyLogin()));
+  const activate = (e: React.FormEvent) => {
+    e.preventDefault();
+    run(async () => {
+      const setup = await activateAndRegister(apaar.replace(/[\s-]/g, ""), code);
+      setNote(`Passkey registered for the ${setup.kind}.` + (setup.reissue ? " It can approve consent after 24 hours (reissued code)." : "")
+        + " Now sign in with it.");
+      setCode("");
+    });
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-semibold">Students and guardians</h2>
+      <p className="mt-1 text-xs text-slate-500">Sign in with your passkey (fingerprint, face or device PIN). No password, nothing to type.</p>
+      {passkeysSupported() ? (
+        <Button className="mt-3" disabled={busy} onClick={signIn}>{busy ? "Waiting for passkey…" : "Sign in with passkey"}</Button>
+      ) : <p className="mt-3 text-xs text-err">This browser doesn't support passkeys.</p>}
+      <form onSubmit={activate} className="mt-4 border-t border-slate-100 pt-3">
+        <p className="text-xs text-slate-600">First time? Use the one-time activation code from your institution to register a passkey.</p>
+        <div className="mt-2 flex flex-wrap items-end gap-3">
+          <label className="text-sm">
+            <span className="block text-slate-700">APAAR ID</span>
+            <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits"
+              className="mt-1 w-52 rounded-lg border border-slate-300 px-3 py-1.5 font-mono" />
+          </label>
+          <label className="text-sm">
+            <span className="block text-slate-700">Activation code</span>
+            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="XXXX-XXXX-XX" autoComplete="one-time-code"
+              className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-1.5 font-mono uppercase" />
+          </label>
+          <Button type="submit" variant="secondary" disabled={busy || !passkeysSupported()}>Activate and register passkey</Button>
+        </div>
+      </form>
+      {note && <p className="mt-3 text-sm text-ok" role="status">{note}</p>}
+      {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+    </div>
+  );
+}
+
+/** DEMO_MODE only: the old MOCK APAAR + date-of-birth sign-in. */
+function DobSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
   const [apaar, setApaar] = useState("");
   const [dob, setDob] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +157,9 @@ function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
   }
 
   return (
-    <form onSubmit={submit} className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-semibold">Students</h2>
-      <p className="mt-1 text-xs text-slate-500">MOCK sign-in with your APAAR ID and date of birth (production: APAAR / DigiLocker authentication).
-        5 wrong attempts lock the APAAR ID for 15 minutes.</p>
+    <form onSubmit={submit} className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+      <h2 className="text-sm font-semibold">Demo fallback: date-of-birth sign-in <span className="rounded bg-amber-200 px-1 text-xs">MOCK · DEMO_MODE</span></h2>
+      <p className="mt-1 text-xs text-slate-600">Not authentication: a date of birth isn't a secret. Enabled only because the server runs in DEMO_MODE.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="block text-slate-700">APAAR ID</span>
@@ -104,7 +170,7 @@ function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
           <span className="block text-slate-700">Date of birth</span>
           <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required className="mt-1 rounded-lg border border-slate-300 px-3 py-1.5" />
         </label>
-        <Button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in as student"}</Button>
+        <Button type="submit" variant="secondary" disabled={busy}>{busy ? "Signing in…" : "Sign in (MOCK)"}</Button>
       </div>
       {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
     </form>

@@ -67,12 +67,14 @@ def run(live: bool = False) -> dict:
 
         e = _ok(c.get("/v1/enrolments", params={"apaar": STUDENT["apaar"]}, headers=h("inst-a")), 200)[0]
         vc = _ok(c.post(f"/v1/credentials/{e['id']}/issue", json={"type": "EnrolmentCredential"}, headers=h("inst-a")), 201)
+        act = _ok(c.post(f"/v1/enrolments/{e['id']}/activation-code", json={"kind": "student", "reason": "Demo: first passkey activation"},
+                         headers=h("inst-a")), 200)
         _ok(c.post("/v1/consents/requests", json={"apaar_id": STUDENT["apaar"], "purpose": "Pre-employment education check",
                                                   "fields": ["name", "programme", "institution", "status"]}, headers=h("employer")), 201)
         _ok(c.post("/v1/ledger/checkpoints", headers=h("aicte")), 200)
         aicte = _ok(c.get("/v1/dashboard/aicte", headers=h("aicte")), 200)
 
-    return {"credential_id": vc["id"], "open_cases": aicte["open_cases"], "excess_seats": aicte["totals"]["excess_seats"],
+    return {"credential_id": vc["id"], "activation_code": act["code"], "open_cases": aicte["open_cases"], "excess_seats": aicte["totals"]["excess_seats"],
             "active_enrolments": aicte["totals"]["active_enrolments"], "post_deadline_mutations": aicte["totals"]["post_deadline_mutations"]}
 
 
@@ -82,7 +84,9 @@ if __name__ == "__main__":
     print(f"""
 Demo database ready (MOCK data).
   Staff logins (password: demo): inst-a, inst-b, inst-c, inst-d, aicte, auditor, employer, univ
-  Student: APAAR {STUDENT['apaar']}  DOB {STUDENT['dob']}  ({STUDENT['name']}); consent OTP 123456
+  Student: APAAR {STUDENT['apaar']} ({STUDENT['name']}), passkey activation code {out['activation_code']}
+           (open http://localhost:5173, not 127.0.0.1). Fallback: start the API with DEMO_MODE=true for the MOCK
+           DOB sign-in ({STUDENT['dob']}) and OTP 123456.
   Enrolment credential: {out['credential_id']} (pending consent request from employer)
   AICTE: {out['active_enrolments']} active enrolments, {out['excess_seats']} excess seats, {out['open_cases']} open duplicate cases,
          {out['post_deadline_mutations']} post-deadline change(s) (E501)""")

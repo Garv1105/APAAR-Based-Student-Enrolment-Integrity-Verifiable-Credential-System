@@ -56,6 +56,9 @@ def aicte(conn) -> dict:
     compliance = conn.execute(
         "SELECT i.id, i.name, i.state, i.status, max(b.created_at) last_upload, count(b.id)::int batches "
         "FROM institutions i LEFT JOIN upload_batches b ON b.institution_id=i.id GROUP BY i.id ORDER BY i.id").fetchall()
+    reissues = {r["institution_id"]: r["reissues"] for r in conn.execute("SELECT * FROM activation_reissue_counts()")}
+    for c in compliance:
+        c["activation_reissues"] = reissues.get(c["id"], 0)
     open_cases = one("SELECT count(*) n FROM duplicate_cases WHERE status IN ('flagged','under_investigation')")
     return {
         "totals": {"institutions": one("SELECT count(*) n FROM institutions"),
