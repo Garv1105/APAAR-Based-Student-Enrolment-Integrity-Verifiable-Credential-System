@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
 import { EnrolmentLookup } from "./Registrar";
+import { OwnDqsCard } from "../risk";
+import { ReportsCard } from "../ui";
 import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, go, Loading, Stat, Table, Td, Updated, usePoll } from "../ui";
 
 export default function InstitutionHome() {
@@ -52,6 +54,10 @@ export default function InstitutionHome() {
           </div>
         )}
       </Card>
+
+      <OwnDqsCard />
+
+      <ReportsCard />
 
       <Card title="Upload history">
         {data.batches.length === 0 ? <Empty>No uploads yet.</Empty> : (

@@ -291,6 +291,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/anomalies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Anomalies
+         * @description Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).
+         */
+        get: operations["anomalies_v1_anomalies_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inspection-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Inspection Queue
+         * @description Institutions ranked by risk = (100 - DQS) x active enrolments, with DQS components and reasons.
+         */
+        get: operations["inspection_queue_v1_inspection_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/dqs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Own Dqs
+         * @description The calling institution's own Data Quality Score and flags.
+         */
+        get: operations["own_dqs_v1_dqs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report Index
+         * @description Available reports for the caller's role.
+         */
+        get: operations["report_index_v1_reports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/reports/{kind}.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Report Csv
+         * @description CSV report (formula-injection safe). Institutions: accreditation and category-utilisation for their own data. Regulators: all reports; accreditation needs ?institution_id=.
+         */
+        get: operations["report_csv_v1_reports__kind__csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/credentials/{enrolment_id}/issue": {
         parameters: {
             query?: never;
@@ -699,6 +799,34 @@ export interface components {
             /** Post Deadline Mutations */
             post_deadline_mutations: number;
         };
+        /** AnomalyFlag */
+        AnomalyFlag: {
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP";
+            /** Institution Id */
+            institution_id: string;
+            /** Programme */
+            programme: string | null;
+            /** Score */
+            score: number;
+            /**
+             * Evidence
+             * @description the numbers that triggered the rule
+             */
+            evidence: {
+                [key: string]: unknown;
+            };
+            /** Explanation */
+            explanation: string;
+            /**
+             * Label
+             * @description always: risk indicator for review, not proof of misconduct
+             */
+            label: string;
+        };
         /** BatchCounts */
         BatchCounts: {
             /**
@@ -951,6 +1079,32 @@ export interface components {
             /** Reason */
             reason: string;
         };
+        /** Dqs */
+        Dqs: {
+            /**
+             * Score
+             * @description 0-100 = 100 x sum(weight x component)
+             */
+            score: number;
+            /**
+             * Components
+             * @description each 0-1
+             */
+            components: {
+                [key: string]: number;
+            };
+            /**
+             * Points
+             * @description 100 x weight x component; sums to score
+             */
+            points: {
+                [key: string]: number;
+            };
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
         /** EnrolmentOut */
         EnrolmentOut: {
             /** Id */
@@ -1012,6 +1166,31 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** InspectionEntry */
+        InspectionEntry: {
+            /** Rank */
+            rank: number;
+            /** Institution Id */
+            institution_id: string;
+            /** Name */
+            name: string;
+            /** State */
+            state: string;
+            /** Status */
+            status: string;
+            /** Active */
+            active: number;
+            dqs: components["schemas"]["Dqs"] | null;
+            /**
+             * Risk
+             * @description (100 - DQS) x active enrolments; null = not submitted (listed first)
+             */
+            risk: number | null;
+            /** Why */
+            why: string[];
+            /** Flags */
+            flags: components["schemas"]["AnomalyFlag"][];
+        };
         /** InstitutionDashboard */
         InstitutionDashboard: {
             /** Institution Id */
@@ -1036,6 +1215,15 @@ export interface components {
             apaar_coverage: {
                 [key: string]: number;
             };
+        };
+        /** InstitutionRisk */
+        InstitutionRisk: {
+            /** Institution Id */
+            institution_id: string;
+            /** @description null when nothing was submitted */
+            dqs: components["schemas"]["Dqs"] | null;
+            /** Flags */
+            flags: components["schemas"]["AnomalyFlag"][];
         };
         /** Issue */
         Issue: {
@@ -1721,6 +1909,119 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    anomalies_v1_anomalies_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnomalyFlag"][];
+                };
+            };
+        };
+    };
+    inspection_queue_v1_inspection_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InspectionEntry"][];
+                };
+            };
+        };
+    };
+    own_dqs_v1_dqs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstitutionRisk"];
+                };
+            };
+        };
+    };
+    report_index_v1_reports_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    report_csv_v1_reports__kind__csv_get: {
+        parameters: {
+            query?: {
+                institution_id?: string | null;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

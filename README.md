@@ -55,7 +55,8 @@ How far each PS requirement has got, with the evidence in the test suite:
 | 6. Verifiable student records | ✅ | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the **official W3C test vectors**. Trust registry (MOCK) and Bitstring Status Lists |
 | 7. Integration/API | 🟡 | REST API + OpenAPI, public status lists, DID documents and a signed registry snapshot. Webhooks and the ERP connector are deferred |
 | 8. Security, privacy, auth, RBAC, audit, consent | ✅ | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent with OTP (MOCK), guardian path for under-18s (MOCK, self-asserted). Student transparency log |
-| 9. Reports | 🟡 | Per-batch error report CSV. Policy/accreditation reports planned |
+| 9. Reports | ✅ | CSV reports, all safe against spreadsheet-formula injection and audited: accreditation pack (per institution), state summary, category-quota utilisation, excess-admission case file (each over-cap row with batch/row evidence and the ledger checkpoint), plus the per-batch error report. Institutions get their own data only (RLS) |
+| Innovation: anomaly detection, risk-based inspection (D3) | ✅ | Five explainable rules, each flag carrying its evidence numbers (enrolment spike by robust z, category-mix shift, DOB cluster, sequential APAAR run, deadline dump). Data Quality Score with visible weighted components. Inspection queue ranked by (100 − DQS) × enrolments. Scored against the teammate generator's independent labels (see Tests) |
 | 10. APAAR ID + student ID on certificates | ✅ | Printable certificate showing both IDs in full, with a QR holding the signed credential (`AV1:` + Base45(zlib), RFC 9285). Measured at 1,012 chars, which fits one QR at error-correction level M |
 
 Day-to-day progress, blockers and limitations are tracked in [`TASKS.md`](TASKS.md). What is in or out of scope is in [`MVP_SCOPE.md`](MVP_SCOPE.md).
@@ -120,7 +121,8 @@ npm run dev
 - **Sign-in:** pick a demo identity.
 - **Institution:** drag-and-drop CSV upload with instant validation results, plus a downloadable template. Re-uploading the same file returns the original batch (the Idempotency-Key is the file's SHA-256). Also shows seats vs approved intake per category with over-cap highlighting, neutral AICTE notices, and upload history.
 - **Batch issues:** row-level issues with severity and code filters, fix hints, and a CSV report.
-- **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, and seat-ledger verify / sign checkpoint.
+- **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, seat-ledger verify / sign checkpoint, the risk-based inspection queue (click a row for its DQS breakdown and flags), anomaly flags with evidence, and CSV reports.
+- **Institution DQS:** each institution sees its own data quality score, what pulled it down, and any flags about it.
 - **Institution student records:** find a student by APAAR ID or student ID, issue an enrolment credential, mark the enrolment completed or withdrawn (withdrawal revokes their credentials), and suspend a credential or lift the suspension.
 - **Student** (MOCK sign-in with APAAR ID + date of birth; consent approval uses OTP `123456`): enrolments, credential wallet, the consent inbox (approve, deny, revoke, guardian path), a printable certificate with QR, and **who accessed my data**.
 - **Verifier** (`employer`): request consent for specific fields, fetch and verify the consent-scoped credential, a verify tool (paste JSON or the certificate QR text), and a forged-credential demo.
@@ -245,6 +247,18 @@ cd backend
 **Synthetic dataset:** 450 rows across 5 upload files and 4 institutions, plus scripted withdrawals, migrations and a post-deadline edit. Every row has labelled expected codes, and the dataset includes legitimate-move controls that must **not** be flagged.
 
 **Result:** every row-level code scores precision and recall of **1.000**, both in memory and through the full API + Postgres pipeline.
+
+**Anomaly rules (D3), scored against independent labels.** The teammate's generator (`synthetic/`) labels anomalies, and it was written by a different author than the rules. `backend/data/eval_anomalies.py` reads its messy files with the generator's own reference parser, builds the same aggregate features the platform computes at upload, and runs the exact functions the API uses. Five seeds × 30 institutions (834 programmes, 150 institutions):
+
+| Rule | TP | FP | of which on planted over-admissions | FN | Precision (strict) | Precision (over-admission flags counted as explained) | Recall |
+|---|---|---|---|---|---|---|---|
+| Enrolment spike | 10 | 6 | 6 | 0 | 0.625 | 1.000 | 1.000 |
+| Category-mix shift | 5 | 1 | 1 | 0 | 0.833 | 1.000 | 1.000 |
+| DOB cluster | 5 | 0 | 0 | 0 | 1.000 | 1.000 | 1.000 |
+| Sequential APAAR | 5 | 0 | 0 | 0 | 1.000 | 1.000 | 1.000 |
+| Deadline dump | 5 | 0 | 0 | 0 | 1.000 | 1.000 | 1.000 |
+
+Every "false positive" sits on a programme the generator deliberately over-filled (an E301/E302 programme fault). It is real over-admission, but the labels record it as a programme fault rather than as an anomaly. There are only 5–10 labelled positives per rule, so treat these as early evidence on synthetic data, not as measured field accuracy. `tests/test_anomaly.py` re-runs this check on the demo preset on every test run.
 
 **How to read that number.** The rules and the labels were written by the same team, so it shows the rules implement the specification. It does **not** measure real-world detection accuracy. Four codes (E201, E301, E302, E303) are labelled by re-applying the counting rule, so for those it is a consistency check rather than independent ground truth.
 

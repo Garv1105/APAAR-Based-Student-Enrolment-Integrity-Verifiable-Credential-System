@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 
 from psycopg.types.json import Jsonb
 
-from . import crypto, ledger
+from . import anomaly, crypto, ledger
 from .auth import audit
 from .mocks import apaar_registry
 from .validation import Ctx, counter_keys, student_id_key, validate_batch
@@ -89,6 +89,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
             ledger.append(conn, inst_id, "enrolment.created", e)
             if any(i["code"] == "E203" for i in o["issues"]):
                 new_cases.append(_open_case(conn, sid, year["code"]))
+        _store_batch_features(conn, b["id"], outcomes, progs, year["deadline"])
         if issues:
             with conn.cursor() as cur:
                 cur.executemany("INSERT INTO validation_issues (batch_id, row_no, code, severity, field, params) VALUES (%s,%s,%s,%s,%s,%s)", issues)
@@ -105,6 +106,21 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                          (Jsonb(counts), b["id"])).fetchone()
         audit(conn, user, "batch.upload", "upload_batch", b["id"], request=request)
     return batch_out(b)
+
+
+def _store_batch_features(conn, batch_id: int, outcomes: list[dict], progs: dict, deadline) -> None:
+    """F1 (PRD §9.1): anomaly features from the plaintext rows while they are still in memory. Every submitted,
+    parseable row counts (a ghost batch is suspicious even if its rows get rejected); only aggregates persist."""
+    groups: dict[str, list[dict]] = {}
+    for o in outcomes:
+        if o["data"] and o["data"]["programme_code"] in progs:
+            groups.setdefault(progs[o["data"]["programme_code"]]["id"], []).append(o["data"])
+    minutes = (deadline - datetime.now(timezone.utc)).total_seconds() / 60
+    for pid, rows in groups.items():
+        conn.execute("INSERT INTO batch_features (batch_id, programme_id, rows, max_dob_cluster, longest_apaar_run, minutes_before_deadline) "
+                     "VALUES (%s,%s,%s,%s,%s,%s)",
+                     (batch_id, pid, len(rows), anomaly.max_dob_cluster([r["dob"] for r in rows]),
+                      anomaly.longest_consecutive_run([r["apaar_id"] for r in rows if len(r["apaar_id"]) == 12]), minutes))
 
 
 def _student_id(conn, d: dict, o: dict) -> int:

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ApiError, loadSession } from "./api/client";
+import { ApiError, download, loadSession } from "./api/client";
 
 export const go = (path: string) => { window.location.hash = path; };
 
@@ -106,6 +106,39 @@ export function fmtTime(iso: string | null | undefined) {
 
 export function Updated({ at }: { at: Date | null }) {
   return <span className="text-xs text-slate-500" aria-live="polite">{at ? `Live · updated ${at.toLocaleTimeString()}` : ""}</span>;
+}
+
+/** Req 9 report downloads. `institutions` (AICTE view) enables the per-institution accreditation pack picker. */
+export function ReportsCard({ institutions }: { institutions?: { id: string; name: string }[] }) {
+  const [inst, setInst] = useState(institutions?.[0]?.id ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const get = async (kind: string, params = "") => {
+    setError(null);
+    try { await download(`/v1/reports/${kind}.csv${params}`, `${kind}.csv`); } catch (e) { setError(e instanceof ApiError ? e.text : "Download failed"); }
+  };
+  return (
+    <Card title="Reports (CSV)" actions={<span className="text-xs text-slate-500">Aggregates only · spreadsheet-formula safe · every export is audited</span>}>
+      <div className="flex flex-wrap items-end gap-2">
+        {institutions ? (<>
+          <Button variant="secondary" onClick={() => get("state-summary")}>State summary</Button>
+          <Button variant="secondary" onClick={() => get("category-utilisation")}>Category-quota utilisation</Button>
+          <Button variant="secondary" onClick={() => get("excess-case-file")}>Excess-admission case file</Button>
+          <span className="mx-2 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden />
+          <label className="text-xs text-slate-600">
+            <span className="sr-only">Institution</span>
+            <select value={inst} onChange={(e) => setInst(e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+              {institutions.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+          </label>
+          <Button variant="secondary" disabled={!inst} onClick={() => get("accreditation", `?institution_id=${encodeURIComponent(inst)}`)}>Accreditation pack</Button>
+        </>) : (<>
+          <Button variant="secondary" onClick={() => get("accreditation")}>Accreditation pack</Button>
+          <Button variant="secondary" onClick={() => get("category-utilisation")}>Category-quota utilisation</Button>
+        </>)}
+      </div>
+      {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+    </Card>
+  );
 }
 
 /** Column header + rows with consistent styling; horizontal scroll on narrow screens. */

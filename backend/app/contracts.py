@@ -192,6 +192,42 @@ class AicteDashboard(BaseModel):
     ledger_ok: bool
 
 
+class AnomalyFlag(BaseModel):
+    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP"]
+    institution_id: str
+    programme: str | None
+    score: float
+    evidence: dict = Field(description="the numbers that triggered the rule")
+    explanation: str
+    label: str = Field(description="always: risk indicator for review, not proof of misconduct")
+
+
+class Dqs(BaseModel):
+    score: float = Field(description="0-100 = 100 x sum(weight x component)")
+    components: dict[str, float] = Field(description="each 0-1")
+    points: dict[str, float] = Field(description="100 x weight x component; sums to score")
+    weights: dict[str, float]
+
+
+class InstitutionRisk(BaseModel):
+    institution_id: str
+    dqs: Dqs | None = Field(description="null when nothing was submitted")
+    flags: list[AnomalyFlag]
+
+
+class InspectionEntry(BaseModel):
+    rank: int
+    institution_id: str
+    name: str
+    state: str
+    status: str
+    active: int
+    dqs: Dqs | None
+    risk: float | None = Field(description="(100 - DQS) x active enrolments; null = not submitted (listed first)")
+    why: list[str]
+    flags: list[AnomalyFlag]
+
+
 class LedgerVerifyOut(BaseModel):
     ok: bool
     entries: int
