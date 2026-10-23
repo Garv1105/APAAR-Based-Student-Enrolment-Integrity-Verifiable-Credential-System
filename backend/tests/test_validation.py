@@ -1,4 +1,5 @@
 """One test per error code (PRD P2 exit criterion) plus false-positive controls."""
+import itertools
 import json
 from datetime import date
 from pathlib import Path
@@ -28,8 +29,12 @@ def ctx(**kw):
     return Ctx(**base)
 
 
+_SEQ = itertools.count(1)
+
+
 def row(**kw):
-    r = {"apaar_id": "100000000001", "apaar_reason": "", "institution_student_id": "DIT/CSE/0001",
+    """A clean row; each call gets its own student ID (IDs must be unique per institution)."""
+    r = {"apaar_id": "100000000001", "apaar_reason": "", "institution_student_id": f"DIT/CSE/{next(_SEQ):04d}",
          "student_name": "Asha Rao", "dob": "2008-03-14", "guardian_name": "Ramesh Rao",
          "programme_code": "CSE", "academic_year": "2026-27", "year_of_study": "1",
          "seat_category": "REGULAR", "is_supernumerary": "N", "is_lateral_entry": "N",
@@ -99,8 +104,29 @@ def test_e201_duplicate_in_file():
 
 def test_e201_without_apaar_uses_name_and_dob():
     r = row(apaar_id="", apaar_reason="PENDING")
-    out = validate_batch([r, r], ctx())
+    out = validate_batch([r, {**r, "institution_student_id": "DIT/CSE/9999"}], ctx())
     assert codes(out[1]) == {"E101W", "E201"}
+
+
+def test_e105_missing_student_id():
+    o = one(row(institution_student_id="  "))
+    assert codes(o) == {"E105"} and not o["accepted"]
+
+
+def test_e205_duplicate_student_id_in_file_and_institution():
+    out = validate_batch([row(institution_student_id="DIT/CSE/0042"),
+                          row(apaar_id="100000000002", student_name="Ravi Kumar", dob="2007-11-02",
+                              institution_student_id=" dit/cse/0042 ")], ctx())  # case/space-insensitive
+    assert codes(out[0]) == set() and codes(out[1]) == {"E205"} and not out[1]["accepted"]
+    assert out[1]["issues"][0]["params"]["detail"] == "row 1 of this file"
+    c = ctx(own_active_student_ids={"dit/cse/0042"})
+    o = one(row(institution_student_id="DIT/CSE/0042"), c)
+    assert codes(o) == {"E205"} and o["issues"][0]["params"]["detail"] == "an active enrolment at this institution"
+
+
+def test_identical_rows_raise_both_duplicate_codes():
+    r = row()
+    assert codes(validate_batch([r, r], ctx())[1]) == {"E201", "E205"}
 
 
 def test_e202_duplicate_in_institution():

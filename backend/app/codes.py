@@ -9,6 +9,8 @@ CODES = {  # code: (name, severity)
     "E102": ("INVALID_APAAR_FORMAT", "error"),
     "E103": ("APAAR_NOT_FOUND_IN_REGISTRY", "error"),
     "E104": ("APAAR_DETAILS_MISMATCH", "warning"),
+    "E105": ("MISSING_STUDENT_ID", "error"),        # extension: Req 10 prints the student ID on certificates
+    "E205": ("DUPLICATE_STUDENT_ID", "error"),      # extension: student ID unique per institution
     "E201": ("DUPLICATE_IN_FILE", "error"),
     "E202": ("DUPLICATE_IN_INSTITUTION", "error"),
     "E203": ("CROSS_INSTITUTION_DUPLICATE", "flag"),

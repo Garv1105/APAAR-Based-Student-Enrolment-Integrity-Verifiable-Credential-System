@@ -6,6 +6,8 @@
   "E102": {"template": "APAAR ID must be exactly 12 digits", "fix_hint": "Remove spaces or dashes and check the number of digits."},
   "E103": {"template": "APAAR ID not found in the APAAR registry (MOCK)", "fix_hint": "Check the ID with the student's APAAR card or DigiLocker."},
   "E104": {"template": "{detail} does not match the APAAR registry (MOCK) after normalisation", "fix_hint": "Correct the name or date of birth to match the APAAR record."},
+  "E105": {"template": "Institution student ID is blank", "fix_hint": "Enter the student's roll or registration number; it is printed on certificates with the APAAR ID."},
+  "E205": {"template": "Student ID is already used by {detail}", "fix_hint": "Each student ID must be unique within the institution. Correct the ID, or update the existing record instead of uploading it again."},
   "E201": {"template": "Same student already appears in row {detail} of this file", "fix_hint": "Remove the repeated row."},
   "E202": {"template": "Student already has an active enrolment at this institution for this year", "fix_hint": "Use the enrolment update (PATCH) to correct the existing record instead of uploading it again."},
   "E203": {"template": "A record in this batch needs AICTE review", "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."},

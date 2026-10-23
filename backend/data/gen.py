@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
 from app.contracts import CSV_COLUMNS  # noqa: E402
 
-ERRORS = {"E001", "E101", "E102", "E103", "E201", "E202", "E304", "E401", "E404"}
+ERRORS = {"E001", "E101", "E102", "E103", "E105", "E201", "E202", "E205", "E304", "E401", "E404"}
 FEMALE = ["Asha", "Priya", "Meera", "Kavya", "Ananya", "Divya", "Sneha", "Pooja", "Lakshmi", "Nandini",
           "Shreya", "Aishwarya", "Ritu", "Swati", "Neha", "Sowmya", "Bhavana", "Deepa", "Isha", "Tanvi"]
 MALE = ["Ravi", "Arjun", "Rahul", "Vikram", "Suresh", "Karthik", "Aditya", "Rohan", "Manoj", "Nikhil",
@@ -206,6 +206,10 @@ def build(seed):
     c = [g.row("C", "MBA", g.next_person()) for _ in range(116)]
     c += [g.row("C", "MBA", g.next_person(), expected={"E403"}, admission_date="2026-06-20") for _ in range(2)]
     g.r.shuffle(c)
+    # student-ID faults appended after the shuffle so "first occurrence" is unambiguous
+    c += [g.row("C", "MBA", g.next_person(), expected={"E105"}, institution_student_id="") for _ in range(2)]
+    c += [g.row("C", "MBA", g.next_person(), expected={"E205"}, institution_student_id=c[k]["raw"]["institution_student_id"])
+          for k in (0, 1)]
     files["C1.csv"] = c
 
     # ---- D1: closed institution ----
@@ -219,6 +223,9 @@ def build(seed):
     b2 = [g.row("B", "CSE", {"apaar": r["raw"]["apaar_id"], "name": r["raw"]["student_name"], "dob": r["raw"]["dob"],
                              "guardian": r["raw"]["guardian_name"]}, expected={"E202"}) for r in accepted_b[:5]]
     b2 += [g.row("B", "ME", g.next_person()) for _ in range(3)]
+    # new student reusing an active B1 student's ID -> E205 against the institution's existing enrolments
+    b2.append(g.row("B", "ME", g.next_person(), expected={"E205"},
+                    institution_student_id=accepted_b[20]["raw"]["institution_student_id"]))
     files["B2.csv"] = b2  # ME count 40 + 3 <= 60, so no positional codes
 
     post = accepted_b[10]["raw"]["apaar_id"]

@@ -2260,6 +2260,34 @@
 "expected": []
 },
 {
+"file": "C1.csv",
+"row_no": 119,
+"expected": [
+"E105"
+]
+},
+{
+"file": "C1.csv",
+"row_no": 120,
+"expected": [
+"E105"
+]
+},
+{
+"file": "C1.csv",
+"row_no": 121,
+"expected": [
+"E205"
+]
+},
+{
+"file": "C1.csv",
+"row_no": 122,
+"expected": [
+"E205"
+]
+},
+{
 "file": "D1.csv",
 "row_no": 1,
 "expected": [
@@ -2378,6 +2406,13 @@
 "file": "B2.csv",
 "row_no": 8,
 "expected": []
+},
+{
+"file": "B2.csv",
+"row_no": 9,
+"expected": [
+"E205"
+]
 }
 ]
 }
