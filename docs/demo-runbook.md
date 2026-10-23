@@ -33,7 +33,7 @@ Reset between rehearsals by running step 3 again. Sign out of both windows first
 | 6 | W1 `inst-a` | Same record: **Withdraw**, then confirm | Enrolment withdrawn | |
 | | W1 `employer` | **Fetch & verify credential** again | **REVOKED** | "Withdrawal flips a bit in the public status list; the verifier's check reveals nothing to us." |
 | 7 | W2 `aicte` | **Verify a credential**: **Try a forged credential (DEMO)** | **UNTRUSTED ISSUER** | "Issuers must be in AICTE's registry, which blocks fake universities." |
-| | W1 `employer` | **Verify a credential**: **Load JSON file** (from step 5), change one letter of the name, **Verify now** | **TAMPERED** (the signature check fails before the status check) | "Change one character and the signature breaks." |
+| | W2 `aicte` | Same page: **Load JSON file** (downloaded in step 5), change one letter of the name, **Verify now** | **TAMPERED** (the signature check fails before the status check) | "Change one character and the signature breaks." |
 | 8 | W2 `aicte` dashboard | Totals | Post-deadline changes: 1 (a backdated withdrawal, E501); ledger verified | "A backdated deletion after the deadline is flagged and can't be hidden in the ledger." |
 | | W1 student (Asha) | **Who accessed my data** | Credential issued; consent request and grant; employer verifications; withdrawal | "The student sees every access (D6). An AICTE unmask shows up the same way, with its reason, for the student in that case." |
 
