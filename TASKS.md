@@ -1,4 +1,4 @@
-﻿# Tasks, risks, blockers
+# Tasks, risks, blockers
 
 Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 
@@ -21,7 +21,7 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - [x] Batch upload (CSV multipart / text/csv / JSON) → validate → store encrypted → issues + report CSV
 - [x] Row-locked intake counters + concurrency test (2×70 rows vs intake 120 → exactly 20 E301)
 - [x] Institution + AICTE dashboard endpoints
-- [ ] Frontend shell: login/role switch, upload page, two dashboards  ← NEXT
+- [x] Frontend: login/role switch, upload (drag-drop, idempotent re-upload), batch issues with filters, institution + AICTE dashboards (3 s polling); verified headless at desktop + 390 px, no console errors
 - [x] Eval through API + Postgres: 450/450 rows exact, E501 patch steps correct
 
 ### Hybrid hardening (CLAUDE.md rules adopted)

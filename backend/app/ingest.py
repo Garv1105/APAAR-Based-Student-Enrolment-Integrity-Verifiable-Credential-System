@@ -1,4 +1,4 @@
-﻿"""Batch ingestion and enrolment updates: one transaction per batch (PRD Â§7, Â§9.2, Â§10).
+"""Batch ingestion and enrolment updates: one transaction per batch (PRD §7, §9.2, §10).
 
 Concurrency (F11): counter rows for the institution's programmes are locked FOR UPDATE, and
 every APAAR blind index in the batch takes a transaction advisory lock, so two parallel batches

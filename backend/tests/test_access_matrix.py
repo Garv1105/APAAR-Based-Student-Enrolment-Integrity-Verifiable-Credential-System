@@ -24,6 +24,7 @@ def test_access_matrix(client, dbconn):
                is_ciwg=False, year_of_study=1, guardian_name=None)
     cases = [
         ("POST", "/v1/batches", {"json": {"rows": [row]}}, expect({"inst-a": 201, "inst-b": 201})),
+        ("GET", "/v1/batches/template.csv", {}, expect({"inst-a": 200, "inst-b": 200})),
         ("GET", f"/v1/batches/{bid}", {}, expect(INST | REG, 404)),
         ("GET", f"/v1/batches/{bid}/issues", {}, expect(INST | REG, 404)),
         ("GET", f"/v1/batches/{bid}/report.csv", {}, expect(INST | REG, 404)),
