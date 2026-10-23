@@ -2,6 +2,39 @@
 
 Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 
+## ▶ Next steps and open decisions (handoff, updated 2026-10-23)
+
+**Where things stand:** `main` = `5703b37` on GitHub.
+- **Backend:** upload, deterministic validation (17 codes), intake engine with row locks, cross-institution duplicates, seat ledger, RLS (`app_user`), audit, typed contract.
+- **Frontend:** sign-in, upload, batch issues, institution and AICTE dashboards.
+- **Checks:** 51 backend tests green; frontend build green; headless UI check passed at desktop and 390 px.
+- **How to run:** README "Quick start", or the CLAUDE.md commands.
+
+**Untracked files, waiting on decision 4 below (not committed):**
+- `IMPLEMENTATION_PLAN_Dataset.md`: the same plan with T7.1 marked DONE.
+- `synthetic.zip`: a teammate's generator plus an independent `selfcheck.py`. Reviewed: no network or subprocess use. Needs `pyyaml`.
+- `data_demo.zip`: generator output, seed 7: 4 institutions, 1,897 rows, answer key.
+
+**Open decisions for the user** (asked, not yet answered):
+1. **Order:** build credentials and consent first (Req 5, 6 and 10 are still at zero; recommended), or integrate the teammate's dataset first?
+2. **`pyyaml`:** may it be added as a dependency so `synthetic/` generate and selfcheck can run?
+3. **Student ID:** the teammate's uploads have no `institution_student_id`, which Req 10 prints on certificates. Either (a) make it optional and show a platform-generated ID, or (b) ask the teammate to add the column.
+4. **Plan file and zips:** replace `IMPLEMENTATION_PLAN.md` with the Dataset version? Keep the zips out of git and extract only the generator into `synthetic/`?
+
+**Next task options:**
+- **A. Credentials (T5.1–T5.8):**
+  - Fetch the official `eddsa-jcs-2022` test vectors from the W3C spec and match them exactly before trusting the implementation.
+  - Then build the trust registry (`did:web` style), the Bitstring Status List (confirm the 131,072 minimum in the spec), consent (request → mock OTP approve → scoped VerificationCredential), the verifier page (VALID/REVOKED/UNTRUSTED/TAMPERED/EXPIRED) and the printable certificate with APAAR ID, student ID and QR.
+  - Credential, consent and issuer tables already exist with RLS deny-by-default; add policies with each feature.
+- **B. Dataset integration (~5–7 h):**
+  - Deterministic header-alias and value normalisation: dates in `dd/mm/yyyy`, `dd-mm-yyyy`, `dd.mm.yyyy` and Excel serials; Y/Yes/1/TRUE booleans; APAAR with spaces or hyphens is valid; category spellings.
+  - XLSX input, title rows, `;` delimiter.
+  - Seat model with REGULAR/FN/OCI/CIWG/NRI in a FOREIGN pool (TFW and LATERAL caps are unverified placeholders, so don't treat them as real).
+  - Mutation `delete` maps to withdraw, because there is no delete endpoint by design.
+  - Reseed from their `registry/`, and an evaluation script against their `ground_truth.json`. Programme-level E301/E302/E303 count as a hit if any row in that programme carries the code.
+
+**Also still open:** case resolution and AICTE unmask with reason (closes security-review L2), CSV policy reports (Req 9), anomaly rules and DQS, SSE.
+
 ## Checklist
 ### H0–3 Foundation
 - [x] Repo + runtime inspection
