@@ -11,9 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports
+from . import auth, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports, risk
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, AicteDashboard, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
                         EnrolmentPatch, InstitutionDashboard, IssueIn, IssuesPage, LedgerVerifyOut, LoginIn, LoginOut,
                         ProgrammeSeats, RegistryIssuer, StudentLoginIn, StudentProfile, VerifyIn, VerifyOut)
@@ -262,6 +262,24 @@ def ledger_latest(conn=Depends(get_conn)):
     """Public: latest signed checkpoint, plus the AICTE ledger public key."""
     cp = conn.execute("SELECT upto_seq, root_hash, aicte_sig, published_at FROM ledger_checkpoints ORDER BY id DESC LIMIT 1").fetchone()
     return {"checkpoint": cp, "public_key": crypto.public_multikey(crypto.signing_key(ledger.SIGNER))}
+
+
+# ---------- D3: anomalies, DQS, inspection queue ----------
+@app.get("/v1/anomalies", response_model=list[AnomalyFlag],
+         description="Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).")
+def anomalies(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    return risk.flags(conn)
+
+
+@app.get("/v1/inspection-queue", response_model=list[InspectionEntry],
+         description="Institutions ranked by risk = (100 - DQS) x active enrolments, with DQS components and reasons.")
+def inspection_queue(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    return risk.inspection_queue(conn)
+
+
+@app.get("/v1/dqs", response_model=InstitutionRisk, description="The calling institution's own Data Quality Score and flags.")
+def own_dqs(user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    return risk.institution_view(conn, user["institution_id"])
 
 
 # ---------- reports (Req 9) ----------

@@ -34,7 +34,7 @@ GRANT SELECT ON institutions, programmes, approved_intake, seat_categories, acad
   issuer_registry, affiliations, status_lists TO app_user;   -- registry + status lists: public, written only by admin/definer fns
 GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, students, programme_category_counters,
   duplicate_cases, anomaly_flags, consents TO app_user;
-GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints, credentials TO app_user;
+GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints, credentials, batch_features TO app_user;
 GRANT SELECT ON ledger_entries TO app_user;            -- writes only via ledger_append()
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
 
@@ -61,6 +61,13 @@ CREATE POLICY sel ON enrolments FOR SELECT USING (app_is_regulator() OR app_owns
   OR app_registrar_covers(programme_id));      -- a university registrar sees its affiliated institutions' enrolments
 CREATE POLICY ins ON enrolments FOR INSERT WITH CHECK (app_owns_programme(programme_id));
 CREATE POLICY upd ON enrolments FOR UPDATE USING (app_owns_programme(programme_id)) WITH CHECK (app_owns_programme(programme_id));
+
+-- batch_features (F1 aggregates): own institution and regulators
+ALTER TABLE batch_features ENABLE ROW LEVEL SECURITY; ALTER TABLE batch_features FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON batch_features; DROP POLICY IF EXISTS ins ON batch_features;
+CREATE POLICY sel ON batch_features FOR SELECT USING (app_is_regulator() OR app_owns_programme(programme_id));
+CREATE POLICY ins ON batch_features FOR INSERT WITH CHECK (app_owns_programme(programme_id)
+  AND EXISTS (SELECT 1 FROM upload_batches b WHERE b.id = batch_id AND b.institution_id = app_inst()));
 
 -- programme_category_counters
 ALTER TABLE programme_category_counters ENABLE ROW LEVEL SECURITY; ALTER TABLE programme_category_counters FORCE ROW LEVEL SECURITY;
@@ -183,6 +190,15 @@ BEGIN
   VALUES (v_me, 'verifier', 'consent.request', 'consent', v_id::text, v_student, left(p_purpose, 200), left(p_request_id, 64));
   RETURN QUERY SELECT c.id, c.requester_name, c.purpose, c.scope_fields, c.status, c.granted_by, c.requested_at, c.expires_at
                  FROM consents c WHERE c.id = v_id;
+END $$;
+
+-- DQS correction churn for the caller's own institution: enrolment updates recorded in the ledger
+-- (institutions can't read ledger_entries directly — payload hashes could be brute-forced into an oracle).
+CREATE OR REPLACE FUNCTION own_correction_count() RETURNS bigint
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> 'institution_admin' THEN RAISE EXCEPTION 'own_correction_count: not allowed'; END IF;
+  RETURN (SELECT count(*) FROM ledger_entries WHERE institution_id = app_inst() AND event_type = 'enrolment.updated');
 END $$;
 
 -- The verifier's own requests, without student_id.
@@ -353,9 +369,9 @@ REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text)
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
-  request_consent(text, text, text[], int, text, text), my_consent_requests() FROM PUBLIC;
+  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
-  request_consent(text, text, text[], int, text, text), my_consent_requests() TO app_user;
+  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count() TO app_user;

@@ -650,6 +650,86 @@
     ]
    }
   },
+  "/v1/anomalies": {
+   "get": {
+    "summary": "Anomalies",
+    "description": "Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).",
+    "operationId": "anomalies_v1_anomalies_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AnomalyFlag"
+         },
+         "type": "array",
+         "title": "Response Anomalies V1 Anomalies Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/inspection-queue": {
+   "get": {
+    "summary": "Inspection Queue",
+    "description": "Institutions ranked by risk = (100 - DQS) x active enrolments, with DQS components and reasons.",
+    "operationId": "inspection_queue_v1_inspection_queue_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/InspectionEntry"
+         },
+         "type": "array",
+         "title": "Response Inspection Queue V1 Inspection Queue Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/dqs": {
+   "get": {
+    "summary": "Own Dqs",
+    "description": "The calling institution's own Data Quality Score and flags.",
+    "operationId": "own_dqs_v1_dqs_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InstitutionRisk"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/reports": {
    "get": {
     "summary": "Report Index",
@@ -1608,6 +1688,66 @@
     ],
     "title": "AicteTotals"
    },
+   "AnomalyFlag": {
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "ENROLMENT_SPIKE",
+       "CATEGORY_MIX_SHIFT",
+       "DOB_CLUSTER",
+       "SEQUENTIAL_APAAR",
+       "DEADLINE_DUMP"
+      ],
+      "title": "Type"
+     },
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "programme": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Programme"
+     },
+     "score": {
+      "type": "number",
+      "title": "Score"
+     },
+     "evidence": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Evidence",
+      "description": "the numbers that triggered the rule"
+     },
+     "explanation": {
+      "type": "string",
+      "title": "Explanation"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label",
+      "description": "always: risk indicator for review, not proof of misconduct"
+     }
+    },
+    "type": "object",
+    "required": [
+     "type",
+     "institution_id",
+     "programme",
+     "score",
+     "evidence",
+     "explanation",
+     "label"
+    ],
+    "title": "AnomalyFlag"
+   },
    "BatchCounts": {
     "properties": {
      "rows": {
@@ -2127,6 +2267,46 @@
     ],
     "title": "CredentialStatusIn"
    },
+   "Dqs": {
+    "properties": {
+     "score": {
+      "type": "number",
+      "title": "Score",
+      "description": "0-100 = 100 x sum(weight x component)"
+     },
+     "components": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "type": "object",
+      "title": "Components",
+      "description": "each 0-1"
+     },
+     "points": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "type": "object",
+      "title": "Points",
+      "description": "100 x weight x component; sums to score"
+     },
+     "weights": {
+      "additionalProperties": {
+       "type": "number"
+      },
+      "type": "object",
+      "title": "Weights"
+     }
+    },
+    "type": "object",
+    "required": [
+     "score",
+     "components",
+     "points",
+     "weights"
+    ],
+    "title": "Dqs"
+   },
    "EnrolmentOut": {
     "properties": {
      "id": {
@@ -2318,6 +2498,84 @@
     "type": "object",
     "title": "HTTPValidationError"
    },
+   "InspectionEntry": {
+    "properties": {
+     "rank": {
+      "type": "integer",
+      "title": "Rank"
+     },
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "active": {
+      "type": "integer",
+      "title": "Active"
+     },
+     "dqs": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Dqs"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "risk": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Risk",
+      "description": "(100 - DQS) x active enrolments; null = not submitted (listed first)"
+     },
+     "why": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Why"
+     },
+     "flags": {
+      "items": {
+       "$ref": "#/components/schemas/AnomalyFlag"
+      },
+      "type": "array",
+      "title": "Flags"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rank",
+     "institution_id",
+     "name",
+     "state",
+     "status",
+     "active",
+     "dqs",
+     "risk",
+     "why",
+     "flags"
+    ],
+    "title": "InspectionEntry"
+   },
    "InstitutionDashboard": {
     "properties": {
      "institution_id": {
@@ -2374,6 +2632,39 @@
      "apaar_coverage"
     ],
     "title": "InstitutionDashboard"
+   },
+   "InstitutionRisk": {
+    "properties": {
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "dqs": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/Dqs"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "null when nothing was submitted"
+     },
+     "flags": {
+      "items": {
+       "$ref": "#/components/schemas/AnomalyFlag"
+      },
+      "type": "array",
+      "title": "Flags"
+     }
+    },
+    "type": "object",
+    "required": [
+     "institution_id",
+     "dqs",
+     "flags"
+    ],
+    "title": "InstitutionRisk"
    },
    "Issue": {
     "properties": {

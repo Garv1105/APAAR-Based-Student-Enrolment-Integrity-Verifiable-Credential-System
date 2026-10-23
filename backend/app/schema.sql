@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS intake_history (      -- prior-year filled counts (an
   academic_year text NOT NULL,
   approved      int  NOT NULL,
   filled        int  NOT NULL,
+  foreign_filled int,                           -- FN/OCI/CIWG/NRI pool; NULL = unknown (category-mix rule then skipped)
   PRIMARY KEY (programme_id, academic_year)
 );
 
@@ -124,6 +125,16 @@ CREATE TABLE IF NOT EXISTS validation_issues (
   params    jsonb  NOT NULL DEFAULT '{}'      -- message rendered from i18n/<locale>.json on read
 );
 CREATE INDEX IF NOT EXISTS validation_issues_batch_idx ON validation_issues (batch_id);
+
+CREATE TABLE IF NOT EXISTS batch_features (      -- F1: computed in memory from plaintext at upload; only aggregates persist
+  batch_id          bigint NOT NULL REFERENCES upload_batches(id),
+  programme_id      text   NOT NULL REFERENCES programmes(id),
+  rows              int    NOT NULL,          -- rows submitted for this programme in the batch (accepted or not)
+  max_dob_cluster   int    NOT NULL,          -- largest group sharing one date of birth (the DOB itself is not stored)
+  longest_apaar_run int    NOT NULL,          -- longest run of consecutive APAAR numbers (the numbers are not stored)
+  minutes_before_deadline double precision NOT NULL,
+  PRIMARY KEY (batch_id, programme_id)
+);
 
 CREATE TABLE IF NOT EXISTS duplicate_cases (
   id            bigserial PRIMARY KEY,

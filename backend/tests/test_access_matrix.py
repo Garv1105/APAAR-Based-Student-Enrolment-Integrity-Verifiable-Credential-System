@@ -66,6 +66,10 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/registry/snapshot", {}, {u: 200 for u in USERS}),
         ("GET", "/status/inst-1-0000000001-revocation", {}, {u: 200 for u in USERS}),
         ("GET", "/dids/inst/1-0000000001/did.json", {}, {u: 200 for u in USERS}),
+        # D3
+        ("GET", "/v1/anomalies", {}, expect(REG)),
+        ("GET", "/v1/inspection-queue", {}, expect(REG)),
+        ("GET", "/v1/dqs", {}, expect({"inst-a": 200, "inst-b": 200})),
         # reports (Req 9)
         ("GET", "/v1/reports", {}, expect({"inst-a": 200, "inst-b": 200} | REG)),
         ("GET", "/v1/reports/state-summary.csv", {}, expect(REG)),

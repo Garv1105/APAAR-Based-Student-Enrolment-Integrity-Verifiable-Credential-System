@@ -30,7 +30,6 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 **Open items (not started):**
 - **Offline browser verifier:** verify a VC with no network, using a cached AICTE-signed registry snapshot and status lists (both already served signed, with a 24 h expiry). Needs JS Ed25519 + RFC 8785 JCS libraries (dependency decision) and IndexedDB caching. Add a cross-implementation test: Python-signed VCs verify in JS, tampered ones fail.
 - **Camera QR scan:** scan the certificate QR (`AV1:` + Base45) on the verifier page. Needs a QR-scanning library (dependency decision); Base45 decoding plus native `DecompressionStream('deflate')` cover the rest.
-- **D3 anomaly engine, DQS and inspection queue:** explainable rules (fill ratio vs 3-year history by robust z, category-mix shift, DOB cluster, sequential APAAR, deadline dump), evidence shown on every flag, a Data Quality Score with visible components, and a risk-ranked inspection queue. `synthetic/` ground truth already labels these anomalies.
 - **D7 multilingual error reports (hi, kn):** translate `backend/i18n/en.json` templates only (no data); every placeholder must survive; a human reviewer signs off and is recorded in each file; a placeholder-integrity test; a language switcher in the UI. The rendering path (`?lang=`) already exists.
 - **D2 duplicate pre-check:** consent-gated endpoint that returns only CLEAR or NEEDS_REVIEW; single-use signed student consent token; rate-limited and audit-logged; no oracle.
 - **Gemini column mapping (use case A):** headers plus synthetic samples only, behind a PII scrubber and audit, paid tier only, confirm before apply, outputs limited to enum targets. Needs a billing-enabled key and a dependency decision. Deterministic alias mapping (dataset branch) is the fallback.
@@ -97,7 +96,8 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - [x] CSV reports (Req 9): accreditation pack, state summary, category utilisation, excess-admission case file; formula-safe, audited, RLS-scoped (T4.7)
 
 ### H27–30 Stretch (drop first)
-- [ ] Anomaly rules + DQS
+- [x] D3 (T4.4, T4.5): 5 explainable anomaly rules with evidence; F1 upload features (aggregates only); DQS with visible components; risk-ranked inspection queue; own-DQS view. Scored against the teammate's independent anomaly labels (5 seeds × 30 institutions): recall 1.000 on every rule, 0 unexplained false positives; strict precision spike 0.625 and mix 0.833, all extra flags on planted over-admissions
+- [ ] Isolation Forest (secondary) — on the PRD cut list
 - [ ] SSE
 
 ### H30–36 Reliability only
@@ -130,6 +130,13 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
 - Security review t0.6 (no high findings; M1–M3, L3–L5 fixed). Open lows: L1 student_id_by_bi tells an institution, during ingestion, whether a person row exists for a submitted APAAR; L2 an institution can read the full enrolment_ids array of a duplicate case it is part of (other side's internal ids, no PII) — fix with a scoped view when case resolution is built.
 - Schema changes need `app.seed --reset` (drops and rebuilds the demo DB); there are no migrations.
 - Name matching is Latin-script only (no Indic transliteration).
+- D3 limitations:
+  - The rules run on demand (no stored flag history or trend).
+  - DOB-cluster and sequential-APAAR features are per batch, not across batches.
+  - The category-mix rule needs foreign-pool history; our seeded `intake_history` has none, so the rule only runs on the teammate's data.
+  - The anomaly scores rest on few labelled positives (5–10 per rule) of synthetic data.
+  - The DQS "duplicate exposure" component penalises both institutions in a case, including the one that uploaded first.
+  - Isolation Forest is not built.
 - Credentials:
   - Student sign-in is MOCK and **not authentication**:
     - APAAR + DOB plus a fixed consent OTP means anyone who knows a candidate's DOB (e.g. an employer) can sign in as the student and approve its own consent request.
