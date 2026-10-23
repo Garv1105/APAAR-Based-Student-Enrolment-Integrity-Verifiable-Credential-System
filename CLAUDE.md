@@ -19,6 +19,7 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 - Eval table: `..\.venv\Scripts\python.exe -m pytest -s tests/test_eval.py`
 - Regenerate synthetic data: `..\.venv\Scripts\python.exe data/gen.py --seed 42`
 - Reset + seed demo DB `apaar`: `..\.venv\Scripts\python.exe -m app.seed --reset`
+- Demo seed (reset `apaar` + replay scenario through the API, credential + pending consent): `..\.venv\Scripts\python.exe -m app.demo`
 - Run API: `..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs (users inst-a, inst-b, inst-c, inst-d, aicte, auditor, employer, univ; password `demo`)
 - Regenerate contract: `..\.venv\Scripts\python.exe -c "import json; from app.main import app; open('openapi.json','w').write(json.dumps(app.openapi(), indent=1))"`
 
