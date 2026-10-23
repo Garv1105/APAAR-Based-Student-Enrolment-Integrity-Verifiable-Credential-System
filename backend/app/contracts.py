@@ -232,12 +232,37 @@ class ConsentOut(BaseModel):
     requester: str
     purpose: str
     fields: list[str]
-    status: str
+    status: Literal["pending", "granted", "denied", "revoked", "expired"]
+    granted_by: Literal["student", "guardian"] | None
+    requested_at: datetime
     expires_at: datetime
+    credential_id: str | None = None
 
 
 class ConsentApprove(BaseModel):
     otp: str = Field(description="MOCK OTP; demo value is 123456")
+    approved_by: Literal["student", "guardian"] = "student"
+    guardian_otp: str | None = Field(None, description="required when the student is under 18 (MOCK OTP 123456)")
+
+
+class ConsentCredentialOut(BaseModel):
+    consent: ConsentOut
+    credential: dict = Field(description="VerificationCredential holding only the approved fields")
+
+
+class StudentEnrolment(BaseModel):
+    programme: str
+    institution: str
+    academic_year: str
+    status: str
+    institution_student_id: str
+
+
+class StudentProfile(BaseModel):
+    apaar_masked: str | None
+    provisional_id: str | None
+    apaar_status: str
+    enrolments: list[StudentEnrolment]
 
 
 class VerifyIn(BaseModel):
@@ -322,6 +347,8 @@ class AccessLogEntry(BaseModel):
     role: str
     action: str
     reason: str | None
+    entity: str
+    entity_id: str | None
 
 
 class Problem(BaseModel):

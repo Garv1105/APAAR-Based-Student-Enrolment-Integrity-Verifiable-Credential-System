@@ -9,11 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, credentials, crypto, dashboards, db, i18n, ingest, ledger
+from . import auth, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger
 from .auth import require
-from .contracts import (CSV_COLUMNS, AicteDashboard, BatchJsonIn, BatchOut, CheckpointOut, CredentialOut, CredentialStatusIn,
-                        EnrolmentOut, EnrolmentPatch, InstitutionDashboard, IssueIn, IssuesPage, LedgerVerifyOut, LoginIn, LoginOut,
-                        ProgrammeSeats, RegistryIssuer, StudentLoginIn, VerifyIn, VerifyOut)
+from .contracts import (CSV_COLUMNS, AccessLogEntry, AicteDashboard, BatchJsonIn, BatchOut, CheckpointOut, ConsentApprove,
+                        ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
+                        EnrolmentPatch, InstitutionDashboard, IssueIn, IssuesPage, LedgerVerifyOut, LoginIn, LoginOut,
+                        ProgrammeSeats, RegistryIssuer, StudentLoginIn, StudentProfile, VerifyIn, VerifyOut)
 from .validation import missing_columns
 
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
@@ -256,20 +257,33 @@ def ledger_latest(conn=Depends(get_conn)):
 
 
 # ---------- verifiable credentials (Req 5, 6, 10) ----------
-def _credential_out(conn, row) -> dict:
+REGULATORS = ("aicte_officer", "auditor")
+
+
+def _credential_out(conn, row, user) -> dict:
+    vc = credentials.stored_credential(conn, row)
+    if user["role"] in REGULATORS:  # masked by default (PRD §13): no name, APAAR masked; full view needs an unmask with reason
+        s = {k: v for k, v in vc["credentialSubject"].items() if k != "name"}
+        if "apaarId" in s:
+            s["apaarId"] = crypto.mask_apaar(s["apaarId"])
+        vc = {**{k: v for k, v in vc.items() if k != "proof"}, "credentialSubject": s, "redacted": True}
     return {"id": row["id"], "type": row["type"], "issuer_did": row["issuer_did"], "issued_at": row["issued_at"],
-            "status": credentials.credential_status(conn, row), "credential": credentials.stored_credential(conn, row)}
+            "status": credentials.credential_status(conn, row), "credential": vc}
 
 
 @app.post("/v1/credentials/{enrolment_id}/issue", response_model=CredentialOut, status_code=201,
-          description="EnrolmentCredential: the student's institution. DegreeCredential: the affiliated university registrar.")
-def issue_credential(enrolment_id: int, body: IssueIn, request: Request,
+          description="EnrolmentCredential: the student's institution. DegreeCredential (completed enrolments): the affiliated "
+                      "university registrar. Accepts Idempotency-Key.")
+def issue_credential(enrolment_id: int, body: IssueIn, request: Request, idempotency_key: str | None = Header(None),
                      user=Depends(require("institution_admin", "university_registrar")), conn=Depends(get_conn)):
-    vc = credentials.issue(conn, user, enrolment_id, body.type)
+    vc, replayed = credentials.issue(conn, user, enrolment_id, body.type, idempotency_key)
     row = conn.execute("SELECT * FROM credentials WHERE id=%s", (vc["id"],)).fetchone()
-    auth.audit(conn, user, "credential.issue", "credential", vc["id"], student_id=row["subject_student_id"], reason=body.type, request=request)
+    if not replayed:
+        auth.audit(conn, user, "credential.issue", "credential", vc["id"], student_id=row["subject_student_id"], reason=body.type,
+                   request=request)
     conn.commit()
-    return _credential_out(conn, row)
+    out = CredentialOut(**_credential_out(conn, row, user)).model_dump(mode="json")
+    return JSONResponse(out, status_code=200 if replayed else 201)
 
 
 @app.get("/v1/credentials", response_model=list[CredentialOut],
@@ -282,7 +296,7 @@ def list_credentials(request: Request, enrolment_id: int | None = None,
     for r in rows:
         auth.audit(conn, user, "credential.read", "credential", r["id"], student_id=r["subject_student_id"], request=request)
     conn.commit()
-    return [_credential_out(conn, r) for r in rows]
+    return [_credential_out(conn, r, user) for r in rows]
 
 
 @app.post("/v1/credentials/status", response_model=CredentialOut,
@@ -298,7 +312,7 @@ def change_credential_status(body: CredentialStatusIn, request: Request,
     auth.audit(conn, user, f"credential.{body.purpose}.{'set' if body.value else 'clear'}", "credential", row["id"],
                student_id=row["subject_student_id"], reason=body.reason, request=request)
     conn.commit()
-    return _credential_out(conn, row)
+    return _credential_out(conn, row, user)
 
 
 @app.post("/v1/verify", response_model=VerifyOut,
@@ -308,7 +322,9 @@ def verify_credential(body: VerifyIn, request: Request,
                       conn=Depends(get_conn)):
     out = credentials.verify(conn, body.credential)
     cred_id = body.credential.get("id") if isinstance(body.credential.get("id"), str) else ""
-    conn.execute("SELECT log_verification(%s, %s, %s)", (cred_id, out["result"], request.state.request_id))
+    # linked to the student only if this is exactly the stored credential (see log_verification)
+    h = credentials.vc_hash(body.credential) if out["checks"]["signature_valid"] else None
+    conn.execute("SELECT log_verification(%s, %s, %s, %s)", (cred_id, h, out["result"], request.state.request_id))
     conn.commit()
     return out
 
@@ -343,3 +359,83 @@ def did_doc(path: str, conn=Depends(get_conn)):
 @app.get("/v1/demo/forged-credential", description="DEMO ONLY: a credential signed by an issuer outside the registry.")
 def demo_forged(user=Depends(require("verifier", "aicte_officer", "auditor"))):
     return credentials.forged_credential()
+
+
+# ---------- consent (Req 5, 8; D5) ----------
+def _consent_out(conn, k) -> dict:
+    cid = conn.execute("SELECT id FROM credentials WHERE consent_id=%s", (k["id"],)).fetchone()  # visible to the student only
+    return consent.consent_out(k, cid["id"] if cid else None)
+
+
+@app.post("/v1/consents/requests", response_model=ConsentOut, status_code=201,
+          description="Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose.")
+def consent_request(body: ConsentRequestIn, request: Request, user=Depends(require("verifier")), conn=Depends(get_conn)):
+    apaar = body.apaar_id.replace(" ", "").replace("-", "")
+    if not (apaar.isdigit() and len(apaar) == 12):
+        raise HTTPException(422, "APAAR ID must be 12 digits")
+    k = consent.request(conn, user, apaar, body.purpose, list(body.fields), body.valid_days)
+    auth.audit(conn, user, "consent.request", "consent", k["id"], student_id=k["student_id"], reason=body.purpose, request=request)
+    conn.commit()
+    return _consent_out(conn, k)
+
+
+@app.get("/v1/consents", response_model=list[ConsentOut],
+         description="Verifier: its own requests. Student: requests about them. Regulators: all.")
+def consent_list(user=Depends(require("verifier", "student", "aicte_officer", "auditor")), conn=Depends(get_conn)):
+    rows = conn.execute("SELECT * FROM consents ORDER BY requested_at DESC LIMIT 200").fetchall()
+    return [_consent_out(conn, k) for k in rows]
+
+
+@app.post("/v1/consents/{consent_id}/approve", response_model=ConsentCredentialOut,
+          description="Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.")
+def consent_approve(consent_id: int, body: ConsentApprove, request: Request, user=Depends(require("student")), conn=Depends(get_conn)):
+    k, vc = consent.approve(conn, user, consent_id, body.otp, body.approved_by, body.guardian_otp)
+    auth.audit(conn, user, "consent.grant", "consent", k["id"], student_id=k["student_id"], reason=f"granted by {k['granted_by']}",
+               request=request)
+    conn.commit()
+    return {"consent": consent.consent_out(k, vc["id"]), "credential": vc}
+
+
+@app.post("/v1/consents/{consent_id}/deny", response_model=ConsentOut)
+def consent_deny(consent_id: int, request: Request, user=Depends(require("student")), conn=Depends(get_conn)):
+    k = consent.deny(conn, user, consent_id)
+    auth.audit(conn, user, "consent.deny", "consent", k["id"], student_id=k["student_id"], request=request)
+    conn.commit()
+    return _consent_out(conn, k)
+
+
+@app.post("/v1/consents/{consent_id}/revoke", response_model=ConsentOut,
+          description="Student withdraws consent; the VerificationCredential is revoked via the status list.")
+def consent_revoke(consent_id: int, request: Request, user=Depends(require("student")), conn=Depends(get_conn)):
+    k = consent.revoke(conn, user, consent_id)
+    auth.audit(conn, user, "consent.revoke", "consent", k["id"], student_id=k["student_id"], request=request)
+    conn.commit()
+    return _consent_out(conn, k)
+
+
+@app.get("/v1/consents/{consent_id}/credential", description="Verifier fetches the VerificationCredential for its granted consent.")
+def consent_credential(consent_id: int, request: Request, user=Depends(require("verifier")), conn=Depends(get_conn)):
+    out = consent.verifier_credential(conn, consent_id)
+    conn.execute("SELECT log_verification(%s, %s, %s, %s)",
+                 (out["id"], credentials.vc_hash(out["vc"]), "consent-credential-fetch", request.state.request_id))
+    conn.commit()
+    return out["vc"]
+
+
+# ---------- student self-service (D6) ----------
+@app.get("/v1/students/me", response_model=StudentProfile)
+def student_me(user=Depends(require("student")), conn=Depends(get_conn)):
+    s = conn.execute("SELECT apaar_masked, provisional_id, apaar_status FROM students WHERE id=%s", (user["student_id"],)).fetchone()
+    if s is None:
+        raise HTTPException(404, "Student not found")
+    ens = conn.execute("SELECT p.name programme, i.name institution, e.academic_year, e.status, e.institution_student_id "
+                       "FROM enrolments e JOIN programmes p ON p.id=e.programme_id JOIN institutions i ON i.id=p.institution_id "
+                       "WHERE e.student_id=%s ORDER BY e.id DESC", (user["student_id"],)).fetchall()
+    return {**s, "enrolments": ens}
+
+
+@app.get("/v1/students/me/access-log", response_model=list[AccessLogEntry],
+         description="D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).")
+def student_access_log(user=Depends(require("student")), conn=Depends(get_conn)):
+    return conn.execute("SELECT ts, actor, role, action, reason, entity, entity_id FROM audit_logs WHERE student_id=%s "
+                        "ORDER BY ts DESC LIMIT 500", (user["student_id"],)).fetchall()

@@ -127,6 +127,13 @@ def test_credential_functions_enforce_issuer_and_student_rules(client, dbconn):
                   "VALUES ('urn:x', 'EnrolmentCredential', %s, %s, 'inst-1-0000000001-revocation', 5, 'x', 'x')", (e["student_id"], a_did))
     with as_app("institution_admin", B) as c:
         assert c.execute("SELECT count(*) n FROM credentials").fetchone()["n"] == 0
+    with as_app("institution_admin", A, "inst-a") as c:  # even the issuer can't un-revoke, or use a bogus purpose
+        c.execute("SELECT set_credential_status(%s, 'revocation', true)", (vc["id"],))
+        c.commit()
+        for purpose, value in (("revocation", False), ("bogus", True)):
+            with pytest.raises(psycopg.errors.RaiseException):
+                c.execute("SELECT set_credential_status(%s, %s, %s)", (vc["id"], purpose, value))
+            c.rollback()
 
 
 def test_definer_functions_refuse_other_roles(client):

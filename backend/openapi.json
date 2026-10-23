@@ -653,7 +653,7 @@
   "/v1/credentials/{enrolment_id}/issue": {
    "post": {
     "summary": "Issue Credential",
-    "description": "EnrolmentCredential: the student's institution. DegreeCredential: the affiliated university registrar.",
+    "description": "EnrolmentCredential: the student's institution. DegreeCredential (completed enrolments): the affiliated university registrar. Accepts Idempotency-Key.",
     "operationId": "issue_credential_v1_credentials__enrolment_id__issue_post",
     "security": [
      {
@@ -668,6 +668,22 @@
       "schema": {
        "type": "integer",
        "title": "Enrolment Id"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
       }
      }
     ],
@@ -1006,10 +1022,378 @@
      }
     ]
    }
+  },
+  "/v1/consents/requests": {
+   "post": {
+    "summary": "Consent Request",
+    "description": "Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose.",
+    "operationId": "consent_request_v1_consents_requests_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsentRequestIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/consents": {
+   "get": {
+    "summary": "Consent List",
+    "description": "Verifier: its own requests. Student: requests about them. Regulators: all.",
+    "operationId": "consent_list_v1_consents_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConsentOut"
+         },
+         "type": "array",
+         "title": "Response Consent List V1 Consents Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/consents/{consent_id}/approve": {
+   "post": {
+    "summary": "Consent Approve",
+    "description": "Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.",
+    "operationId": "consent_approve_v1_consents__consent_id__approve_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsentApprove"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentCredentialOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/deny": {
+   "post": {
+    "summary": "Consent Deny",
+    "operationId": "consent_deny_v1_consents__consent_id__deny_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/revoke": {
+   "post": {
+    "summary": "Consent Revoke",
+    "description": "Student withdraws consent; the VerificationCredential is revoked via the status list.",
+    "operationId": "consent_revoke_v1_consents__consent_id__revoke_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/credential": {
+   "get": {
+    "summary": "Consent Credential",
+    "description": "Verifier fetches the VerificationCredential for its granted consent.",
+    "operationId": "consent_credential_v1_consents__consent_id__credential_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/students/me": {
+   "get": {
+    "summary": "Student Me",
+    "operationId": "student_me_v1_students_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StudentProfile"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/students/me/access-log": {
+   "get": {
+    "summary": "Student Access Log",
+    "description": "D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).",
+    "operationId": "student_access_log_v1_students_me_access_log_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AccessLogEntry"
+         },
+         "type": "array",
+         "title": "Response Student Access Log V1 Students Me Access Log Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
   "schemas": {
+   "AccessLogEntry": {
+    "properties": {
+     "ts": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ts"
+     },
+     "actor": {
+      "type": "string",
+      "title": "Actor"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "action": {
+      "type": "string",
+      "title": "Action"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "entity": {
+      "type": "string",
+      "title": "Entity"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ts",
+     "actor",
+     "role",
+     "action",
+     "reason",
+     "entity",
+     "entity_id"
+    ],
+    "title": "AccessLogEntry"
+   },
    "AicteDashboard": {
     "properties": {
      "totals": {
@@ -1306,6 +1690,185 @@
      "batches"
     ],
     "title": "ComplianceRow"
+   },
+   "ConsentApprove": {
+    "properties": {
+     "otp": {
+      "type": "string",
+      "title": "Otp",
+      "description": "MOCK OTP; demo value is 123456"
+     },
+     "approved_by": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Approved By",
+      "default": "student"
+     },
+     "guardian_otp": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Guardian Otp",
+      "description": "required when the student is under 18 (MOCK OTP 123456)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "otp"
+    ],
+    "title": "ConsentApprove"
+   },
+   "ConsentCredentialOut": {
+    "properties": {
+     "consent": {
+      "$ref": "#/components/schemas/ConsentOut"
+     },
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential",
+      "description": "VerificationCredential holding only the approved fields"
+     }
+    },
+    "type": "object",
+    "required": [
+     "consent",
+     "credential"
+    ],
+    "title": "ConsentCredentialOut"
+   },
+   "ConsentOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "requester": {
+      "type": "string",
+      "title": "Requester"
+     },
+     "purpose": {
+      "type": "string",
+      "title": "Purpose"
+     },
+     "fields": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Fields"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "granted",
+       "denied",
+       "revoked",
+       "expired"
+      ],
+      "title": "Status"
+     },
+     "granted_by": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "student",
+         "guardian"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Granted By"
+     },
+     "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Requested At"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     },
+     "credential_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credential Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "requester",
+     "purpose",
+     "fields",
+     "status",
+     "granted_by",
+     "requested_at",
+     "expires_at"
+    ],
+    "title": "ConsentOut"
+   },
+   "ConsentRequestIn": {
+    "properties": {
+     "apaar_id": {
+      "type": "string",
+      "title": "Apaar Id"
+     },
+     "purpose": {
+      "type": "string",
+      "minLength": 3,
+      "title": "Purpose"
+     },
+     "fields": {
+      "items": {
+       "type": "string",
+       "enum": [
+        "name",
+        "programme",
+        "institution",
+        "academic_year",
+        "status",
+        "apaar_id",
+        "student_id"
+       ]
+      },
+      "type": "array",
+      "title": "Fields"
+     },
+     "valid_days": {
+      "type": "integer",
+      "maximum": 30.0,
+      "minimum": 1.0,
+      "title": "Valid Days",
+      "default": 7
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_id",
+     "purpose",
+     "fields"
+    ],
+    "title": "ConsentRequestIn"
    },
    "CredentialOut": {
     "properties": {
@@ -2009,6 +2572,39 @@
     ],
     "title": "StateRow"
    },
+   "StudentEnrolment": {
+    "properties": {
+     "programme": {
+      "type": "string",
+      "title": "Programme"
+     },
+     "institution": {
+      "type": "string",
+      "title": "Institution"
+     },
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "institution_student_id": {
+      "type": "string",
+      "title": "Institution Student Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "programme",
+     "institution",
+     "academic_year",
+     "status",
+     "institution_student_id"
+    ],
+    "title": "StudentEnrolment"
+   },
    "StudentLoginIn": {
     "properties": {
      "apaar_id": {
@@ -2028,6 +2624,51 @@
      "otp"
     ],
     "title": "StudentLoginIn"
+   },
+   "StudentProfile": {
+    "properties": {
+     "apaar_masked": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Apaar Masked"
+     },
+     "provisional_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provisional Id"
+     },
+     "apaar_status": {
+      "type": "string",
+      "title": "Apaar Status"
+     },
+     "enrolments": {
+      "items": {
+       "$ref": "#/components/schemas/StudentEnrolment"
+      },
+      "type": "array",
+      "title": "Enrolments"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_masked",
+     "provisional_id",
+     "apaar_status",
+     "enrolments"
+    ],
+    "title": "StudentProfile"
    },
    "ValidationError": {
     "properties": {

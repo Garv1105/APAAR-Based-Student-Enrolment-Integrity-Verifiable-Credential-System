@@ -152,7 +152,7 @@ END $$;
 -- Random unused index (herd privacy) on the issuer's revocation list. The same index is used on its suspension list.
 CREATE OR REPLACE FUNCTION allocate_status_index(p_issuer text) RETURNS TABLE (list_id text, idx int)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
-DECLARE v_list text; v_size int; v_idx int; tries int := 0;
+DECLARE v_list text; v_size int; v_idx int; tries int := 0; b bytea;
 BEGIN
   IF NOT (app_may_issue_for(p_issuer) OR (app_student() IS NOT NULL AND EXISTS (
         SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
@@ -163,7 +163,9 @@ BEGIN
   IF v_list IS NULL THEN RAISE EXCEPTION 'allocate_status_index: issuer has no status list'; END IF;
   PERFORM pg_advisory_xact_lock(hashtextextended(v_list, 0));
   LOOP
-    v_idx := floor(random() * v_size)::int;
+    -- CSPRNG: gen_random_uuid() uses the server's strong random source; 24 random bits mod a power-of-two size is unbiased
+    b := uuid_send(gen_random_uuid());
+    v_idx := ((get_byte(b, 0) << 16) | (get_byte(b, 1) << 8) | get_byte(b, 2)) % v_size;
     EXIT WHEN NOT EXISTS (SELECT 1 FROM credentials c WHERE c.status_list_id = v_list AND c.status_index = v_idx);
     tries := tries + 1;
     IF tries > 1000 THEN RAISE EXCEPTION 'allocate_status_index: list full'; END IF;
@@ -172,11 +174,14 @@ BEGIN
 END $$;
 
 -- Set or clear a credential's bit (W3C: index 0 = left-most bit; PG set_bit numbers bits from the right of each byte).
--- Issuers may set/clear their own credentials' bits; a student may only REVOKE a VerificationCredential about themselves.
+-- Issuers may suspend/unsuspend and revoke their own credentials; a student may only REVOKE a VerificationCredential
+-- about themselves. Revocation is permanent for everyone (never cleared).
 CREATE OR REPLACE FUNCTION set_credential_status(p_cred text, p_purpose text, p_value boolean) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE c record; v_list text;
 BEGIN
+  IF p_purpose NOT IN ('revocation', 'suspension') OR p_value IS NULL THEN RAISE EXCEPTION 'set_credential_status: bad purpose'; END IF;
+  IF p_purpose = 'revocation' AND NOT p_value THEN RAISE EXCEPTION 'set_credential_status: revocation is permanent'; END IF;
   SELECT * INTO c FROM credentials WHERE id = p_cred;
   IF c.id IS NULL THEN RAISE EXCEPTION 'set_credential_status: no such credential'; END IF;
   IF NOT (app_may_issue_for(c.issuer_did)
@@ -184,6 +189,7 @@ BEGIN
     RAISE EXCEPTION 'set_credential_status: not allowed';
   END IF;
   SELECT id INTO v_list FROM status_lists WHERE issuer_did = c.issuer_did AND purpose = p_purpose;
+  IF v_list IS NULL THEN RAISE EXCEPTION 'set_credential_status: issuer has no % list', p_purpose; END IF;
   UPDATE status_lists SET bits = set_bit(bits, (c.status_index / 8) * 8 + 7 - (c.status_index % 8), CASE WHEN p_value THEN 1 ELSE 0 END),
                           version = version + 1
    WHERE id = v_list;
@@ -252,20 +258,38 @@ BEGIN
           v_ts);
 END $$;
 
+-- The verifier that requested a consent may fetch the VerificationCredential minted for it (D5).
+-- Returns nothing unless the caller is that requester; the app checks status/expiry and audits the fetch.
+CREATE OR REPLACE FUNCTION consent_credential(p_consent bigint)
+RETURNS TABLE (credential_id text, vc_enc bytea, consent_status text, expires_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> 'verifier' THEN RAISE EXCEPTION 'consent_credential: not allowed'; END IF;
+  RETURN QUERY SELECT c.id, c.vc_enc, k.status, k.expires_at
+    FROM consents k LEFT JOIN credentials c ON c.consent_id = k.id
+   WHERE k.id = p_consent AND k.requester_id = current_setting('app.user_id', true);
+END $$;
+
 -- Records a verification in the audit log against the credential's subject (so the student sees it, D6)
--- without revealing anything to the verifier.
-CREATE OR REPLACE FUNCTION log_verification(p_cred text, p_result text, p_request_id text) RETURNS void
+-- without revealing anything to the verifier. The entry is linked to the student only when the presented
+-- document is byte-for-byte the stored credential (same JCS hash), so nobody can plant fake entries by
+-- quoting a credential id.
+DROP FUNCTION IF EXISTS log_verification(text, text, text);
+CREATE OR REPLACE FUNCTION log_verification(p_cred text, p_vc_hash text, p_result text, p_request_id text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF app_role() = '' THEN RAISE EXCEPTION 'log_verification: not allowed'; END IF;
   INSERT INTO audit_logs (actor, role, action, entity, entity_id, student_id, reason, request_id)
   VALUES (current_setting('app.user_id', true), app_role(), 'credential.verify', 'credential', left(p_cred, 100),
-          (SELECT subject_student_id FROM credentials WHERE id = p_cred), left(p_result, 40), left(p_request_id, 64));
+          (SELECT subject_student_id FROM credentials WHERE id = p_cred AND vc_hash = p_vc_hash),
+          left(p_result, 40), left(p_request_id, 64));
 END $$;
 
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_id_for_login(text),
-  allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text) FROM PUBLIC;
+  allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
+  consent_credential(bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_id_for_login(text),
-  allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text) TO app_user;
+  allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
+  consent_credential(bigint) TO app_user;

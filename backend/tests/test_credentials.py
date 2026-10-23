@@ -63,11 +63,50 @@ def test_enrolment_credential_lifecycle_valid_tampered_suspended_revoked(client,
     assert client.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "reason": "left"},
                         headers=login(client, "inst-a")).status_code == 200
     assert verify(client, vc)["result"] == "REVOKED"
-    # the verification shows up in the student's audit trail (D6), recorded without telling the verifier anything
-    rows = dbconn.execute("SELECT actor, reason FROM audit_logs WHERE action='credential.verify' AND entity_id=%s ORDER BY id",
+    # genuine verifications show up in the student's audit trail (D6); the TAMPERED one is not linked to them
+    rows = dbconn.execute("SELECT actor, reason, student_id FROM audit_logs WHERE action='credential.verify' AND entity_id=%s ORDER BY id",
                           (vc["id"],)).fetchall()
-    assert [r["reason"] for r in rows][-1] == "REVOKED" and all(r["actor"] == "employer" for r in rows)
-    assert dbconn.execute("SELECT count(*) n FROM audit_logs WHERE action='credential.verify' AND student_id IS NULL").fetchone()["n"] == 0
+    assert [r["reason"] for r in rows] == ["VALID", "TAMPERED", "SUSPENDED", "VALID", "REVOKED"]
+    assert all(r["actor"] == "employer" for r in rows)
+    assert [r["student_id"] is not None for r in rows] == [True, False, True, True, True]
+
+
+def test_quoting_a_credential_id_cannot_plant_audit_entries(client, dbconn):
+    e, _ = a_enrolment(client, dbconn)
+    vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
+    assert verify(client, {"id": vc["id"]})["result"] == "MALFORMED"
+    rows = dbconn.execute("SELECT student_id FROM audit_logs WHERE action='credential.verify' AND entity_id=%s", (vc["id"],)).fetchall()
+    assert len(rows) == 1 and rows[0]["student_id"] is None
+
+
+def test_regulators_see_masked_credentials_only(client, dbconn):
+    e, row = a_enrolment(client, dbconn)
+    issue(client, "inst-a", e["id"], "EnrolmentCredential")
+    for user in ("aicte", "auditor"):
+        c = client.get("/v1/credentials", headers=login(client, user)).json()[0]["credential"]
+        assert c["redacted"] and "name" not in c["credentialSubject"] and "proof" not in c
+        assert c["credentialSubject"]["apaarId"] == crypto.mask_apaar(row["apaar_id"])
+
+
+def test_issue_is_idempotent(client, dbconn):
+    e, _ = a_enrolment(client, dbconn)
+    h = login(client, "inst-a") | {"Idempotency-Key": "issue-1"}
+    r1 = client.post(f"/v1/credentials/{e['id']}/issue", json={"type": "EnrolmentCredential"}, headers=h)
+    r2 = client.post(f"/v1/credentials/{e['id']}/issue", json={"type": "EnrolmentCredential"}, headers=h)
+    assert r1.status_code == 201 and r2.status_code == 200 and r1.json()["id"] == r2.json()["id"]
+    e2 = client.get("/v1/enrolments", params={"apaar": [r for r in a_rows() if r["apaar_id"]][1]["apaar_id"]},
+                    headers=login(client, "inst-a")).json()[0]
+    assert client.post(f"/v1/credentials/{e2['id']}/issue", json={"type": "EnrolmentCredential"}, headers=h).status_code == 422
+    assert dbconn.execute("SELECT count(*) n FROM credentials").fetchone()["n"] == 1
+
+
+def test_non_student_documents_are_not_reported_valid(client, dbconn):
+    e, _ = a_enrolment(client, dbconn)
+    vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
+    slc = client.get("/status/" + vc["credentialStatus"][0]["statusListCredential"].split("/status/")[1]).json()
+    assert slc["validUntil"] > slc["validFrom"]  # published lists expire (offline verifiers must refresh)
+    assert verify(client, slc)["result"] == "MALFORMED"
+    assert verify(client, client.get("/v1/registry/snapshot").json()["snapshot"])["result"] == "MALFORMED"
 
 
 def test_status_list_credential_is_spec_shaped_and_signed(client, dbconn):
@@ -95,6 +134,9 @@ def test_status_list_bit_order_matches_spec():
 
 def test_degree_credential_by_affiliated_university_only(client, dbconn):
     e, row = a_enrolment(client, dbconn)
+    assert issue(client, "univ", e["id"], "DegreeCredential").status_code == 409   # not completed yet
+    assert client.patch(f"/v1/enrolments/{e['id']}", json={"status": "completed", "reason": "graduated"},
+                        headers=login(client, "inst-a")).status_code == 200
     r = issue(client, "univ", e["id"], "DegreeCredential")
     assert r.status_code == 201, r.text
     s = r.json()["credential"]["credentialSubject"]

@@ -8,7 +8,7 @@ import gzip
 import json
 import os
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from psycopg.types.json import Jsonb
 
@@ -19,6 +19,8 @@ VC_CONTEXT = ["https://www.w3.org/ns/credentials/v2"]
 STATUS_LIST_BITS = 131_072        # W3C Bitstring Status List minimum length (16KB uncompressed)
 AICTE_REGISTRY_DID = "did:web:registry.aicte-demo.in"   # signs registry snapshots (MOCK trust anchor)
 AICTE_REGISTRY_KEY = "aicte-registry"
+STUDENT_CREDENTIAL_TYPES = {"EnrolmentCredential", "DegreeCredential", "VerificationCredential"}
+PUBLISHED_TTL = timedelta(hours=24)  # status lists / registry snapshots: offline verifiers must refresh after this
 
 
 class CredentialError(Exception):
@@ -85,7 +87,7 @@ def registry_entry(r: dict) -> dict:
 def registry_snapshot(conn) -> dict:
     """AICTE-signed snapshot of all issuers, for verifiers that cache the registry offline."""
     doc = {"@context": VC_CONTEXT, "type": ["VerifiableCredential", "TrustedIssuerRegistrySnapshot"],
-           "issuer": AICTE_REGISTRY_DID, "validFrom": iso(now_utc()),
+           "issuer": AICTE_REGISTRY_DID, "validFrom": iso(now_utc()), "validUntil": iso(now_utc() + PUBLISHED_TTL),
            "credentialSubject": {"issuers": [registry_entry(r) for r in conn.execute("SELECT * FROM issuer_registry ORDER BY did")]}}
     key = crypto.signing_key(AICTE_REGISTRY_KEY)
     return crypto.eddsa_jcs_2022_sign(doc, _proof_options(f"{AICTE_REGISTRY_DID}#key-1"), key)
@@ -123,7 +125,7 @@ def status_list_credential(conn, list_id: str) -> dict | None:
         return None
     url = status_list_url(list_id)
     doc = {"@context": VC_CONTEXT, "id": url, "type": ["VerifiableCredential", "BitstringStatusListCredential"],
-           "issuer": sl["issuer_did"], "validFrom": iso(now_utc()),
+           "issuer": sl["issuer_did"], "validFrom": iso(now_utc()), "validUntil": iso(now_utc() + PUBLISHED_TTL),
            "credentialSubject": {"id": f"{url}#list", "type": "BitstringStatusList", "statusPurpose": sl["purpose"],
                                  "encodedList": encode_list(sl["bits"])}}
     return crypto.eddsa_jcs_2022_sign(doc, _proof_options(f"{sl['issuer_did']}#key-1"), crypto.signing_key(sl["issuer_did"]))
@@ -172,7 +174,8 @@ def subject_details(conn, enrolment: dict) -> dict:
 
 
 def sign_and_store(conn, *, issuer_did: str, issuer_name: str, vc_type: str, subject: dict, student_id: int,
-                   valid_until: datetime | None, enrolment_id: int | None = None, consent_id: int | None = None) -> dict:
+                   valid_until: datetime | None, enrolment_id: int | None = None, consent_id: int | None = None,
+                   idempotency_key: str | None = None, request_hash: str | None = None) -> dict:
     alloc = conn.execute("SELECT * FROM allocate_status_index(%s)", (issuer_did,)).fetchone()
     cred_id = f"urn:uuid:{uuid.uuid4()}"
     vc = {"@context": VC_CONTEXT, "id": cred_id, "type": ["VerifiableCredential", vc_type],
@@ -182,13 +185,25 @@ def sign_and_store(conn, *, issuer_did: str, issuer_name: str, vc_type: str, sub
         vc["validUntil"] = iso(valid_until)
     signed = crypto.eddsa_jcs_2022_sign(vc, _proof_options(f"{issuer_did}#key-1"), crypto.signing_key(issuer_did))
     conn.execute("INSERT INTO credentials (id, type, enrolment_id, consent_id, subject_student_id, issuer_did, status_list_id, "
-                 "status_index, vc_enc, vc_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                 "status_index, vc_enc, vc_hash, idempotency_key, request_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                  (cred_id, vc_type, enrolment_id, consent_id, student_id, issuer_did, alloc["list_id"], alloc["idx"],
-                  crypto.encrypt("credentials", "vc", cred_id, json.dumps(signed)), crypto.sha256_hex(crypto.jcs(signed))))
+                  crypto.encrypt("credentials", "vc", cred_id, json.dumps(signed)), vc_hash(signed), idempotency_key, request_hash))
     return signed
 
 
-def issue(conn, user: dict, enrolment_id: int, vc_type: str) -> dict:
+def vc_hash(vc: dict) -> str:
+    return crypto.sha256_hex(crypto.jcs(vc))
+
+
+def issue(conn, user: dict, enrolment_id: int, vc_type: str, idempotency_key: str | None = None) -> tuple[dict, bool]:
+    """Returns (credential, replayed). A repeated Idempotency-Key for the same enrolment + type returns the original."""
+    req_hash = crypto.sha256_hex(f"{enrolment_id}|{vc_type}".encode())
+    if idempotency_key:
+        prev = conn.execute("SELECT * FROM credentials WHERE idempotency_key=%s", (idempotency_key,)).fetchone()  # RLS: own issuer
+        if prev is not None:
+            if prev["request_hash"] != req_hash:
+                raise CredentialError(422, "Idempotency-Key was already used for a different credential request")
+            return stored_credential(conn, prev), True
     e = conn.execute("SELECT * FROM enrolments WHERE id=%s", (enrolment_id,)).fetchone()  # RLS: own / affiliated only
     if e is None:
         raise CredentialError(404, "Enrolment not found")
@@ -208,6 +223,8 @@ def issue(conn, user: dict, enrolment_id: int, vc_type: str) -> dict:
     elif vc_type == "DegreeCredential":
         if user["role"] != "university_registrar":
             raise CredentialError(403, "Only the degree-awarding university issues degree credentials")
+        if e["status"] != "completed":
+            raise CredentialError(409, "A degree is awarded only for a completed enrolment (the institution marks it completed first)")
         issuer = _issuer(conn, user["issuer_did"])
         # Req 10: APAAR ID and student ID are both carried (and printed on the certificate)
         subject = {k: v for k, v in d.items() if not k.startswith("_") and k not in ("status",)}
@@ -216,7 +233,8 @@ def issue(conn, user: dict, enrolment_id: int, vc_type: str) -> dict:
     else:
         raise CredentialError(422, "Unknown credential type")
     return sign_and_store(conn, issuer_did=issuer["did"], issuer_name=issuer["name"], vc_type=vc_type, subject=subject,
-                          student_id=d["_student_id"], valid_until=valid_until, enrolment_id=enrolment_id)
+                          student_id=d["_student_id"], valid_until=valid_until, enrolment_id=enrolment_id,
+                          idempotency_key=idempotency_key, request_hash=req_hash), False
 
 
 def stored_credential(conn, row: dict) -> dict:
@@ -244,6 +262,9 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
         refs = [(e["statusPurpose"], e["statusListCredential"], int(e["statusListIndex"])) for e in entries]
         if not all(url.startswith(f"{PUBLIC_BASE_URL}/status/") for _, url, _ in refs) or not isinstance(vc["credentialSubject"], dict):
             return out
+        # only student credentials, signed for assertion (not status lists, registry snapshots, ...)
+        if not set(vc["type"]) & STUDENT_CREDENTIAL_TYPES or vc["proof"].get("proofPurpose") != "assertionMethod":
+            return out
     except (KeyError, TypeError, ValueError, AttributeError):
         return out
     checks["well_formed"] = True
@@ -255,7 +276,6 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
     if reg is None or key is None or not vm_id.startswith(issuer_did + "#"):
         out["result"] = "UNTRUSTED_ISSUER"
         return out
-    out["issuer_name"] = reg["name"]
     checks["issuer_trusted"] = (reg["status"] == "active" and reg["valid_from"] <= valid_from
                                 and (reg["valid_until"] is None or valid_from <= reg["valid_until"]))
     # 3. signature
@@ -286,8 +306,8 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
         out["result"] = "EXPIRED"
     else:
         out["result"] = "VALID"
-    if out["result"] != "TAMPERED":
-        out["subject"] = vc["credentialSubject"]
+    if checks["signature_valid"]:  # never show unsigned data next to a registered issuer's name
+        out["subject"], out["issuer_name"] = vc["credentialSubject"], reg["name"]
     return out
 
 

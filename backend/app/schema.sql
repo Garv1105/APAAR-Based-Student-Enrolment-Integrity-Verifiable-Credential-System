@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS consents (
   id            bigserial PRIMARY KEY,
   student_id    bigint NOT NULL REFERENCES students(id),
   requester_id  text   NOT NULL REFERENCES users(id),
+  requester_name text  NOT NULL,                -- shown to the student in the consent inbox
   purpose       text   NOT NULL,
   scope_fields  text[] NOT NULL,
   status        text   NOT NULL CHECK (status IN ('pending','granted','denied','revoked')),
@@ -199,7 +200,10 @@ CREATE TABLE IF NOT EXISTS credentials (
   issued_at      timestamptz NOT NULL DEFAULT now(),
   vc_enc         bytea NOT NULL,                -- AES-GCM of the signed VC JSON (contains PII); AAD credentials|vc|id
   vc_hash        text NOT NULL,                 -- SHA-256 of JCS(signed VC)
-  UNIQUE (status_list_id, status_index)
+  idempotency_key text,                         -- issuance retries return the same credential
+  request_hash   text,                          -- enrolment + type the key was first used for
+  UNIQUE (status_list_id, status_index),
+  UNIQUE (issuer_did, idempotency_key)
 );
 
 CREATE TABLE IF NOT EXISTS ledger_entries (      -- D1 hash chain
