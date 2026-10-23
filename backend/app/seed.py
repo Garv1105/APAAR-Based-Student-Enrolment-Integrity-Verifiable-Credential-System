@@ -8,7 +8,7 @@ from pathlib import Path
 from argon2 import PasswordHasher
 from psycopg.types.json import Jsonb
 
-from . import db
+from . import credentials, db
 from .validation import caps_for
 
 SEED = Path(__file__).resolve().parent.parent / "data/seed/registry.json"
@@ -39,10 +39,11 @@ def seed(conn) -> None:
             conn.execute("INSERT INTO programme_category_counters VALUES (%s,%s,%s,0,%s)", (a["programme"], a["academic_year"], key, cap))
     for h in s["intake_history"]:
         conn.execute("INSERT INTO intake_history VALUES (%s,%s,%s,%s)", (h["programme"], h["academic_year"], h["approved"], h["filled"]))
+    credentials.seed_trust_registry(conn, s["trust_registry"])
     pw = PasswordHasher().hash(DEMO_PASSWORD)
     for u in s["users"]:
-        conn.execute("INSERT INTO users (id, role, institution_id, display_name, password_hash) VALUES (%s,%s,%s,%s,%s)",
-                     (u["id"], u["role"], u.get("institution_id"), u["display_name"], pw))
+        conn.execute("INSERT INTO users (id, role, institution_id, issuer_did, display_name, password_hash) VALUES (%s,%s,%s,%s,%s,%s)",
+                     (u["id"], u["role"], u.get("institution_id"), u.get("issuer_did"), u["display_name"], pw))
 
 
 def main(name: str = db.DB_NAME) -> None:

@@ -157,6 +157,8 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
         e = conn.execute("UPDATE enrolments SET status=%s, ended_on=%s, year_of_study=%s WHERE id=%s RETURNING *",
                          (new_status, ended, body.get("year_of_study") or e["year_of_study"], enrolment_id)).fetchone()
         ledger.append(conn, user["institution_id"], "enrolment.updated", e)
+        if new_status in ("withdrawn", "migrated"):  # PRD §11.7: leaving the institution revokes its credentials
+            conn.execute("SELECT revoke_enrolment_credentials(%s)", (e["id"],))
         if flags:
             conn.execute("INSERT INTO anomaly_flags (institution_id, programme_id, type, score, evidence_json) VALUES (%s,%s,'E501',1,%s)",
                          (user["institution_id"], e["programme_id"],

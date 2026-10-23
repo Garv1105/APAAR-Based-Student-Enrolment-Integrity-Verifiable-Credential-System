@@ -1,9 +1,12 @@
 """T5.11: every endpoint x every role, incl. wrong-institution (inst-b on inst-a's resources).
 Expected codes: 2xx allowed, 401 no/invalid token, 403 wrong role, 404 wrong institution (no oracle)."""
-from conftest import login
+import csv
+from pathlib import Path
+
+from conftest import login, student_headers
 from test_api import pending_rows, upload
 
-USERS = ["anon", "inst-a", "inst-b", "aicte", "auditor", "employer", "univ"]
+USERS = ["anon", "inst-a", "inst-b", "aicte", "auditor", "employer", "univ", "student"]
 INST, REG = {"inst-a": 200}, {"aicte": 200, "auditor": 200}
 
 
@@ -28,7 +31,9 @@ def test_access_matrix(client, dbconn):
         ("GET", f"/v1/batches/{bid}", {}, expect(INST | REG, 404)),
         ("GET", f"/v1/batches/{bid}/issues", {}, expect(INST | REG, 404)),
         ("GET", f"/v1/batches/{bid}/report.csv", {}, expect(INST | REG, 404)),
-        ("GET", "/v1/enrolments?student_id=A/CSE/2026/0001", {}, expect({"inst-a": 200, "inst-b": 200})),  # b gets []
+        ("GET", "/v1/enrolments?student_id=A/CSE/2026/0001", {}, expect({"inst-a": 200, "inst-b": 200, "univ": 200})),  # b: []
+        ("GET", "/v1/credentials/certificate?id=urn:uuid:nope", {},
+         expect({"inst-a": 404, "inst-b": 404, "univ": 404, "student": 404})),
         ("PATCH", f"/v1/enrolments/{eid}", {"json": {"year_of_study": 1, "reason": "access test"}}, expect(INST, 404)),
         ("GET", "/v1/programmes/1-0000000001:CSE/seats", {}, expect(INST | REG, 404)),
         ("GET", "/v1/dashboard/institution", {}, expect({"inst-a": 200, "inst-b": 200})),
@@ -36,9 +41,37 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/ledger/verify", {}, expect(REG)),
         ("POST", "/v1/ledger/checkpoints", {}, expect({"aicte": 200})),
         ("GET", "/v1/ledger/checkpoints/latest", {}, {u: 200 for u in USERS}),
+        # credentials (Req 5, 6, 10)
+        ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "EnrolmentCredential"}}, expect({"inst-a": 201}, 404)),
+        ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "DegreeCredential"}},
+         expect({"univ": 409, "inst-a": 403}, 404)),  # univ: 409 = role allowed, enrolment not completed; inst-b: RLS hides it
+        ("GET", "/v1/credentials", {}, expect({"inst-a": 200, "inst-b": 200, "univ": 200, "student": 200} | REG)),  # RLS filters
+        ("POST", "/v1/credentials/status",
+         {"json": {"credential_id": "urn:uuid:nope", "purpose": "suspension", "value": True, "reason": "test"}},
+         expect({"inst-a": 404, "inst-b": 404, "univ": 404})),
+        ("POST", "/v1/verify", {"json": {"credential": {}}},
+         expect({"inst-a": 200, "inst-b": 200, "employer": 200, "univ": 200, "student": 200} | REG)),
+        ("GET", "/v1/demo/forged-credential", {}, expect({"employer": 200} | REG)),
+        # consent + student self-service (Req 5, 8; D5, D6)
+        ("POST", "/v1/consents/requests", {"json": {"apaar_id": "999999999999", "purpose": "check", "fields": ["name"]}},
+         expect({"employer": 201})),  # same 201 whether or not the APAAR is registered (no existence oracle)
+        ("GET", "/v1/consents", {}, expect({"employer": 200, "student": 200} | REG)),
+        ("POST", "/v1/consents/999999/approve", {"json": {"otp": "123456"}}, expect({"student": 404})),
+        ("POST", "/v1/consents/999999/deny", {}, expect({"student": 404})),
+        ("POST", "/v1/consents/999999/revoke", {}, expect({"student": 404})),
+        ("GET", "/v1/consents/999999/credential", {}, expect({"employer": 404})),
+        ("GET", "/v1/students/me", {}, expect({"student": 200})),
+        ("GET", "/v1/students/me/access-log", {}, expect({"student": 200})),
+        ("GET", "/v1/registry/issuers", {}, {u: 200 for u in USERS}),
+        ("GET", "/v1/registry/snapshot", {}, {u: 200 for u in USERS}),
+        ("GET", "/status/inst-1-0000000001-revocation", {}, {u: 200 for u in USERS}),
+        ("GET", "/dids/inst/1-0000000001/did.json", {}, {u: 200 for u in USERS}),
         ("GET", "/healthz", {}, {u: 200 for u in USERS}),
     ]
-    headers = {u: ({} if u == "anon" else login(client, u)) for u in USERS}
+    headers = {u: ({} if u == "anon" else login(client, u)) for u in USERS if u != "student"}
+    a1 = csv.DictReader(open(Path(__file__).parent.parent / "data/synthetic/A1.csv", encoding="utf-8"))
+    apaar = next(r["apaar_id"] for r in a1 if r["apaar_id"])
+    headers["student"] = student_headers(client, apaar)
     bad = []
     for method, path, kw, exp in cases:
         for u in USERS:

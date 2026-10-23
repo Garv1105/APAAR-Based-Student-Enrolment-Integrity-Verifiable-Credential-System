@@ -62,7 +62,8 @@ def app_connect(user: dict | None, dbname: str = DB_NAME) -> psycopg.Connection:
                            row_factory=dict_row, connect_timeout=5)
     u = user or {}
     for key, val in (("app.role", u.get("role")), ("app.institution_id", u.get("institution_id")),
-                     ("app.user_id", u.get("id")), ("app.student_id", u.get("student_id"))):
+                     ("app.user_id", u.get("id")), ("app.student_id", u.get("student_id")),
+                     ("app.issuer_did", u.get("issuer_did"))):
         conn.execute("SELECT set_config(%s, %s, false)", (key, "" if val is None else str(val)))
     conn.commit()
     return conn

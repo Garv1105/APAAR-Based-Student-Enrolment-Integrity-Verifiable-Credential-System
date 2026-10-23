@@ -13,16 +13,28 @@ CREATE OR REPLACE FUNCTION app_is_regulator() RETURNS boolean LANGUAGE sql STABL
 $$ SELECT app_role() IN ('aicte_officer', 'auditor') $$;
 CREATE OR REPLACE FUNCTION app_owns_programme(pid text) RETURNS boolean LANGUAGE sql STABLE AS
 $$ SELECT app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM programmes p WHERE p.id = pid AND p.institution_id = app_inst()) $$;
+CREATE OR REPLACE FUNCTION app_student() RETURNS bigint LANGUAGE sql STABLE AS
+$$ SELECT CASE WHEN app_role() = 'student' THEN nullif(current_setting('app.student_id', true), '')::bigint END $$;
+CREATE OR REPLACE FUNCTION app_registrar_did() RETURNS text LANGUAGE sql STABLE AS
+$$ SELECT CASE WHEN app_role() = 'university_registrar' THEN nullif(current_setting('app.issuer_did', true), '') END $$;
+-- issuer DIDs the caller may sign for: its own institution's DID, or the registrar's university DID
+CREATE OR REPLACE FUNCTION app_may_issue_for(p_did text) RETURNS boolean LANGUAGE sql STABLE AS
+$$ SELECT (app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM issuer_registry r WHERE r.did = p_did AND r.institution_id = app_inst()))
+       OR (app_registrar_did() IS NOT NULL AND p_did = app_registrar_did()) $$;
+CREATE OR REPLACE FUNCTION app_registrar_covers(pid text) RETURNS boolean LANGUAGE sql STABLE AS
+$$ SELECT app_registrar_did() IS NOT NULL AND EXISTS (SELECT 1 FROM programmes p JOIN affiliations a ON a.institution_id = p.institution_id
+                                                      WHERE p.id = pid AND a.university_did = app_registrar_did()) $$;
 
 -- ---------- privileges ----------
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM app_user;
 GRANT USAGE ON SCHEMA public TO app_user;
 -- users is NOT granted: password hashes are reachable only through login_lookup()
-GRANT SELECT ON institutions, programmes, approved_intake, seat_categories, academic_years, intake_history TO app_user;
+GRANT SELECT ON institutions, programmes, approved_intake, seat_categories, academic_years, intake_history,
+  issuer_registry, affiliations, status_lists TO app_user;   -- registry + status lists: public, written only by admin/definer fns
 GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, students, programme_category_counters,
-  duplicate_cases, anomaly_flags, consents, credentials, status_lists, issuer_registry TO app_user;
-GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints TO app_user;
+  duplicate_cases, anomaly_flags, consents TO app_user;
+GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints, credentials TO app_user;
 GRANT SELECT ON ledger_entries TO app_user;            -- writes only via ledger_append()
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
 
@@ -44,7 +56,9 @@ CREATE POLICY ins ON validation_issues FOR INSERT WITH CHECK (EXISTS (SELECT 1 F
 -- enrolments
 ALTER TABLE enrolments ENABLE ROW LEVEL SECURITY; ALTER TABLE enrolments FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON enrolments; DROP POLICY IF EXISTS ins ON enrolments; DROP POLICY IF EXISTS upd ON enrolments;
-CREATE POLICY sel ON enrolments FOR SELECT USING (app_is_regulator() OR app_owns_programme(programme_id));
+CREATE POLICY sel ON enrolments FOR SELECT USING (app_is_regulator() OR app_owns_programme(programme_id)
+  OR student_id = app_student()                -- a student sees their own enrolments
+  OR app_registrar_covers(programme_id));      -- a university registrar sees its affiliated institutions' enrolments
 CREATE POLICY ins ON enrolments FOR INSERT WITH CHECK (app_owns_programme(programme_id));
 CREATE POLICY upd ON enrolments FOR UPDATE USING (app_owns_programme(programme_id)) WITH CHECK (app_owns_programme(programme_id));
 
@@ -57,7 +71,8 @@ CREATE POLICY upd ON programme_category_counters FOR UPDATE USING (app_owns_prog
 -- students: shared person rows; an institution sees a student only through its own enrolment
 ALTER TABLE students ENABLE ROW LEVEL SECURITY; ALTER TABLE students FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON students; DROP POLICY IF EXISTS ins ON students;
-CREATE POLICY sel ON students FOR SELECT USING (app_is_regulator() OR EXISTS (SELECT 1 FROM enrolments e WHERE e.student_id = students.id));
+CREATE POLICY sel ON students FOR SELECT USING (app_is_regulator() OR id = app_student()
+  OR EXISTS (SELECT 1 FROM enrolments e WHERE e.student_id = students.id));  -- enrolments RLS decides (own / affiliated)
 CREATE POLICY ins ON students FOR INSERT WITH CHECK (app_role() = 'institution_admin');
 
 -- duplicate_cases: visible to an institution only if one of its own enrolments is in the case
@@ -72,10 +87,10 @@ DROP POLICY IF EXISTS sel ON anomaly_flags; DROP POLICY IF EXISTS ins ON anomaly
 CREATE POLICY sel ON anomaly_flags FOR SELECT USING (app_is_regulator() OR (app_role() = 'institution_admin' AND institution_id = app_inst()));
 CREATE POLICY ins ON anomaly_flags FOR INSERT WITH CHECK (app_role() = 'institution_admin' AND institution_id = app_inst());
 
--- audit_logs: anyone authenticated may append as themselves; only regulators read (students: own, later)
+-- audit_logs: anyone authenticated may append as themselves; regulators read all; a student reads entries about them (D6)
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY; ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON audit_logs; DROP POLICY IF EXISTS ins ON audit_logs;
-CREATE POLICY sel ON audit_logs FOR SELECT USING (app_is_regulator());
+CREATE POLICY sel ON audit_logs FOR SELECT USING (app_is_regulator() OR student_id = app_student());
 CREATE POLICY ins ON audit_logs FOR INSERT WITH CHECK (app_role() <> '' AND actor = current_setting('app.user_id', true));
 
 -- ledger_entries: read by regulators only (payload hashes could otherwise be brute-forced into an oracle)
@@ -89,18 +104,143 @@ DROP POLICY IF EXISTS sel ON ledger_checkpoints; DROP POLICY IF EXISTS ins ON le
 CREATE POLICY sel ON ledger_checkpoints FOR SELECT USING (true);
 CREATE POLICY ins ON ledger_checkpoints FOR INSERT WITH CHECK (app_role() = 'aicte_officer');
 
--- credential/consent tables: RLS on with no policies = deny all, until their features add policies
-ALTER TABLE consents ENABLE ROW LEVEL SECURITY; ALTER TABLE consents FORCE ROW LEVEL SECURITY;
-ALTER TABLE credentials ENABLE ROW LEVEL SECURITY; ALTER TABLE credentials FORCE ROW LEVEL SECURITY;
+-- trust registry and status lists: public read (SELECT-only grant; writes by admin seed / definer fns)
 ALTER TABLE status_lists ENABLE ROW LEVEL SECURITY; ALTER TABLE status_lists FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON status_lists;
+CREATE POLICY sel ON status_lists FOR SELECT USING (true);
 ALTER TABLE issuer_registry ENABLE ROW LEVEL SECURITY; ALTER TABLE issuer_registry FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON issuer_registry;
+CREATE POLICY sel ON issuer_registry FOR SELECT USING (true);
+
+-- credentials: the issuer (institution / registrar), the subject student and regulators can read.
+-- VerificationCredentials are the student's (D5): the issuing institution can't see them (they reveal which
+-- employer the student shares data with) — only the student, regulators and the consent requester (definer fn).
+-- Insert: an issuer for its own DID; a student only for the single VerificationCredential of a consent they
+-- granted, issued by an institution where they hold an active enrolment.
+ALTER TABLE credentials ENABLE ROW LEVEL SECURITY; ALTER TABLE credentials FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON credentials; DROP POLICY IF EXISTS ins ON credentials;
+CREATE POLICY sel ON credentials FOR SELECT USING (app_is_regulator() OR subject_student_id = app_student()
+  OR (app_may_issue_for(issuer_did) AND type <> 'VerificationCredential'));
+CREATE POLICY ins ON credentials FOR INSERT WITH CHECK (
+  (app_may_issue_for(issuer_did) AND type <> 'VerificationCredential')
+  OR (type = 'VerificationCredential' AND subject_student_id = app_student()
+      AND EXISTS (SELECT 1 FROM consents k WHERE k.id = consent_id AND k.student_id = app_student() AND k.status = 'granted')
+      AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
+                  WHERE e.student_id = app_student() AND e.status = 'active' AND r.did = issuer_did)));
+
+-- consents: the student sees and answers requests about them; regulators read. Verifiers have NO direct
+-- access: they create and list requests only through request_consent() / my_consent_requests(), which never
+-- return student_id — so a verifier can't tell whether an APAAR matched a registered student.
+ALTER TABLE consents ENABLE ROW LEVEL SECURITY; ALTER TABLE consents FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON consents; DROP POLICY IF EXISTS ins ON consents; DROP POLICY IF EXISTS upd ON consents;
+CREATE POLICY sel ON consents FOR SELECT USING (app_is_regulator() OR student_id = app_student());
+CREATE POLICY upd ON consents FOR UPDATE USING (student_id = app_student()) WITH CHECK (student_id = app_student());
 
 -- ---------- SECURITY DEFINER functions (the only cross-institution paths) ----------
-CREATE OR REPLACE FUNCTION login_lookup(p_id text)
-RETURNS TABLE (id text, role text, institution_id text, student_id bigint, display_name text, password_hash text)
+DROP FUNCTION IF EXISTS login_lookup(text);
+CREATE FUNCTION login_lookup(p_id text)
+RETURNS TABLE (id text, role text, institution_id text, student_id bigint, issuer_did text, display_name text, password_hash text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT id, role, institution_id, student_id, display_name, password_hash FROM users WHERE id = p_id
+  SELECT id, role, institution_id, student_id, issuer_did, display_name, password_hash FROM users WHERE id = p_id
 $$;
+
+-- MOCK student sign-in (APAAR + date of birth): returns the id and the encrypted DOB for the app to compare.
+-- Anonymous (login) connections only; the app throttles failed attempts.
+DROP FUNCTION IF EXISTS student_id_for_login(text);
+CREATE OR REPLACE FUNCTION student_login_lookup(p_bi text) RETURNS TABLE (id bigint, dob_enc bytea)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> '' THEN RAISE EXCEPTION 'student_login_lookup: not allowed'; END IF;
+  RETURN QUERY SELECT s.id, s.dob_enc FROM students s WHERE s.apaar_bi = p_bi;
+END $$;
+
+-- Verifier consent request. Always stores the request and returns the same shape, whether or not the APAAR
+-- belongs to a registered student (unmatched requests simply stay pending until they expire, exactly like a
+-- request the student never answers). Rate-limited per verifier; the audit row is written here, linked to
+-- the student only when matched, so the application layer never learns the outcome either.
+CREATE OR REPLACE FUNCTION request_consent(p_bi text, p_purpose text, p_fields text[], p_days int, p_requester_name text,
+                                           p_request_id text)
+RETURNS TABLE (id bigint, requester_name text, purpose text, scope_fields text[], status text, granted_by text,
+               requested_at timestamptz, expires_at timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_student bigint; v_id bigint; v_me text := current_setting('app.user_id', true);
+BEGIN
+  IF app_role() <> 'verifier' OR coalesce(v_me, '') = '' THEN RAISE EXCEPTION 'request_consent: not allowed'; END IF;
+  IF p_days NOT BETWEEN 1 AND 30 OR length(p_purpose) NOT BETWEEN 3 AND 200 OR cardinality(p_fields) = 0
+     OR NOT p_fields <@ ARRAY['name','programme','institution','academic_year','status','apaar_id','student_id'] THEN
+    RAISE EXCEPTION 'request_consent: invalid request';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('consent-rate:' || v_me, 0));
+  IF (SELECT count(*) FROM consents c WHERE c.requester_id = v_me AND c.requested_at > now() - interval '1 hour') >= 20 THEN
+    RAISE EXCEPTION 'request_consent: rate limit' USING ERRCODE = 'RL429';
+  END IF;
+  SELECT s.id INTO v_student FROM students s WHERE s.apaar_bi = p_bi;
+  INSERT INTO consents (student_id, requester_id, requester_name, purpose, scope_fields, status, expires_at)
+  VALUES (v_student, v_me, p_requester_name, p_purpose, (SELECT array_agg(DISTINCT f ORDER BY f) FROM unnest(p_fields) f), 'pending',
+          date_trunc('second', now()) + make_interval(days => p_days))
+  RETURNING consents.id INTO v_id;
+  INSERT INTO audit_logs (actor, role, action, entity, entity_id, student_id, reason, request_id)
+  VALUES (v_me, 'verifier', 'consent.request', 'consent', v_id::text, v_student, left(p_purpose, 200), left(p_request_id, 64));
+  RETURN QUERY SELECT c.id, c.requester_name, c.purpose, c.scope_fields, c.status, c.granted_by, c.requested_at, c.expires_at
+                 FROM consents c WHERE c.id = v_id;
+END $$;
+
+-- The verifier's own requests, without student_id.
+CREATE OR REPLACE FUNCTION my_consent_requests()
+RETURNS TABLE (id bigint, requester_name text, purpose text, scope_fields text[], status text, granted_by text,
+               requested_at timestamptz, expires_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> 'verifier' THEN RAISE EXCEPTION 'my_consent_requests: not allowed'; END IF;
+  RETURN QUERY SELECT c.id, c.requester_name, c.purpose, c.scope_fields, c.status, c.granted_by, c.requested_at, c.expires_at
+                 FROM consents c WHERE c.requester_id = current_setting('app.user_id', true) ORDER BY c.requested_at DESC LIMIT 200;
+END $$;
+
+-- Random unused index (herd privacy) on the issuer's revocation list. The same index is used on its suspension list.
+CREATE OR REPLACE FUNCTION allocate_status_index(p_issuer text) RETURNS TABLE (list_id text, idx int)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_list text; v_size int; v_idx int; tries int := 0; b bytea;
+BEGIN
+  IF NOT (app_may_issue_for(p_issuer) OR (app_student() IS NOT NULL AND EXISTS (
+        SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
+        WHERE e.student_id = app_student() AND e.status = 'active' AND r.did = p_issuer))) THEN
+    RAISE EXCEPTION 'allocate_status_index: not allowed';
+  END IF;
+  SELECT id, length(bits) * 8 INTO v_list, v_size FROM status_lists WHERE issuer_did = p_issuer AND purpose = 'revocation';
+  IF v_list IS NULL THEN RAISE EXCEPTION 'allocate_status_index: issuer has no status list'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_list, 0));
+  LOOP
+    -- CSPRNG: gen_random_uuid() uses the server's strong random source; 24 random bits mod a power-of-two size is unbiased
+    b := uuid_send(gen_random_uuid());
+    v_idx := ((get_byte(b, 0) << 16) | (get_byte(b, 1) << 8) | get_byte(b, 2)) % v_size;
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM credentials c WHERE c.status_list_id = v_list AND c.status_index = v_idx);
+    tries := tries + 1;
+    IF tries > 1000 THEN RAISE EXCEPTION 'allocate_status_index: list full'; END IF;
+  END LOOP;
+  RETURN QUERY SELECT v_list, v_idx;
+END $$;
+
+-- Set or clear a credential's bit (W3C: index 0 = left-most bit; PG set_bit numbers bits from the right of each byte).
+-- Issuers may suspend/unsuspend and revoke their own credentials; a student may only REVOKE a VerificationCredential
+-- about themselves. Revocation is permanent for everyone (never cleared).
+CREATE OR REPLACE FUNCTION set_credential_status(p_cred text, p_purpose text, p_value boolean) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE c record; v_list text;
+BEGIN
+  IF p_purpose NOT IN ('revocation', 'suspension') OR p_value IS NULL THEN RAISE EXCEPTION 'set_credential_status: bad purpose'; END IF;
+  IF p_purpose = 'revocation' AND NOT p_value THEN RAISE EXCEPTION 'set_credential_status: revocation is permanent'; END IF;
+  SELECT * INTO c FROM credentials WHERE id = p_cred;
+  IF c.id IS NULL THEN RAISE EXCEPTION 'set_credential_status: no such credential'; END IF;
+  IF NOT ((app_may_issue_for(c.issuer_did) AND c.type <> 'VerificationCredential')  -- consent-scoped VCs are the student's
+          OR (c.type = 'VerificationCredential' AND c.subject_student_id = app_student() AND p_purpose = 'revocation' AND p_value)) THEN
+    RAISE EXCEPTION 'set_credential_status: not allowed';
+  END IF;
+  SELECT id INTO v_list FROM status_lists WHERE issuer_did = c.issuer_did AND purpose = p_purpose;
+  IF v_list IS NULL THEN RAISE EXCEPTION 'set_credential_status: issuer has no % list', p_purpose; END IF;
+  UPDATE status_lists SET bits = set_bit(bits, (c.status_index / 8) * 8 + 7 - (c.status_index % 8), CASE WHEN p_value THEN 1 ELSE 0 END),
+                          version = version + 1
+   WHERE id = v_list;
+END $$;
 
 CREATE OR REPLACE FUNCTION active_enrolment_owners(p_bis text[], p_year text)
 RETURNS TABLE (apaar_bi text, own boolean)
@@ -165,7 +305,57 @@ BEGIN
           v_ts);
 END $$;
 
+-- Withdrawal/migration revokes every credential of that enrolment, including the student's consent-scoped
+-- VerificationCredentials (which the institution can't otherwise see or change). Caller must own the enrolment.
+CREATE OR REPLACE FUNCTION revoke_enrolment_credentials(p_enrolment bigint) RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE c record; n int := 0;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM enrolments e WHERE e.id = p_enrolment AND app_owns_programme(e.programme_id) AND e.status IN ('withdrawn', 'migrated')) THEN
+    RAISE EXCEPTION 'revoke_enrolment_credentials: not allowed';
+  END IF;
+  FOR c IN SELECT * FROM credentials WHERE enrolment_id = p_enrolment AND type IN ('EnrolmentCredential', 'VerificationCredential') LOOP
+    UPDATE status_lists SET bits = set_bit(bits, (c.status_index / 8) * 8 + 7 - (c.status_index % 8), 1), version = version + 1
+     WHERE issuer_did = c.issuer_did AND purpose = 'revocation';
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END $$;
+
+-- The verifier that requested a consent may fetch the VerificationCredential minted for it (D5).
+-- Returns nothing unless the caller is that requester; the app checks status/expiry and audits the fetch.
+CREATE OR REPLACE FUNCTION consent_credential(p_consent bigint)
+RETURNS TABLE (credential_id text, vc_enc bytea, consent_status text, expires_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> 'verifier' THEN RAISE EXCEPTION 'consent_credential: not allowed'; END IF;
+  RETURN QUERY SELECT c.id, c.vc_enc, k.status, k.expires_at
+    FROM consents k LEFT JOIN credentials c ON c.consent_id = k.id
+   WHERE k.id = p_consent AND k.requester_id = current_setting('app.user_id', true);
+END $$;
+
+-- Records a verification in the audit log against the credential's subject (so the student sees it, D6)
+-- without revealing anything to the verifier. The entry is linked to the student only when the presented
+-- document is byte-for-byte the stored credential (same JCS hash), so nobody can plant fake entries by
+-- quoting a credential id.
+DROP FUNCTION IF EXISTS log_verification(text, text, text);
+CREATE OR REPLACE FUNCTION log_verification(p_cred text, p_vc_hash text, p_result text, p_request_id text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() = '' THEN RAISE EXCEPTION 'log_verification: not allowed'; END IF;
+  INSERT INTO audit_logs (actor, role, action, entity, entity_id, student_id, reason, request_id)
+  VALUES (current_setting('app.user_id', true), app_role(), 'credential.verify', 'credential', left(p_cred, 100),
+          (SELECT subject_student_id FROM credentials WHERE id = p_cred AND vc_hash = p_vc_hash),
+          left(p_result, 40), left(p_request_id, 64));
+END $$;
+
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
-  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text) FROM PUBLIC;
+  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
+  allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
+  consent_credential(bigint), revoke_enrolment_credentials(bigint),
+  request_consent(text, text, text[], int, text, text), my_consent_requests() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
-  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text) TO app_user;
+  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
+  allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
+  consent_credential(bigint), revoke_enrolment_credentials(bigint),
+  request_consent(text, text, text[], int, text, text), my_consent_requests() TO app_user;

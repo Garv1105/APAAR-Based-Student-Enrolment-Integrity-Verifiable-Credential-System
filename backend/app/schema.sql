@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS users (
   role           text NOT NULL CHECK (role IN ('institution_admin','aicte_officer','auditor','verifier','student','university_registrar')),
   institution_id text REFERENCES institutions(id),
   student_id     bigint,
+  issuer_did     text,                          -- university_registrar: the university it signs for
   display_name   text NOT NULL,
   password_hash  text NOT NULL                  -- argon2
 );
@@ -145,49 +146,66 @@ CREATE TABLE IF NOT EXISTS anomaly_flags (
   status         text NOT NULL DEFAULT 'open'
 );
 
-CREATE TABLE IF NOT EXISTS issuer_registry (     -- D4 trust registry
+CREATE TABLE IF NOT EXISTS issuer_registry (     -- D4 trust registry (AICTE is the trust anchor)
   did            text PRIMARY KEY,
+  kind           text NOT NULL CHECK (kind IN ('institution','university')),
   institution_id text REFERENCES institutions(id),
   name           text NOT NULL,
-  public_keys_json jsonb NOT NULL,              -- [{id, publicKeyMultibase, status}]
+  public_keys_json jsonb NOT NULL,              -- [{id, type, controller, publicKeyMultibase, status}]
   status         text NOT NULL CHECK (status IN ('active','suspended','revoked')),
-  valid_from     timestamptz NOT NULL,
-  valid_until    timestamptz
+  valid_from     timestamptz NOT NULL,          -- credentials must be issued (validFrom) inside this window
+  valid_until    timestamptz                    -- e.g. closure date: later credentials are untrusted
 );
 
-CREATE TABLE IF NOT EXISTS status_lists (
-  id            text PRIMARY KEY,               -- '<issuer-slug>/<n>'
+CREATE TABLE IF NOT EXISTS affiliations (        -- which university awards degrees for which institution
+  university_did text NOT NULL REFERENCES issuer_registry(did),
+  institution_id text NOT NULL REFERENCES institutions(id),
+  PRIMARY KEY (university_did, institution_id)
+);
+
+CREATE TABLE IF NOT EXISTS status_lists (        -- W3C Bitstring Status List
+  id            text PRIMARY KEY,               -- '<issuer-slug>-<purpose>'
   issuer_did    text NOT NULL REFERENCES issuer_registry(did),
   purpose       text NOT NULL CHECK (purpose IN ('revocation','suspension')),
-  bits          bytea NOT NULL,                 -- uncompressed bitstring
-  next_index    int   NOT NULL DEFAULT 0,
-  version       int   NOT NULL DEFAULT 1
+  bits          bytea NOT NULL,                 -- uncompressed, >= 16KB (131,072 entries), index 0 = left-most bit
+  version       int   NOT NULL DEFAULT 1,
+  UNIQUE (issuer_did, purpose)
+);
+
+CREATE TABLE IF NOT EXISTS consents (
+  id            bigserial PRIMARY KEY,
+  student_id    bigint REFERENCES students(id),  -- NULL when the APAAR matched nobody: stored anyway so the
+                                                 -- verifier can't tell registered from unregistered IDs
+  requester_id  text   NOT NULL REFERENCES users(id),
+  requester_name text  NOT NULL,                -- shown to the student in the consent inbox
+  purpose       text   NOT NULL,
+  scope_fields  text[] NOT NULL,
+  status        text   NOT NULL CHECK (status IN ('pending','granted','denied','revoked')),
+  granted_by    text CHECK (granted_by IN ('student','guardian')),
+  requested_at  timestamptz NOT NULL DEFAULT now(),
+  granted_at    timestamptz,
+  expires_at    timestamptz NOT NULL,
+  revoked_at    timestamptz,
+  artifact_sig  text                            -- platform Ed25519 signature over the consent artifact (JCS)
 );
 
 CREATE TABLE IF NOT EXISTS credentials (
   id             text PRIMARY KEY,              -- urn:uuid
   type           text NOT NULL CHECK (type IN ('EnrolmentCredential','DegreeCredential','VerificationCredential')),
   enrolment_id   bigint REFERENCES enrolments(id),
+  consent_id     bigint REFERENCES consents(id),
   subject_student_id bigint NOT NULL REFERENCES students(id),
   issuer_did     text NOT NULL REFERENCES issuer_registry(did),
-  status_list_id text REFERENCES status_lists(id),
-  status_index   int,
+  status_list_id text NOT NULL REFERENCES status_lists(id),
+  status_index   int  NOT NULL,
   issued_at      timestamptz NOT NULL DEFAULT now(),
-  vc_hash        text NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS consents (
-  id            bigserial PRIMARY KEY,
-  student_id    bigint NOT NULL REFERENCES students(id),
-  requester_id  text   NOT NULL REFERENCES users(id),
-  purpose       text   NOT NULL,
-  scope_fields  text[] NOT NULL,
-  status        text   NOT NULL CHECK (status IN ('pending','granted','denied','revoked')),
-  requested_at  timestamptz NOT NULL DEFAULT now(),
-  granted_at    timestamptz,
-  expires_at    timestamptz NOT NULL,
-  revoked_at    timestamptz,
-  artifact_sig  text
+  vc_enc         bytea NOT NULL,                -- AES-GCM of the signed VC JSON (contains PII); AAD credentials|vc|id
+  vc_hash        text NOT NULL,                 -- SHA-256 of JCS(signed VC)
+  idempotency_key text,                         -- issuance retries return the same credential
+  request_hash   text,                          -- enrolment + type the key was first used for
+  UNIQUE (status_list_id, status_index),
+  UNIQUE (issuer_did, idempotency_key),
+  UNIQUE (consent_id)                           -- one VerificationCredential per consent
 );
 
 CREATE TABLE IF NOT EXISTS ledger_entries (      -- D1 hash chain

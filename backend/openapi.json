@@ -70,6 +70,50 @@
     ]
    }
   },
+  "/v1/auth/student-login": {
+   "post": {
+    "summary": "Student Login",
+    "description": "MOCK student sign-in: APAAR ID + date of birth. Production: APAAR/DigiLocker authentication. 5 failed attempts per APAAR in 15 minutes lock it out.",
+    "operationId": "student_login_v1_auth_student_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/StudentLoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LoginOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/batches": {
    "post": {
     "summary": "Create Batch",
@@ -317,7 +361,7 @@
   "/v1/enrolments": {
    "get": {
     "summary": "Find Enrolments",
-    "description": "Own institution only. Lookup by APAAR or institution student id.",
+    "description": "Institution: own enrolments. University registrar: its affiliated institutions' enrolments (RLS). Lookup by APAAR or institution student id.",
     "operationId": "find_enrolments_v1_enrolments_get",
     "security": [
      {
@@ -605,10 +649,796 @@
      }
     ]
    }
+  },
+  "/v1/credentials/{enrolment_id}/issue": {
+   "post": {
+    "summary": "Issue Credential",
+    "description": "EnrolmentCredential: the student's institution. DegreeCredential (completed enrolments): the affiliated university registrar. Accepts Idempotency-Key.",
+    "operationId": "issue_credential_v1_credentials__enrolment_id__issue_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "enrolment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Enrolment Id"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/IssueIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CredentialOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/credentials": {
+   "get": {
+    "summary": "List Credentials",
+    "description": "Credentials visible to the caller (issuer, subject student or regulator), optionally for one enrolment.",
+    "operationId": "list_credentials_v1_credentials_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "enrolment_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Enrolment Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/CredentialOut"
+         },
+         "title": "Response List Credentials V1 Credentials Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/credentials/certificate": {
+   "get": {
+    "summary": "Credential Certificate",
+    "description": "Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.",
+    "operationId": "credential_certificate_v1_credentials_certificate_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CertificateOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/credentials/status": {
+   "post": {
+    "summary": "Change Credential Status",
+    "description": "Issuer revokes/suspends (or un-suspends) one of its own credentials via the Bitstring Status List.",
+    "operationId": "change_credential_status_v1_credentials_status_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CredentialStatusIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CredentialOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/verify": {
+   "post": {
+    "summary": "Verify Credential",
+    "description": "Online verification helper. The same checks can be run offline with the signed registry snapshot and status lists.",
+    "operationId": "verify_credential_v1_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VerifyIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/VerifyOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/status/{list_id}": {
+   "get": {
+    "summary": "Status List",
+    "description": "Public, cacheable: signed BitstringStatusListCredential.",
+    "operationId": "status_list_status__list_id__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "list_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "List Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/registry/issuers": {
+   "get": {
+    "summary": "Registry Issuers",
+    "description": "Public trust registry (MOCK, D4).",
+    "operationId": "registry_issuers_v1_registry_issuers_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/RegistryIssuer"
+         },
+         "type": "array",
+         "title": "Response Registry Issuers V1 Registry Issuers Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/registry/snapshot": {
+   "get": {
+    "summary": "Registry Snapshot",
+    "description": "Public: AICTE-signed registry snapshot for offline verifiers, plus the AICTE key.",
+    "operationId": "registry_snapshot_v1_registry_snapshot_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/dids/{path}/did.json": {
+   "get": {
+    "summary": "Did Doc",
+    "description": "did:web style DID documents, e.g. /dids/inst/1-0000000001/did.json",
+    "operationId": "did_doc_dids__path__did_json_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "path",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Path"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/demo/forged-credential": {
+   "get": {
+    "summary": "Demo Forged",
+    "description": "DEMO ONLY: a credential signed by an issuer outside the registry.",
+    "operationId": "demo_forged_v1_demo_forged_credential_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/consents/requests": {
+   "post": {
+    "summary": "Consent Request",
+    "description": "Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose. The response is the same whether or not the APAAR is registered; rate-limited (20/hour per verifier) and audit-logged.",
+    "operationId": "consent_request_v1_consents_requests_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsentRequestIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/consents": {
+   "get": {
+    "summary": "Consent List",
+    "description": "Verifier: its own requests. Student: requests about them. Regulators: all.",
+    "operationId": "consent_list_v1_consents_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ConsentOut"
+         },
+         "type": "array",
+         "title": "Response Consent List V1 Consents Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/consents/{consent_id}/approve": {
+   "post": {
+    "summary": "Consent Approve",
+    "description": "Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.",
+    "operationId": "consent_approve_v1_consents__consent_id__approve_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ConsentApprove"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentCredentialOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/deny": {
+   "post": {
+    "summary": "Consent Deny",
+    "operationId": "consent_deny_v1_consents__consent_id__deny_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/revoke": {
+   "post": {
+    "summary": "Consent Revoke",
+    "description": "Student withdraws consent; the VerificationCredential is revoked via the status list.",
+    "operationId": "consent_revoke_v1_consents__consent_id__revoke_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ConsentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/credential": {
+   "get": {
+    "summary": "Consent Credential",
+    "description": "Verifier fetches the VerificationCredential for its granted consent.",
+    "operationId": "consent_credential_v1_consents__consent_id__credential_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/students/me": {
+   "get": {
+    "summary": "Student Me",
+    "operationId": "student_me_v1_students_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StudentProfile"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/students/me/access-log": {
+   "get": {
+    "summary": "Student Access Log",
+    "description": "D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).",
+    "operationId": "student_access_log_v1_students_me_access_log_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AccessLogEntry"
+         },
+         "type": "array",
+         "title": "Response Student Access Log V1 Students Me Access Log Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
   }
  },
  "components": {
   "schemas": {
+   "AccessLogEntry": {
+    "properties": {
+     "ts": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ts"
+     },
+     "actor": {
+      "type": "string",
+      "title": "Actor"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "action": {
+      "type": "string",
+      "title": "Action"
+     },
+     "reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Reason"
+     },
+     "entity": {
+      "type": "string",
+      "title": "Entity"
+     },
+     "entity_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Entity Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ts",
+     "actor",
+     "role",
+     "action",
+     "reason",
+     "entity",
+     "entity_id"
+    ],
+    "title": "AccessLogEntry"
+   },
    "AicteDashboard": {
     "properties": {
      "totals": {
@@ -826,6 +1656,37 @@
     ],
     "title": "CategoryMix"
    },
+   "CertificateOut": {
+    "properties": {
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential"
+     },
+     "qr_payload": {
+      "type": "string",
+      "title": "Qr Payload",
+      "description": "offline QR: 'AV1:' + Base45(zlib(VC JSON))"
+     },
+     "qr_payload_chars": {
+      "type": "integer",
+      "title": "Qr Payload Chars"
+     },
+     "qr_svg": {
+      "type": "string",
+      "title": "Qr Svg",
+      "description": "QR code image (SVG), error correction level M"
+     }
+    },
+    "type": "object",
+    "required": [
+     "credential",
+     "qr_payload",
+     "qr_payload_chars",
+     "qr_svg"
+    ],
+    "title": "CertificateOut"
+   },
    "CheckpointOut": {
     "properties": {
      "id": {
@@ -905,6 +1766,285 @@
      "batches"
     ],
     "title": "ComplianceRow"
+   },
+   "ConsentApprove": {
+    "properties": {
+     "otp": {
+      "type": "string",
+      "title": "Otp",
+      "description": "MOCK OTP; demo value is 123456"
+     },
+     "approved_by": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Approved By",
+      "default": "student"
+     },
+     "guardian_otp": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Guardian Otp",
+      "description": "required when the student is under 18 (MOCK OTP 123456)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "otp"
+    ],
+    "title": "ConsentApprove"
+   },
+   "ConsentCredentialOut": {
+    "properties": {
+     "consent": {
+      "$ref": "#/components/schemas/ConsentOut"
+     },
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential",
+      "description": "VerificationCredential holding only the approved fields"
+     }
+    },
+    "type": "object",
+    "required": [
+     "consent",
+     "credential"
+    ],
+    "title": "ConsentCredentialOut"
+   },
+   "ConsentOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "requester": {
+      "type": "string",
+      "title": "Requester"
+     },
+     "purpose": {
+      "type": "string",
+      "title": "Purpose"
+     },
+     "fields": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Fields"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "granted",
+       "denied",
+       "revoked",
+       "expired"
+      ],
+      "title": "Status"
+     },
+     "granted_by": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "student",
+         "guardian"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Granted By"
+     },
+     "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Requested At"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     },
+     "credential_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credential Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "requester",
+     "purpose",
+     "fields",
+     "status",
+     "granted_by",
+     "requested_at",
+     "expires_at"
+    ],
+    "title": "ConsentOut"
+   },
+   "ConsentRequestIn": {
+    "properties": {
+     "apaar_id": {
+      "type": "string",
+      "title": "Apaar Id"
+     },
+     "purpose": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 3,
+      "pattern": "^[\\w .,:;()'/&-]+$",
+      "title": "Purpose",
+      "description": "shown to the student; plain text only"
+     },
+     "fields": {
+      "items": {
+       "type": "string",
+       "enum": [
+        "name",
+        "programme",
+        "institution",
+        "academic_year",
+        "status",
+        "apaar_id",
+        "student_id"
+       ]
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Fields"
+     },
+     "valid_days": {
+      "type": "integer",
+      "maximum": 30.0,
+      "minimum": 1.0,
+      "title": "Valid Days",
+      "default": 7
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_id",
+     "purpose",
+     "fields"
+    ],
+    "title": "ConsentRequestIn"
+   },
+   "CredentialOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "type": {
+      "type": "string",
+      "enum": [
+       "EnrolmentCredential",
+       "DegreeCredential",
+       "VerificationCredential"
+      ],
+      "title": "Type"
+     },
+     "issuer_did": {
+      "type": "string",
+      "title": "Issuer Did"
+     },
+     "issued_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Issued At"
+     },
+     "status": {
+      "$ref": "#/components/schemas/CredentialStatusFlags"
+     },
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential",
+      "description": "the signed W3C VC 2.0 document (eddsa-jcs-2022 DataIntegrityProof)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "type",
+     "issuer_did",
+     "issued_at",
+     "status",
+     "credential"
+    ],
+    "title": "CredentialOut"
+   },
+   "CredentialStatusFlags": {
+    "properties": {
+     "revocation": {
+      "type": "boolean",
+      "title": "Revocation"
+     },
+     "suspension": {
+      "type": "boolean",
+      "title": "Suspension"
+     }
+    },
+    "type": "object",
+    "required": [
+     "revocation",
+     "suspension"
+    ],
+    "title": "CredentialStatusFlags"
+   },
+   "CredentialStatusIn": {
+    "properties": {
+     "credential_id": {
+      "type": "string",
+      "title": "Credential Id"
+     },
+     "purpose": {
+      "type": "string",
+      "enum": [
+       "revocation",
+       "suspension"
+      ],
+      "title": "Purpose"
+     },
+     "value": {
+      "type": "boolean",
+      "title": "Value"
+     },
+     "reason": {
+      "type": "string",
+      "minLength": 3,
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "credential_id",
+     "purpose",
+     "value",
+     "reason"
+    ],
+    "title": "CredentialStatusIn"
    },
    "EnrolmentOut": {
     "properties": {
@@ -1205,6 +2345,23 @@
     ],
     "title": "Issue"
    },
+   "IssueIn": {
+    "properties": {
+     "type": {
+      "type": "string",
+      "enum": [
+       "EnrolmentCredential",
+       "DegreeCredential"
+      ],
+      "title": "Type"
+     }
+    },
+    "type": "object",
+    "required": [
+     "type"
+    ],
+    "title": "IssueIn"
+   },
    "IssuesPage": {
     "properties": {
      "items": {
@@ -1368,6 +2525,70 @@
     ],
     "title": "ProgrammeSeats"
    },
+   "RegistryIssuer": {
+    "properties": {
+     "did": {
+      "type": "string",
+      "title": "Did"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "institution",
+       "university"
+      ],
+      "title": "Kind"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "validFrom": {
+      "type": "string",
+      "title": "Validfrom"
+     },
+     "validUntil": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Validuntil"
+     },
+     "verificationMethod": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Verificationmethod"
+     },
+     "source": {
+      "type": "string",
+      "const": "mock",
+      "title": "Source",
+      "default": "mock"
+     }
+    },
+    "type": "object",
+    "required": [
+     "did",
+     "kind",
+     "name",
+     "status",
+     "validFrom",
+     "validUntil",
+     "verificationMethod"
+    ],
+    "title": "RegistryIssuer"
+   },
    "SeatLine": {
     "properties": {
      "category_code": {
@@ -1431,6 +2652,106 @@
     ],
     "title": "StateRow"
    },
+   "StudentEnrolment": {
+    "properties": {
+     "programme": {
+      "type": "string",
+      "title": "Programme"
+     },
+     "institution": {
+      "type": "string",
+      "title": "Institution"
+     },
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "institution_student_id": {
+      "type": "string",
+      "title": "Institution Student Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "programme",
+     "institution",
+     "academic_year",
+     "status",
+     "institution_student_id"
+    ],
+    "title": "StudentEnrolment"
+   },
+   "StudentLoginIn": {
+    "properties": {
+     "apaar_id": {
+      "type": "string",
+      "title": "Apaar Id",
+      "description": "12-digit APAAR ID"
+     },
+     "dob": {
+      "type": "string",
+      "format": "date",
+      "title": "Dob",
+      "description": "date of birth, YYYY-MM-DD"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_id",
+     "dob"
+    ],
+    "title": "StudentLoginIn",
+    "description": "MOCK student sign-in. Production would authenticate through APAAR / DigiLocker."
+   },
+   "StudentProfile": {
+    "properties": {
+     "apaar_masked": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Apaar Masked"
+     },
+     "provisional_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provisional Id"
+     },
+     "apaar_status": {
+      "type": "string",
+      "title": "Apaar Status"
+     },
+     "enrolments": {
+      "items": {
+       "$ref": "#/components/schemas/StudentEnrolment"
+      },
+      "type": "array",
+      "title": "Enrolments"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_masked",
+     "provisional_id",
+     "apaar_status",
+     "enrolments"
+    ],
+    "title": "StudentProfile"
+   },
    "ValidationError": {
     "properties": {
      "loc": {
@@ -1470,6 +2791,125 @@
      "type"
     ],
     "title": "ValidationError"
+   },
+   "VerifyChecks": {
+    "properties": {
+     "well_formed": {
+      "type": "boolean",
+      "title": "Well Formed"
+     },
+     "issuer_trusted": {
+      "type": "boolean",
+      "title": "Issuer Trusted"
+     },
+     "signature_valid": {
+      "type": "boolean",
+      "title": "Signature Valid"
+     },
+     "within_validity": {
+      "type": "boolean",
+      "title": "Within Validity"
+     },
+     "not_revoked": {
+      "type": "boolean",
+      "title": "Not Revoked"
+     },
+     "not_suspended": {
+      "type": "boolean",
+      "title": "Not Suspended"
+     }
+    },
+    "type": "object",
+    "required": [
+     "well_formed",
+     "issuer_trusted",
+     "signature_valid",
+     "within_validity",
+     "not_revoked",
+     "not_suspended"
+    ],
+    "title": "VerifyChecks"
+   },
+   "VerifyIn": {
+    "properties": {
+     "credential": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credential",
+      "description": "the VC JSON document"
+     },
+     "qr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Qr",
+      "description": "or the scanned certificate QR text: 'AV1:' + Base45(zlib(VC))"
+     }
+    },
+    "type": "object",
+    "title": "VerifyIn"
+   },
+   "VerifyOut": {
+    "properties": {
+     "result": {
+      "type": "string",
+      "enum": [
+       "VALID",
+       "REVOKED",
+       "SUSPENDED",
+       "UNTRUSTED_ISSUER",
+       "TAMPERED",
+       "EXPIRED",
+       "MALFORMED"
+      ],
+      "title": "Result"
+     },
+     "checks": {
+      "$ref": "#/components/schemas/VerifyChecks"
+     },
+     "issuer_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Issuer Name"
+     },
+     "subject": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subject",
+      "description": "credentialSubject, omitted when the signature fails"
+     }
+    },
+    "type": "object",
+    "required": [
+     "result",
+     "checks"
+    ],
+    "title": "VerifyOut"
    }
   },
   "securitySchemes": {

@@ -222,8 +222,9 @@ class CaseResolve(BaseModel):
 
 class ConsentRequestIn(BaseModel):
     apaar_id: str
-    purpose: str = Field(min_length=3)
-    fields: list[Literal["name", "programme", "institution", "academic_year", "status", "apaar_id", "student_id"]]
+    purpose: str = Field(min_length=3, max_length=200, pattern=r"^[\w .,:;()'/&-]+$",
+                         description="shown to the student; plain text only")
+    fields: list[Literal["name", "programme", "institution", "academic_year", "status", "apaar_id", "student_id"]] = Field(min_length=1)
     valid_days: int = Field(7, ge=1, le=30)
 
 
@@ -232,28 +233,115 @@ class ConsentOut(BaseModel):
     requester: str
     purpose: str
     fields: list[str]
-    status: str
+    status: Literal["pending", "granted", "denied", "revoked", "expired"]
+    granted_by: Literal["student", "guardian"] | None
+    requested_at: datetime
     expires_at: datetime
+    credential_id: str | None = None
 
 
 class ConsentApprove(BaseModel):
     otp: str = Field(description="MOCK OTP; demo value is 123456")
+    approved_by: Literal["student", "guardian"] = "student"
+    guardian_otp: str | None = Field(None, description="required when the student is under 18 (MOCK OTP 123456)")
+
+
+class ConsentCredentialOut(BaseModel):
+    consent: ConsentOut
+    credential: dict = Field(description="VerificationCredential holding only the approved fields")
+
+
+class StudentEnrolment(BaseModel):
+    programme: str
+    institution: str
+    academic_year: str
+    status: str
+    institution_student_id: str
+
+
+class StudentProfile(BaseModel):
+    apaar_masked: str | None
+    provisional_id: str | None
+    apaar_status: str
+    enrolments: list[StudentEnrolment]
 
 
 class VerifyIn(BaseModel):
+    credential: dict | None = Field(None, description="the VC JSON document")
+    qr: str | None = Field(None, description="or the scanned certificate QR text: 'AV1:' + Base45(zlib(VC))")
+
+
+class CertificateOut(BaseModel):
     credential: dict
+    qr_payload: str = Field(description="offline QR: 'AV1:' + Base45(zlib(VC JSON))")
+    qr_payload_chars: int
+    qr_svg: str = Field(description="QR code image (SVG), error correction level M")
+
+
+class VerifyChecks(BaseModel):
+    well_formed: bool
+    issuer_trusted: bool
+    signature_valid: bool
+    within_validity: bool
+    not_revoked: bool
+    not_suspended: bool
 
 
 class VerifyOut(BaseModel):
     result: Literal["VALID", "REVOKED", "SUSPENDED", "UNTRUSTED_ISSUER", "TAMPERED", "EXPIRED", "MALFORMED"]
-    checks: dict[str, bool]
+    checks: VerifyChecks
     issuer_name: str | None = None
-    subject: dict | None = None
+    subject: dict | None = Field(None, description="credentialSubject, omitted when the signature fails")
+
+
+CredentialType = Literal["EnrolmentCredential", "DegreeCredential", "VerificationCredential"]
+
+
+class IssueIn(BaseModel):
+    type: Literal["EnrolmentCredential", "DegreeCredential"]
+
+
+class CredentialStatusFlags(BaseModel):
+    revocation: bool
+    suspension: bool
+
+
+class CredentialOut(BaseModel):
+    id: str
+    type: CredentialType
+    issuer_did: str
+    issued_at: datetime
+    status: CredentialStatusFlags
+    credential: dict = Field(description="the signed W3C VC 2.0 document (eddsa-jcs-2022 DataIntegrityProof)")
+
+
+class CredentialStatusIn(BaseModel):
+    credential_id: str
+    purpose: Literal["revocation", "suspension"]
+    value: bool
+    reason: str = Field(min_length=3)
+
+
+class RegistryIssuer(BaseModel):
+    did: str
+    kind: Literal["institution", "university"]
+    name: str
+    status: str
+    validFrom: str
+    validUntil: str | None
+    verificationMethod: list[dict]
+    source: Literal["mock"] = "mock"
 
 
 class LoginIn(BaseModel):
     user_id: str
     password: str
+
+
+class StudentLoginIn(BaseModel):
+    """MOCK student sign-in. Production would authenticate through APAAR / DigiLocker."""
+    apaar_id: str = Field(description="12-digit APAAR ID")
+    dob: date = Field(description="date of birth, YYYY-MM-DD")
 
 
 class LoginOut(BaseModel):
@@ -269,6 +357,8 @@ class AccessLogEntry(BaseModel):
     role: str
     action: str
     reason: str | None
+    entity: str
+    entity_id: str | None
 
 
 class Problem(BaseModel):

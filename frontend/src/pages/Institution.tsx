@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
+import { EnrolmentLookup } from "./Registrar";
 import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, go, Loading, Stat, Table, Td, Updated, usePoll } from "../ui";
 
 export default function InstitutionHome() {
@@ -21,6 +22,8 @@ export default function InstitutionHome() {
       {error && <ErrorNote>{error}</ErrorNote>}
 
       <Upload onDone={refresh} />
+
+      <EnrolmentLookup mode="institution" />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Active enrolments" value={active} />
