@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, AlertTriangle, ArrowDownToLine, CheckCircle2, Clock, FileSpreadsheet, ShieldAlert } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowDownToLine, FileSpreadsheet, ShieldAlert } from "lucide-react";
 import { ApiError, download, loadSession } from "./api/client";
 
 export const go = (path: string) => { window.location.hash = path; };
