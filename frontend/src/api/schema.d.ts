@@ -49,7 +49,7 @@ export interface paths {
         put?: never;
         /**
          * Student Login
-         * @description MOCK student sign-in: APAAR ID + fixed demo OTP (123456). Production: APAAR/DigiLocker authentication.
+         * @description MOCK student sign-in: APAAR ID + date of birth. Production: APAAR/DigiLocker authentication. 5 failed attempts per APAAR in 15 minutes lock it out.
          */
         post: operations["student_login_v1_auth_student_login_post"];
         delete?: never;
@@ -502,7 +502,7 @@ export interface paths {
         put?: never;
         /**
          * Consent Request
-         * @description Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose.
+         * @description Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose. The response is the same whether or not the APAAR is registered; rate-limited (20/hour per verifier) and audit-logged.
          */
         post: operations["consent_request_v1_consents_requests_post"];
         delete?: never;
@@ -1193,7 +1193,10 @@ export interface components {
             /** Institution Student Id */
             institution_student_id: string;
         };
-        /** StudentLoginIn */
+        /**
+         * StudentLoginIn
+         * @description MOCK student sign-in. Production would authenticate through APAAR / DigiLocker.
+         */
         StudentLoginIn: {
             /**
              * Apaar Id
@@ -1201,10 +1204,11 @@ export interface components {
              */
             apaar_id: string;
             /**
-             * Otp
-             * @description MOCK OTP; demo value is 123456
+             * Dob
+             * Format: date
+             * @description date of birth, YYYY-MM-DD
              */
-            otp: string;
+            dob: string;
         };
         /** StudentProfile */
         StudentProfile: {

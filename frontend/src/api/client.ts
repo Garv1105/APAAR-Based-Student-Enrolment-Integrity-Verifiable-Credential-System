@@ -91,9 +91,9 @@ export async function login(user_id: string, password: string): Promise<Session>
   return s;
 }
 
-/** MOCK student sign-in: APAAR ID + demo OTP. */
-export async function studentLogin(apaar_id: string, otp: string): Promise<Session> {
-  const out = await sendJson<S["LoginOut"]>("/v1/auth/student-login", "POST", { apaar_id, otp });
+/** MOCK student sign-in: APAAR ID + date of birth (YYYY-MM-DD). */
+export async function studentLogin(apaar_id: string, dob: string): Promise<Session> {
+  const out = await sendJson<S["LoginOut"]>("/v1/auth/student-login", "POST", { apaar_id, dob });
   const s: Session = { token: out.access_token, role: out.role, institution_id: null, display_name: out.display_name, user_id: "student" };
   saveSession(s);
   return s;

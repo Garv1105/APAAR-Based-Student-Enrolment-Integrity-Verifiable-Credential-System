@@ -122,7 +122,7 @@ npm run dev
 - **Batch issues:** row-level issues with severity and code filters, fix hints, and a CSV report.
 - **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, and seat-ledger verify / sign checkpoint.
 - **Institution student records:** find a student by APAAR ID or student ID, issue an enrolment credential, mark the enrolment completed or withdrawn (withdrawal revokes their credentials), and suspend a credential or lift the suspension.
-- **Student** (sign in with APAAR ID + MOCK OTP `123456`): enrolments, credential wallet, the consent inbox (approve, deny, revoke, guardian path), a printable certificate with QR, and **who accessed my data**.
+- **Student** (MOCK sign-in with APAAR ID + date of birth; consent approval uses OTP `123456`): enrolments, credential wallet, the consent inbox (approve, deny, revoke, guardian path), a printable certificate with QR, and **who accessed my data**.
 - **Verifier** (`employer`): request consent for specific fields, fetch and verify the consent-scoped credential, a verify tool (paste JSON or the certificate QR text), and a forged-credential demo.
 - **University registrar** (`univ`): award degree credentials to affiliated institutions' students whose enrolment is completed.
 - **Verify a credential:** available from the header for AICTE, the auditor, institutions and the registrar.
@@ -130,7 +130,7 @@ npm run dev
 **Credentials demo in 2 minutes:**
 1. Sign in as `inst-a`, upload `A1.csv`, find a student, and issue an enrolment credential.
 2. As `employer`, request consent with that student's APAAR ID.
-3. As the student, approve with OTP `123456`.
+3. Sign in as the student with their APAAR ID and date of birth (both in `A1.csv`), then approve with OTP `123456`.
 4. As `employer`, fetch and verify: the result is **VALID**.
 5. As `inst-a`, withdraw the student, then verify again as `employer`: the result is **REVOKED**.
 6. As `inst-a`, mark another student completed. As `univ`, award the degree and open **Certificate & QR**.
@@ -158,7 +158,7 @@ Both files are gitignored. For a production deployment, keys belong in a KMS/HSM
 | `auditor` | auditor | Read-only regulator |
 | `employer` | verifier | Consent-based credential verification |
 | `univ` | university_registrar | Degree issuance for affiliated institutions A and B |
-| *(any uploaded student)* | student | APAAR ID + MOCK OTP `123456` |
+| *(any uploaded student)* | student | APAAR ID + date of birth from the upload (MOCK) |
 
 ## Trying the API
 
@@ -228,6 +228,7 @@ What is implemented and tested:
   - Stored credentials are encrypted.
   - Consent-scoped credentials carry only the fields the student approved. The issuing institution can't see them.
   - A verification is linked to a student's access log only when the exact stored credential is presented.
+  - **No APAAR existence oracle.** A verifier's consent request gets the same response whether or not the APAAR is registered. Unmatched requests simply stay pending, exactly like unanswered ones. Requests are rate-limited (20/hour per verifier) and audit-logged. Verifiers never see `student_id`, even at the SQL level.
 - **Crypto against standard vectors.** The primitives are checked against RFC 8032 (Ed25519), RFC 4231 (HMAC), the McGrew–Viega GCM vectors and the RFC 8785 (JCS) example.
 
 Security reviews of the RLS, credential and consent changes found no high-severity issues. All medium findings are fixed. The open low findings are listed in [`TASKS.md`](TASKS.md).
@@ -279,9 +280,8 @@ These are the main ones; the full list is in [`TASKS.md`](TASKS.md).
 - **Rejected rows don't count yet.** Rows rejected with errors don't count toward intake until they are corrected. Dashboards show the rejected-row total so they can't silently disappear.
 - **Latin script only.** Name matching doesn't handle Indic scripts, and fuzzy (no-APAAR) duplicate matching is deferred.
 - **No migrations.** Schema changes need `app.seed --reset`.
-- **MOCK student sign-in.** Students sign in with APAAR ID + a fixed OTP, so anyone who knows an APAAR can sign in as that student in the demo. Guardian approval for under-18s is self-asserted (labelled MOCK in the signed consent artifact). Production needs real APAAR/DigiLocker authentication and linked guardian accounts.
+- **MOCK student sign-in.** Students sign in with APAAR ID + date of birth, with a lockout after 5 failures per APAAR in 15 minutes (the lockout is per process, not shared). Anyone who knows both values can sign in as that student in the demo. Guardian approval for under-18s is self-asserted (labelled MOCK in the signed consent artifact). Production needs real APAAR/DigiLocker authentication and linked guardian accounts.
 - **Online verification only.** Verification uses the API. The signed registry snapshot and status lists make offline verification possible, but no offline browser verifier is built yet. There is no camera QR scanner: paste the QR text instead.
-- **APAAR existence signal.** A verifier's consent request reveals whether an APAAR ID is registered on the platform. This is accepted because verifiers are vetted, audited stakeholders.
 - **Demo DIDs.** DIDs are `did:web` style ids on a demo host. The DID documents are served by this API at `/dids/...`, not at the real `did:web` URL.
 - **Local key file.** Keys sit in a local file, not a KMS/HSM.
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from argon2 import PasswordHasher
 
-from conftest import login
+from conftest import login, student_headers
 from test_api import upload
 
 SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
@@ -17,9 +17,7 @@ def rows(name):
 
 
 def student(client, apaar):
-    r = client.post("/v1/auth/student-login", json={"apaar_id": apaar, "otp": OTP})
-    assert r.status_code == 200, r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return student_headers(client, apaar)
 
 
 def adult_a_student(client):
@@ -110,8 +108,56 @@ def test_isolation_between_verifiers_and_students(client, dbconn):
     ho = student(client, other["apaar_id"])
     assert client.get("/v1/consents", headers=ho).json() == []
     assert client.post(f"/v1/consents/{cid}/revoke", headers=ho).status_code == 404
-    assert request_consent(client, "999999999999").status_code == 404
     assert request_consent(client, r["apaar_id"], user="aicte").status_code == 403
+
+
+VARYING = {"id", "requested_at", "expires_at"}  # per-request values; everything else must be identical
+
+
+def test_registered_and_unregistered_apaar_look_identical_to_the_verifier(client, dbconn):
+    r = adult_a_student(client)
+    real = request_consent(client, r["apaar_id"])
+    fake = request_consent(client, "999999999999")
+    assert real.status_code == fake.status_code == 201
+    strip = lambda d: {k: v for k, v in d.items() if k not in VARYING}  # noqa: E731
+    assert strip(real.json()) == strip(fake.json())
+    assert set(real.json()) == set(fake.json()) and "student_id" not in real.json()
+    he = login(client, "employer")
+    listed = {c["id"]: strip(c) for c in client.get("/v1/consents", headers=he).json()}
+    assert listed[real.json()["id"]] == listed[fake.json()["id"]]
+    f1 = client.get(f"/v1/consents/{real.json()['id']}/credential", headers=he)
+    f2 = client.get(f"/v1/consents/{fake.json()['id']}/credential", headers=he)
+    assert f1.status_code == f2.status_code == 409 and f1.json() == f2.json()
+    # both are audit-logged; only the real one is linked to (and visible to) the student
+    rows = dbconn.execute("SELECT entity_id, student_id FROM audit_logs WHERE action='consent.request' ORDER BY id").fetchall()
+    assert [x["entity_id"] for x in rows] == [str(real.json()["id"]), str(fake.json()["id"])]
+    assert rows[0]["student_id"] is not None and rows[1]["student_id"] is None
+    assert [c["id"] for c in client.get("/v1/consents", headers=student(client, r["apaar_id"])).json()] == [real.json()["id"]]
+
+
+def test_consent_requests_are_rate_limited_per_verifier(client, dbconn):
+    from argon2 import PasswordHasher
+    dbconn.execute("INSERT INTO users (id, role, display_name, password_hash) VALUES ('employer2', 'verifier', 'Other Co', %s)",
+                   (PasswordHasher().hash("demo"),))
+    dbconn.commit()
+    for i in range(20):
+        assert request_consent(client, f"9{i:011d}").status_code == 201
+    limited = request_consent(client, "100000000001")
+    assert limited.status_code == 429 and limited.headers["content-type"] == "application/problem+json"
+    assert request_consent(client, "100000000001", user="employer2").status_code == 201  # per verifier
+
+
+def test_verifier_has_no_direct_sql_access_to_consents(client, dbconn):
+    import psycopg
+    import pytest
+    from app import db
+    r = adult_a_student(client)
+    request_consent(client, r["apaar_id"])
+    with db.app_connect({"role": "verifier", "id": "employer"}) as c:
+        assert c.execute("SELECT count(*) n FROM consents").fetchone()["n"] == 0   # RLS: nothing, not even its own rows
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute("INSERT INTO consents (student_id, requester_id, requester_name, purpose, scope_fields, status, expires_at) "
+                      "VALUES (1, 'employer', 'x', 'probe', '{name}', 'pending', now() + interval '1 day')")
 
 
 def test_verification_credentials_belong_to_the_student_not_the_institution(client):

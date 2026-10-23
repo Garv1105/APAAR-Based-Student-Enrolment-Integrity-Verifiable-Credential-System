@@ -28,6 +28,8 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - **How to run:** README "Quick start", or the CLAUDE.md commands.
 
 **Open items (not started):**
+- **Offline browser verifier:** verify a VC with no network, using a cached AICTE-signed registry snapshot and status lists (both already served signed, with a 24 h expiry). Needs JS Ed25519 + RFC 8785 JCS libraries (dependency decision) and IndexedDB caching. Add a cross-implementation test: Python-signed VCs verify in JS, tampered ones fail.
+- **Camera QR scan:** scan the certificate QR (`AV1:` + Base45) on the verifier page. Needs a QR-scanning library (dependency decision); Base45 decoding plus native `DecompressionStream('deflate')` cover the rest.
 - **D3 anomaly engine, DQS and inspection queue:** explainable rules (fill ratio vs 3-year history by robust z, category-mix shift, DOB cluster, sequential APAAR, deadline dump), evidence shown on every flag, a Data Quality Score with visible components, and a risk-ranked inspection queue. `synthetic/` ground truth already labels these anomalies.
 - **D7 multilingual error reports (hi, kn):** translate `backend/i18n/en.json` templates only (no data); every placeholder must survive; a human reviewer signs off and is recorded in each file; a placeholder-integrity test; a language switcher in the UI. The rendering path (`?lang=`) already exists.
 - **D2 duplicate pre-check:** consent-gated endpoint that returns only CLEAR or NEEDS_REVIEW; single-use signed student consent token; rate-limited and audit-logged; no oracle.
@@ -129,9 +131,9 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
 - Schema changes need `app.seed --reset` (drops and rebuilds the demo DB); there are no migrations.
 - Name matching is Latin-script only (no Indic transliteration).
 - Credentials:
-  - Student sign-in is MOCK (APAAR + fixed OTP). Guardian approval is self-asserted, and labelled MOCK in the consent artifact.
-  - Verification is online only; there is no offline browser verifier and no camera scanner.
-  - A verifier's consent request reveals whether an APAAR is registered (accepted: vetted, audited stakeholders).
+  - Student sign-in is MOCK (APAAR + DOB, with an in-process lockout after 5 failures per 15 min). Guardian approval is self-asserted, and labelled MOCK in the consent artifact.
+  - Verification is online only; there is no offline browser verifier and no camera scanner (both listed as open items).
+  - The APAAR existence oracle on consent requests is **fixed**: identical responses, 20/hour per verifier, audited, and verifiers have no direct SQL access to `consents`.
   - Regulators see credentials masked, but there is no unmask-with-reason endpoint yet.
   - Two requests racing with the same issuance Idempotency-Key get a 500 instead of a replay.
 - Keys come from a local `backend/.keys.json` file generated at first run (prototype only; production = KMS/HSM).

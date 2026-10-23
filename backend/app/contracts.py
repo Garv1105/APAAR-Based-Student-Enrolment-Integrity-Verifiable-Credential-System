@@ -339,8 +339,9 @@ class LoginIn(BaseModel):
 
 
 class StudentLoginIn(BaseModel):
+    """MOCK student sign-in. Production would authenticate through APAAR / DigiLocker."""
     apaar_id: str = Field(description="12-digit APAAR ID")
-    otp: str = Field(description="MOCK OTP; demo value is 123456")
+    dob: date = Field(description="date of birth, YYYY-MM-DD")
 
 
 class LoginOut(BaseModel):

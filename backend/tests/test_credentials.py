@@ -5,7 +5,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from app import credentials, crypto
-from conftest import login
+from conftest import login, student_headers
 from test_api import upload
 
 SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
@@ -184,23 +184,41 @@ def test_registry_snapshot_is_signed_by_aicte(client):
     assert all(i["source"] == "mock" for i in client.get("/v1/registry/issuers").json())
 
 
-def test_student_login_and_credential_visibility(client, dbconn):
+def test_student_login_needs_apaar_and_dob(client, dbconn):
     e, row = a_enrolment(client, dbconn)
     issue(client, "inst-a", e["id"], "EnrolmentCredential")
-    bad = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "otp": "000000"})
-    assert bad.status_code == 401
-    assert client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "otp": "123456"}).status_code == 401
-    tok = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "otp": "123456"}).json()
-    hs = {"Authorization": f"Bearer {tok['access_token']}"}
-    assert tok["role"] == "student"
+    wrong = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": "1999-01-01"})
+    unknown = client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "dob": row["dob"]})
+    assert wrong.status_code == unknown.status_code == 401 and wrong.json() == unknown.json()  # same answer either way
+    ok = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": row["dob"]})
+    assert ok.status_code == 200 and ok.json()["role"] == "student"
+    hs = {"Authorization": f"Bearer {ok.json()['access_token']}"}
     mine = client.get("/v1/credentials", headers=hs).json()
     assert len(mine) == 1 and mine[0]["credential"]["credentialSubject"]["apaarId"] == row["apaar_id"]
     # another student and another institution see none of it
     other = next(r for r in a_rows() if r["apaar_id"] and r["apaar_id"] != row["apaar_id"])
-    t2 = client.post("/v1/auth/student-login", json={"apaar_id": other["apaar_id"], "otp": "123456"}).json()
-    assert client.get("/v1/credentials", headers={"Authorization": f"Bearer {t2['access_token']}"}).json() == []
+    assert client.get("/v1/credentials", headers=student_headers(client, other["apaar_id"])).json() == []
     assert client.get("/v1/credentials", headers=login(client, "inst-b")).json() == []
     assert len(client.get("/v1/credentials", headers=login(client, "aicte")).json()) == 1
+
+
+def test_student_login_locks_out_after_repeated_failures(client, dbconn):
+    upload(client, "inst-a", "A1.csv")
+    row = [r for r in a_rows() if r["apaar_id"]][5]
+    for _ in range(5):
+        assert client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": "1990-01-01"}).status_code == 401
+    # locked: even the right DOB is refused for now (guessing a DOB can't be brute-forced)
+    assert client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": row["dob"]}).status_code == 429
+
+
+def test_migration_revokes_the_old_institutions_credential(client, dbconn):
+    e, _ = a_enrolment(client, dbconn, 2)
+    vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
+    assert verify(client, vc)["result"] == "VALID"
+    r = client.patch(f"/v1/enrolments/{e['id']}", json={"status": "migrated", "reason": "moved to another institution"},
+                     headers=login(client, "inst-a"))
+    assert r.status_code == 200
+    assert verify(client, vc)["result"] == "REVOKED"
 
 
 def test_status_indexes_are_random_not_sequential(client, dbconn):

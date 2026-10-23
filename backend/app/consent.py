@@ -5,7 +5,9 @@ under 18) approves with an OTP (MOCK); the platform signs the consent artifact a
 VerificationCredential holding only the approved fields, issued by the student's institution.
 Revoking the consent revokes that credential through the status list.
 """
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
+
+import psycopg
 
 from . import credentials, crypto
 from .credentials import CredentialError
@@ -19,6 +21,7 @@ ADULT_AGE = 18  # DPDP treats under-18s as children: a guardian must consent
 
 
 def consent_out(r: dict, credential_id: str | None = None, role: str = "student") -> dict:
+    """Never includes student_id, so a verifier can't tell matched from unmatched requests."""
     return {"id": r["id"], "requester": r["requester_name"], "purpose": r["purpose"], "fields": r["scope_fields"],
             "status": effective_status(r),
             # "guardian" would tell a verifier the student is under 18 — an age fact outside the approved scope
@@ -32,15 +35,23 @@ def effective_status(r: dict) -> str:
     return r["status"]
 
 
-def request(conn, user: dict, apaar_id: str, purpose: str, fields: list[str], valid_days: int) -> dict:
-    sid = conn.execute("SELECT student_id_for_login(%s) id", (crypto.apaar_bi(apaar_id),)).fetchone()["id"]
-    if sid is None:
-        # ponytail: tells a verifier whether an APAAR is registered; verifiers are vetted, audited stakeholders
-        raise CredentialError(404, "No student with this APAAR ID is registered on the platform")
-    expires = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=valid_days)
-    return conn.execute("INSERT INTO consents (student_id, requester_id, requester_name, purpose, scope_fields, status, expires_at) "
-                        "VALUES (%s,%s,%s,%s,%s,'pending',%s) RETURNING *",
-                        (sid, user["id"], user["name"], purpose, sorted(set(fields)), expires)).fetchone()
+def request(conn, user: dict, apaar_id: str, purpose: str, fields: list[str], valid_days: int, request_id: str) -> dict:
+    """Same response whether or not the APAAR is registered (no existence oracle). Matching, rate limiting
+    (20/hour per verifier) and the audit row all happen inside request_consent()."""
+    try:
+        return conn.execute("SELECT * FROM request_consent(%s, %s, %s, %s, %s, %s)",
+                            (crypto.apaar_bi(apaar_id), purpose, list(fields), valid_days, user["name"], request_id)).fetchone()
+    except psycopg.Error as e:  # custom SQLSTATE RL429 arrives as a generic DatabaseError
+        conn.rollback()
+        if e.sqlstate == "RL429":
+            raise CredentialError(429, "Too many consent requests; try again later") from None
+        if e.sqlstate == "P0001":  # RAISE EXCEPTION in request_consent: invalid input
+            raise CredentialError(422, "Invalid consent request") from None
+        raise
+
+
+def verifier_requests(conn) -> list[dict]:
+    return conn.execute("SELECT * FROM my_consent_requests()").fetchall()
 
 
 def _age_on(dob: date, on: date) -> int:

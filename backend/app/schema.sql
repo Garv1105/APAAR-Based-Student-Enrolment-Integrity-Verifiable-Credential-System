@@ -174,7 +174,8 @@ CREATE TABLE IF NOT EXISTS status_lists (        -- W3C Bitstring Status List
 
 CREATE TABLE IF NOT EXISTS consents (
   id            bigserial PRIMARY KEY,
-  student_id    bigint NOT NULL REFERENCES students(id),
+  student_id    bigint REFERENCES students(id),  -- NULL when the APAAR matched nobody: stored anyway so the
+                                                 -- verifier can't tell registered from unregistered IDs
   requester_id  text   NOT NULL REFERENCES users(id),
   requester_name text  NOT NULL,                -- shown to the student in the consent inbox
   purpose       text   NOT NULL,

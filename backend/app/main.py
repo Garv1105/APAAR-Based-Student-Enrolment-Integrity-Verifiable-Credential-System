@@ -83,11 +83,15 @@ def login(body: LoginIn, conn=Depends(get_conn)):
 
 
 @app.post("/v1/auth/student-login", response_model=LoginOut,
-          description="MOCK student sign-in: APAAR ID + fixed demo OTP (123456). Production: APAAR/DigiLocker authentication.")
+          description="MOCK student sign-in: APAAR ID + date of birth. Production: APAAR/DigiLocker authentication. "
+                      "5 failed attempts per APAAR in 15 minutes lock it out.")
 def student_login(body: StudentLoginIn, conn=Depends(get_conn)):
-    out = auth.student_login(conn, body.apaar_id.replace(" ", "").replace("-", ""), body.otp)
+    try:
+        out = auth.student_login(conn, body.apaar_id.replace(" ", "").replace("-", ""), body.dob.isoformat())
+    except auth.LoginThrottled:
+        raise HTTPException(429, "Too many failed sign-in attempts; try again in 15 minutes")
     if out is None:
-        raise HTTPException(401, "Invalid APAAR ID or OTP")
+        raise HTTPException(401, "APAAR ID and date of birth don't match")
     return out
 
 
@@ -395,20 +399,22 @@ def _consent_out(conn, k, user) -> dict:
 
 
 @app.post("/v1/consents/requests", response_model=ConsentOut, status_code=201,
-          description="Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose.")
+          description="Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose. The response is "
+                      "the same whether or not the APAAR is registered; rate-limited (20/hour per verifier) and audit-logged.")
 def consent_request(body: ConsentRequestIn, request: Request, user=Depends(require("verifier")), conn=Depends(get_conn)):
     apaar = body.apaar_id.replace(" ", "").replace("-", "")
     if not (apaar.isdigit() and len(apaar) == 12):
         raise HTTPException(422, "APAAR ID must be 12 digits")
-    k = consent.request(conn, user, apaar, body.purpose, list(body.fields), body.valid_days)
-    auth.audit(conn, user, "consent.request", "consent", k["id"], student_id=k["student_id"], reason=body.purpose, request=request)
+    k = consent.request(conn, user, apaar, body.purpose, list(body.fields), body.valid_days, request.state.request_id)
     conn.commit()
-    return _consent_out(conn, k, user)
+    return consent.consent_out(k, None, user["role"])
 
 
 @app.get("/v1/consents", response_model=list[ConsentOut],
          description="Verifier: its own requests. Student: requests about them. Regulators: all.")
 def consent_list(user=Depends(require("verifier", "student", "aicte_officer", "auditor")), conn=Depends(get_conn)):
+    if user["role"] == "verifier":  # never sees student_id (no "is this APAAR registered" signal)
+        return [consent.consent_out(k, None, "verifier") for k in consent.verifier_requests(conn)]
     rows = conn.execute("SELECT * FROM consents ORDER BY requested_at DESC LIMIT 200").fetchall()
     return [_consent_out(conn, k, user) for k in rows]
 

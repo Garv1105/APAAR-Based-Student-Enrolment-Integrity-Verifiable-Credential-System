@@ -128,12 +128,12 @@ CREATE POLICY ins ON credentials FOR INSERT WITH CHECK (
       AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
                   WHERE e.student_id = app_student() AND e.status = 'active' AND r.did = issuer_did)));
 
--- consents: verifier sees/creates its own requests; the student sees and answers requests about them
+-- consents: the student sees and answers requests about them; regulators read. Verifiers have NO direct
+-- access: they create and list requests only through request_consent() / my_consent_requests(), which never
+-- return student_id — so a verifier can't tell whether an APAAR matched a registered student.
 ALTER TABLE consents ENABLE ROW LEVEL SECURITY; ALTER TABLE consents FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON consents; DROP POLICY IF EXISTS ins ON consents; DROP POLICY IF EXISTS upd ON consents;
-CREATE POLICY sel ON consents FOR SELECT USING (app_is_regulator() OR student_id = app_student()
-  OR (app_role() = 'verifier' AND requester_id = current_setting('app.user_id', true)));
-CREATE POLICY ins ON consents FOR INSERT WITH CHECK (app_role() = 'verifier' AND requester_id = current_setting('app.user_id', true) AND status = 'pending');
+CREATE POLICY sel ON consents FOR SELECT USING (app_is_regulator() OR student_id = app_student());
 CREATE POLICY upd ON consents FOR UPDATE USING (student_id = app_student()) WITH CHECK (student_id = app_student());
 
 -- ---------- SECURITY DEFINER functions (the only cross-institution paths) ----------
@@ -144,13 +144,56 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT id, role, institution_id, student_id, issuer_did, display_name, password_hash FROM users WHERE id = p_id
 $$;
 
--- MOCK student sign-in (APAAR + fixed OTP) and verifier consent requests need "which student has this APAAR".
--- Returns only the internal id; callable by anonymous (login) and verifier connections only.
-CREATE OR REPLACE FUNCTION student_id_for_login(p_bi text) RETURNS bigint
+-- MOCK student sign-in (APAAR + date of birth): returns the id and the encrypted DOB for the app to compare.
+-- Anonymous (login) connections only; the app throttles failed attempts.
+DROP FUNCTION IF EXISTS student_id_for_login(text);
+CREATE OR REPLACE FUNCTION student_login_lookup(p_bi text) RETURNS TABLE (id bigint, dob_enc bytea)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
-  IF app_role() NOT IN ('', 'verifier') THEN RAISE EXCEPTION 'student_id_for_login: not allowed'; END IF;
-  RETURN (SELECT id FROM students WHERE apaar_bi = p_bi);
+  IF app_role() <> '' THEN RAISE EXCEPTION 'student_login_lookup: not allowed'; END IF;
+  RETURN QUERY SELECT s.id, s.dob_enc FROM students s WHERE s.apaar_bi = p_bi;
+END $$;
+
+-- Verifier consent request. Always stores the request and returns the same shape, whether or not the APAAR
+-- belongs to a registered student (unmatched requests simply stay pending until they expire, exactly like a
+-- request the student never answers). Rate-limited per verifier; the audit row is written here, linked to
+-- the student only when matched, so the application layer never learns the outcome either.
+CREATE OR REPLACE FUNCTION request_consent(p_bi text, p_purpose text, p_fields text[], p_days int, p_requester_name text,
+                                           p_request_id text)
+RETURNS TABLE (id bigint, requester_name text, purpose text, scope_fields text[], status text, granted_by text,
+               requested_at timestamptz, expires_at timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_student bigint; v_id bigint; v_me text := current_setting('app.user_id', true);
+BEGIN
+  IF app_role() <> 'verifier' OR coalesce(v_me, '') = '' THEN RAISE EXCEPTION 'request_consent: not allowed'; END IF;
+  IF p_days NOT BETWEEN 1 AND 30 OR length(p_purpose) NOT BETWEEN 3 AND 200 OR cardinality(p_fields) = 0
+     OR NOT p_fields <@ ARRAY['name','programme','institution','academic_year','status','apaar_id','student_id'] THEN
+    RAISE EXCEPTION 'request_consent: invalid request';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('consent-rate:' || v_me, 0));
+  IF (SELECT count(*) FROM consents c WHERE c.requester_id = v_me AND c.requested_at > now() - interval '1 hour') >= 20 THEN
+    RAISE EXCEPTION 'request_consent: rate limit' USING ERRCODE = 'RL429';
+  END IF;
+  SELECT s.id INTO v_student FROM students s WHERE s.apaar_bi = p_bi;
+  INSERT INTO consents (student_id, requester_id, requester_name, purpose, scope_fields, status, expires_at)
+  VALUES (v_student, v_me, p_requester_name, p_purpose, (SELECT array_agg(DISTINCT f ORDER BY f) FROM unnest(p_fields) f), 'pending',
+          date_trunc('second', now()) + make_interval(days => p_days))
+  RETURNING consents.id INTO v_id;
+  INSERT INTO audit_logs (actor, role, action, entity, entity_id, student_id, reason, request_id)
+  VALUES (v_me, 'verifier', 'consent.request', 'consent', v_id::text, v_student, left(p_purpose, 200), left(p_request_id, 64));
+  RETURN QUERY SELECT c.id, c.requester_name, c.purpose, c.scope_fields, c.status, c.granted_by, c.requested_at, c.expires_at
+                 FROM consents c WHERE c.id = v_id;
+END $$;
+
+-- The verifier's own requests, without student_id.
+CREATE OR REPLACE FUNCTION my_consent_requests()
+RETURNS TABLE (id bigint, requester_name text, purpose text, scope_fields text[], status text, granted_by text,
+               requested_at timestamptz, expires_at timestamptz)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> 'verifier' THEN RAISE EXCEPTION 'my_consent_requests: not allowed'; END IF;
+  RETURN QUERY SELECT c.id, c.requester_name, c.purpose, c.scope_fields, c.status, c.granted_by, c.requested_at, c.expires_at
+                 FROM consents c WHERE c.requester_id = current_setting('app.user_id', true) ORDER BY c.requested_at DESC LIMIT 200;
 END $$;
 
 -- Random unused index (herd privacy) on the issuer's revocation list. The same index is used on its suspension list.
@@ -307,10 +350,12 @@ BEGIN
 END $$;
 
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
-  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_id_for_login(text),
+  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
-  consent_credential(bigint), revoke_enrolment_credentials(bigint) FROM PUBLIC;
+  consent_credential(bigint), revoke_enrolment_credentials(bigint),
+  request_consent(text, text, text[], int, text, text), my_consent_requests() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
-  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_id_for_login(text),
+  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
-  consent_credential(bigint), revoke_enrolment_credentials(bigint) TO app_user;
+  consent_credential(bigint), revoke_enrolment_credentials(bigint),
+  request_consent(text, text, text[], int, text, text), my_consent_requests() TO app_user;

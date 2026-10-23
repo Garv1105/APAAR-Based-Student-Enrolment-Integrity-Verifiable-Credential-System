@@ -2,7 +2,7 @@
 import pytest
 
 from app import credentials
-from conftest import login
+from conftest import login, student_headers
 from test_credentials import a_enrolment, issue, verify
 
 
@@ -43,9 +43,8 @@ def test_certificate_qr_round_trip_and_verification(client, dbconn, capsys):
 def test_certificate_visible_to_issuer_and_subject_only(client, dbconn):
     e, row = a_enrolment(client, dbconn)
     vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
-    tok = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "otp": "123456"}).json()["access_token"]
     assert client.get("/v1/credentials/certificate", params={"id": vc["id"]},
-                      headers={"Authorization": f"Bearer {tok}"}).status_code == 200
+                      headers=student_headers(client, row["apaar_id"])).status_code == 200
     assert client.get("/v1/credentials/certificate", params={"id": vc["id"]}, headers=login(client, "inst-a")).status_code == 200
     assert client.get("/v1/credentials/certificate", params={"id": vc["id"]}, headers=login(client, "inst-b")).status_code == 404
     assert client.get("/v1/credentials/certificate", params={"id": vc["id"]}, headers=login(client, "employer")).status_code == 403

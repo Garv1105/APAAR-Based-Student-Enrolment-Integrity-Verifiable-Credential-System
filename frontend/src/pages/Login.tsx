@@ -72,7 +72,7 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
 
 function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
   const [apaar, setApaar] = useState("");
-  const [otp, setOtp] = useState("123456");
+  const [dob, setDob] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -81,9 +81,9 @@ function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
     setBusy(true);
     setError(null);
     try {
-      onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), otp));
+      onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), dob));
     } catch (err) {
-      setError(err instanceof ApiError ? (err.status === 401 ? "Unknown APAAR ID or wrong OTP." : err.text) : "Cannot reach the API.");
+      setError(err instanceof ApiError ? (err.status === 401 ? "APAAR ID and date of birth don't match." : err.text) : "Cannot reach the API.");
     } finally {
       setBusy(false);
     }
@@ -92,7 +92,8 @@ function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
   return (
     <form onSubmit={submit} className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="text-sm font-semibold">Students</h2>
-      <p className="mt-1 text-xs text-slate-500">Sign in with your APAAR ID and the OTP (MOCK: always 123456). Any uploaded student can sign in.</p>
+      <p className="mt-1 text-xs text-slate-500">MOCK sign-in with your APAAR ID and date of birth (production: APAAR / DigiLocker authentication).
+        5 wrong attempts lock the APAAR ID for 15 minutes.</p>
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="text-sm">
           <span className="block text-slate-700">APAAR ID</span>
@@ -100,8 +101,8 @@ function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
             className="mt-1 w-52 rounded-lg border border-slate-300 px-3 py-1.5 font-mono" />
         </label>
         <label className="text-sm">
-          <span className="block text-slate-700">OTP</span>
-          <input value={otp} onChange={(e) => setOtp(e.target.value)} required inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-3 py-1.5" />
+          <span className="block text-slate-700">Date of birth</span>
+          <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required className="mt-1 rounded-lg border border-slate-300 px-3 py-1.5" />
         </label>
         <Button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in as student"}</Button>
       </div>

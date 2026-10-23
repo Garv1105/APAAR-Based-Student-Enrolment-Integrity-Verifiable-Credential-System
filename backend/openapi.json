@@ -73,7 +73,7 @@
   "/v1/auth/student-login": {
    "post": {
     "summary": "Student Login",
-    "description": "MOCK student sign-in: APAAR ID + fixed demo OTP (123456). Production: APAAR/DigiLocker authentication.",
+    "description": "MOCK student sign-in: APAAR ID + date of birth. Production: APAAR/DigiLocker authentication. 5 failed attempts per APAAR in 15 minutes lock it out.",
     "operationId": "student_login_v1_auth_student_login_post",
     "requestBody": {
      "content": {
@@ -1071,7 +1071,7 @@
   "/v1/consents/requests": {
    "post": {
     "summary": "Consent Request",
-    "description": "Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose.",
+    "description": "Verifier asks a student (by APAAR ID) to share specific fields for a stated purpose. The response is the same whether or not the APAAR is registered; rate-limited (20/hour per verifier) and audit-logged.",
     "operationId": "consent_request_v1_consents_requests_post",
     "requestBody": {
      "content": {
@@ -2692,18 +2692,20 @@
       "title": "Apaar Id",
       "description": "12-digit APAAR ID"
      },
-     "otp": {
+     "dob": {
       "type": "string",
-      "title": "Otp",
-      "description": "MOCK OTP; demo value is 123456"
+      "format": "date",
+      "title": "Dob",
+      "description": "date of birth, YYYY-MM-DD"
      }
     },
     "type": "object",
     "required": [
      "apaar_id",
-     "otp"
+     "dob"
     ],
-    "title": "StudentLoginIn"
+    "title": "StudentLoginIn",
+    "description": "MOCK student sign-in. Production would authenticate through APAAR / DigiLocker."
    },
    "StudentProfile": {
     "properties": {

@@ -3,7 +3,7 @@ Expected codes: 2xx allowed, 401 no/invalid token, 403 wrong role, 404 wrong ins
 import csv
 from pathlib import Path
 
-from conftest import login
+from conftest import login, student_headers
 from test_api import pending_rows, upload
 
 USERS = ["anon", "inst-a", "inst-b", "aicte", "auditor", "employer", "univ", "student"]
@@ -54,7 +54,7 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/demo/forged-credential", {}, expect({"employer": 200} | REG)),
         # consent + student self-service (Req 5, 8; D5, D6)
         ("POST", "/v1/consents/requests", {"json": {"apaar_id": "999999999999", "purpose": "check", "fields": ["name"]}},
-         expect({"employer": 404})),  # 404 = role allowed, no such student
+         expect({"employer": 201})),  # same 201 whether or not the APAAR is registered (no existence oracle)
         ("GET", "/v1/consents", {}, expect({"employer": 200, "student": 200} | REG)),
         ("POST", "/v1/consents/999999/approve", {"json": {"otp": "123456"}}, expect({"student": 404})),
         ("POST", "/v1/consents/999999/deny", {}, expect({"student": 404})),
@@ -71,8 +71,7 @@ def test_access_matrix(client, dbconn):
     headers = {u: ({} if u == "anon" else login(client, u)) for u in USERS if u != "student"}
     a1 = csv.DictReader(open(Path(__file__).parent.parent / "data/synthetic/A1.csv", encoding="utf-8"))
     apaar = next(r["apaar_id"] for r in a1 if r["apaar_id"])
-    tok = client.post("/v1/auth/student-login", json={"apaar_id": apaar, "otp": "123456"}).json()["access_token"]
-    headers["student"] = {"Authorization": f"Bearer {tok}"}
+    headers["student"] = student_headers(client, apaar)
     bad = []
     for method, path, kw, exp in cases:
         for u in USERS:
