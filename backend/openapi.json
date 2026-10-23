@@ -1,0 +1,1114 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "APAAR Student Data & Verification Platform (SIH26263 prototype)",
+  "description": "Prototype. APAAR registry, AICTE approval registry, OTP and identity provider are MOCKS. Synthetic data only.",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/healthz": {
+   "get": {
+    "summary": "Healthz",
+    "operationId": "healthz_healthz_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/login": {
+   "post": {
+    "summary": "Login",
+    "operationId": "login_v1_auth_login_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/LoginIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LoginOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/batches": {
+   "post": {
+    "summary": "Create Batch",
+    "description": "CSV (multipart field 'file' or text/csv body) or JSON {rows:[...]}. Validation runs synchronously.",
+    "operationId": "create_batch_v1_batches_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BatchOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/batches/{batch_id}": {
+   "get": {
+    "summary": "Get Batch",
+    "operationId": "get_batch_v1_batches__batch_id__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "batch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Batch Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BatchOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/batches/{batch_id}/issues": {
+   "get": {
+    "summary": "Get Issues",
+    "operationId": "get_issues_v1_batches__batch_id__issues_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "batch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Batch Id"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 0,
+       "title": "Cursor"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 200,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/IssuesPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/batches/{batch_id}/report.csv": {
+   "get": {
+    "summary": "Batch Report",
+    "operationId": "batch_report_v1_batches__batch_id__report_csv_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "batch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Batch Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/enrolments": {
+   "get": {
+    "summary": "Find Enrolments",
+    "description": "Own institution only. Lookup by APAAR or institution student id.",
+    "operationId": "find_enrolments_v1_enrolments_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "apaar",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Apaar"
+      }
+     },
+     {
+      "name": "student_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Student Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/EnrolmentOut"
+         },
+         "title": "Response Find Enrolments V1 Enrolments Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/enrolments/{enrolment_id}": {
+   "patch": {
+    "summary": "Update Enrolment",
+    "operationId": "update_enrolment_v1_enrolments__enrolment_id__patch",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "enrolment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Enrolment Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EnrolmentPatch"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EnrolmentOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/programmes/{programme_id}/seats": {
+   "get": {
+    "summary": "Seats",
+    "operationId": "seats_v1_programmes__programme_id__seats_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "programme_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Programme Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ProgrammeSeats"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/dashboard/institution": {
+   "get": {
+    "summary": "Dash Institution",
+    "operationId": "dash_institution_v1_dashboard_institution_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/InstitutionDashboard"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/dashboard/aicte": {
+   "get": {
+    "summary": "Dash Aicte",
+    "operationId": "dash_aicte_v1_dashboard_aicte_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AicteDashboard"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/ledger/verify": {
+   "get": {
+    "summary": "Ledger Verify",
+    "operationId": "ledger_verify_v1_ledger_verify_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/ledger/checkpoints": {
+   "post": {
+    "summary": "Ledger Checkpoint",
+    "operationId": "ledger_checkpoint_v1_ledger_checkpoints_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/ledger/checkpoints/latest": {
+   "get": {
+    "summary": "Ledger Latest",
+    "description": "Public: latest signed checkpoint, plus the AICTE ledger public key.",
+    "operationId": "ledger_latest_v1_ledger_checkpoints_latest_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "AicteDashboard": {
+    "properties": {
+     "totals": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Totals"
+     },
+     "excess_ranking": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Excess Ranking"
+     },
+     "category_mix": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Category Mix"
+     },
+     "by_state": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "By State"
+     },
+     "open_cases": {
+      "type": "integer",
+      "title": "Open Cases"
+     },
+     "upload_compliance": {
+      "items": {
+       "additionalProperties": true,
+       "type": "object"
+      },
+      "type": "array",
+      "title": "Upload Compliance"
+     },
+     "ledger_ok": {
+      "type": "boolean",
+      "title": "Ledger Ok"
+     }
+    },
+    "type": "object",
+    "required": [
+     "totals",
+     "excess_ranking",
+     "category_mix",
+     "by_state",
+     "open_cases",
+     "upload_compliance",
+     "ledger_ok"
+    ],
+    "title": "AicteDashboard"
+   },
+   "BatchOut": {
+    "properties": {
+     "batch_id": {
+      "type": "integer",
+      "title": "Batch Id"
+     },
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "processing",
+       "completed",
+       "failed"
+      ],
+      "title": "Status"
+     },
+     "channel": {
+      "type": "string",
+      "enum": [
+       "portal_csv",
+       "api_json"
+      ],
+      "title": "Channel"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "counts": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Counts",
+      "description": "rows, accepted, rejected, warnings, flags"
+     },
+     "replayed": {
+      "type": "boolean",
+      "title": "Replayed",
+      "description": "true when returned for a repeated Idempotency-Key",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "batch_id",
+     "institution_id",
+     "status",
+     "channel",
+     "created_at",
+     "counts"
+    ],
+    "title": "BatchOut"
+   },
+   "EnrolmentOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "programme_id": {
+      "type": "string",
+      "title": "Programme Id"
+     },
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "institution_student_id": {
+      "type": "string",
+      "title": "Institution Student Id"
+     },
+     "apaar_masked": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Apaar Masked"
+     },
+     "provisional_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provisional Id"
+     },
+     "apaar_status": {
+      "type": "string",
+      "title": "Apaar Status"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "seat_category_code": {
+      "type": "string",
+      "title": "Seat Category Code"
+     },
+     "flags": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Flags",
+      "description": "codes raised by this change, e.g. E501"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "programme_id",
+     "academic_year",
+     "institution_student_id",
+     "apaar_masked",
+     "provisional_id",
+     "apaar_status",
+     "status",
+     "seat_category_code",
+     "flags"
+    ],
+    "title": "EnrolmentOut"
+   },
+   "EnrolmentPatch": {
+    "properties": {
+     "status": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "active",
+         "withdrawn",
+         "migrated",
+         "completed"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Status"
+     },
+     "ended_on": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ended On"
+     },
+     "year_of_study": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Year Of Study"
+     },
+     "reason": {
+      "type": "string",
+      "minLength": 3,
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "EnrolmentPatch"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "InstitutionDashboard": {
+    "properties": {
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "programmes": {
+      "items": {
+       "$ref": "#/components/schemas/ProgrammeSeats"
+      },
+      "type": "array",
+      "title": "Programmes"
+     },
+     "batches": {
+      "items": {
+       "$ref": "#/components/schemas/BatchOut"
+      },
+      "type": "array",
+      "title": "Batches"
+     },
+     "open_notices": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Open Notices",
+      "description": "neutral case notices, no other-institution data (F4)"
+     },
+     "rejected_rows_total": {
+      "type": "integer",
+      "title": "Rejected Rows Total",
+      "description": "rows rejected with errors across all batches (not counted toward intake until resubmitted)"
+     },
+     "apaar_coverage": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Apaar Coverage"
+     }
+    },
+    "type": "object",
+    "required": [
+     "institution_id",
+     "name",
+     "programmes",
+     "batches",
+     "open_notices",
+     "rejected_rows_total",
+     "apaar_coverage"
+    ],
+    "title": "InstitutionDashboard"
+   },
+   "Issue": {
+    "properties": {
+     "row_no": {
+      "type": "integer",
+      "title": "Row No",
+      "description": "1-based data row; 0 = batch level"
+     },
+     "code": {
+      "type": "string",
+      "title": "Code"
+     },
+     "severity": {
+      "type": "string",
+      "enum": [
+       "error",
+       "warning",
+       "flag"
+      ],
+      "title": "Severity"
+     },
+     "field": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Field"
+     },
+     "message": {
+      "type": "string",
+      "title": "Message"
+     }
+    },
+    "type": "object",
+    "required": [
+     "row_no",
+     "code",
+     "severity",
+     "message"
+    ],
+    "title": "Issue"
+   },
+   "IssuesPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/Issue"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "next_cursor"
+    ],
+    "title": "IssuesPage"
+   },
+   "LoginIn": {
+    "properties": {
+     "user_id": {
+      "type": "string",
+      "title": "User Id"
+     },
+     "password": {
+      "type": "string",
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user_id",
+     "password"
+    ],
+    "title": "LoginIn"
+   },
+   "LoginOut": {
+    "properties": {
+     "access_token": {
+      "type": "string",
+      "title": "Access Token"
+     },
+     "role": {
+      "type": "string",
+      "enum": [
+       "institution_admin",
+       "aicte_officer",
+       "auditor",
+       "verifier",
+       "student",
+       "university_registrar"
+      ],
+      "title": "Role"
+     },
+     "institution_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Institution Id"
+     },
+     "display_name": {
+      "type": "string",
+      "title": "Display Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "access_token",
+     "role",
+     "institution_id",
+     "display_name"
+    ],
+    "title": "LoginOut"
+   },
+   "ProgrammeSeats": {
+    "properties": {
+     "programme_id": {
+      "type": "string",
+      "title": "Programme Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "approved_intake": {
+      "type": "integer",
+      "title": "Approved Intake"
+     },
+     "source": {
+      "type": "string",
+      "const": "mock",
+      "title": "Source",
+      "default": "mock"
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/SeatLine"
+      },
+      "type": "array",
+      "title": "Lines"
+     }
+    },
+    "type": "object",
+    "required": [
+     "programme_id",
+     "name",
+     "academic_year",
+     "approved_intake",
+     "lines"
+    ],
+    "title": "ProgrammeSeats"
+   },
+   "SeatLine": {
+    "properties": {
+     "category_code": {
+      "type": "string",
+      "title": "Category Code"
+     },
+     "filled": {
+      "type": "integer",
+      "title": "Filled"
+     },
+     "cap": {
+      "type": "integer",
+      "title": "Cap"
+     },
+     "excess": {
+      "type": "integer",
+      "title": "Excess"
+     }
+    },
+    "type": "object",
+    "required": [
+     "category_code",
+     "filled",
+     "cap",
+     "excess"
+    ],
+    "title": "SeatLine"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  },
+  "securitySchemes": {
+   "HTTPBearer": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  }
+ }
+}

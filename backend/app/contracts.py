@@ -123,7 +123,7 @@ class InstitutionDashboard(BaseModel):
     programmes: list[ProgrammeSeats]
     batches: list[BatchOut]
     open_notices: list[str] = Field(description="neutral case notices, no other-institution data (F4)")
-    rejected_pending: int = Field(description="rows rejected with errors and not yet corrected")
+    rejected_rows_total: int = Field(description="rows rejected with errors across all batches (not counted toward intake until resubmitted)")
     apaar_coverage: dict[str, int]
 
 

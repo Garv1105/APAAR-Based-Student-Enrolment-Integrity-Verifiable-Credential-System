@@ -41,7 +41,15 @@ def _save() -> None:
 
 
 def _key(name: str) -> bytes:
-    return bytes.fromhex(_load()[name])
+    keys = _load()
+    if name not in keys:  # e.g. 'k_jwt', 'k_otp' added after first run
+        keys[name] = os.urandom(32).hex()
+        _save()
+    return bytes.fromhex(keys[name])
+
+
+def secret(name: str) -> bytes:
+    return _key(name)
 
 
 # ---------- normalisation ----------

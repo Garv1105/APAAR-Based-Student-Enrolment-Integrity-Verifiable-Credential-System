@@ -193,6 +193,7 @@ CREATE TABLE IF NOT EXISTS ledger_entries (      -- D1 hash chain
   seq            bigserial PRIMARY KEY,
   institution_id text NOT NULL,
   event_type     text NOT NULL,
+  entity_id      bigint NOT NULL,               -- enrolment id
   payload_hash   text NOT NULL,
   prev_hash      text NOT NULL,
   entry_hash     text NOT NULL,

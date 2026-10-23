@@ -15,19 +15,20 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - [x] Pure validation engine + one test per code (31 tests green)
 - [x] In-memory eval on 450 labelled rows: precision/recall 1.000 for all 17 row-level codes (`pytest -s tests/test_eval.py`)
 - [x] DB connection + schema load (`apaar` database on local PG 18.6, 21 tables)
-- [ ] `git init` + first commit (ask user)
+- [x] `git init` + first commit
 
 ### H3–10 Vertical slice
-- [ ] Batch upload endpoint → validate → store encrypted → issues + report CSV
-- [ ] Row-locked intake counters + concurrency test
-- [ ] Institution + AICTE dashboard endpoints
-- [ ] Frontend shell: login/role switch, upload page, two dashboards
-- [ ] Eval runner: scenario through API → precision/recall table
+- [x] Batch upload (CSV multipart / text/csv / JSON) → validate → store encrypted → issues + report CSV
+- [x] Row-locked intake counters + concurrency test (2×70 rows vs intake 120 → exactly 20 E301)
+- [x] Institution + AICTE dashboard endpoints
+- [ ] Frontend shell: login/role switch, upload page, two dashboards  ← NEXT
+- [x] Eval through API + Postgres: 450/450 rows exact, E501 patch steps correct
 
-### H10–15 Integrity
-- [ ] E202/E203 against DB, cases + neutral notice, resolve
-- [ ] PATCH enrolment, ledger chain + signed checkpoint + E501
-- [ ] JWT auth, role guard, audit log
+### H10–15 Integrity (pulled forward, backend done)
+- [x] E202/E203 against DB, duplicate cases, neutral notice to both institutions
+- [ ] Case resolve endpoint + AICTE unmask-with-reason
+- [x] PATCH enrolment (withdraw/migrate decrements counters), ledger chain + signed checkpoint + E501
+- [x] JWT auth, role guard, audit log on writes/reads/exports
 
 ### H15–22 Verification
 - [ ] eddsa-jcs-2022 issue/verify, trust registry, status list
@@ -67,5 +68,8 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
 - Precision/recall is measured on synthetic data written by the same team that wrote the rules: it proves the rules implement the spec, not real-world detection accuracy. Say so on the slide.
 - Order-dependent labels (E201, E301, E302, E303) are derived in `gen.py` by re-applying the PRD §9.2 counting rule, so those four are a consistency check, not independent ground truth.
 - E303 fires once per programme per batch, on the first accepted row with a mismatching declaration.
+- Validation runs synchronously in the request (no 202 + background task / SSE); fine for demo-sized batches, measured later.
+- Institution isolation is enforced in API queries (tested), not yet by Postgres RLS.
+- Ledger writes are serialised by one global advisory lock.
 - Name matching is Latin-script only (no Indic transliteration).
 - Keys come from a local `backend/.keys.json` file generated at first run (prototype only; production = KMS/HSM).

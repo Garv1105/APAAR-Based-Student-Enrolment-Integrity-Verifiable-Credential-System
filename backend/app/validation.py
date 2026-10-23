@@ -72,6 +72,13 @@ def caps_for(intake: int, seat_categories: dict) -> dict:
     return caps
 
 
+def counter_keys(row: dict, seat_categories: dict) -> list[str]:
+    """Counters a row occupies: its category, plus any sub-cap whose flag it carries."""
+    code = row["seat_category"]
+    subs = seat_categories[code]["cap_rule_json"].get("sub_caps", {})
+    return [code] + [f"{code}:{s}" for s, rule in subs.items() if row[rule["flag"]]]
+
+
 # ---------- parsing ----------
 _TRUE, _FALSE = {"y", "yes", "true", "1"}, {"n", "no", "false", "0", ""}
 
@@ -229,14 +236,7 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         # Accepted. Layer 6: intake engine. Every accepted row counts, APAAR or not (F10).
         o["accepted"], o["programme_id"], o["bi"] = True, prog["id"], bi
         caps = caps_for(prog["approved_intake"], ctx.seat_categories)
-        keys = [data["seat_category"]]
-        for sub_key in caps:
-            code, _, sub = sub_key.partition(":")
-            if sub and code == data["seat_category"]:
-                flag = ctx.seat_categories[code]["cap_rule_json"]["sub_caps"][sub]["flag"]
-                if data[flag]:
-                    keys.append(sub_key)
-        o["counter_keys"] = keys
+        keys = o["counter_keys"] = counter_keys(data, ctx.seat_categories)
         for k in keys:
             ck = (prog["id"], k)
             ctx.counters[ck] = ctx.counters.get(ck, 0) + 1
