@@ -5,3 +5,7 @@ backend/.keys.json
 node_modules/
 frontend/dist/
 .env
+*.zip
+# synthetic/ generator output (root-anchored: backend/data/ holds tracked seed + fixtures)
+/data/
+/data_demo/

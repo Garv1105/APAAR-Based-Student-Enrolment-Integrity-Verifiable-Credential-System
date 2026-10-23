@@ -874,15 +874,19 @@ Every adapter has a Mock and a Real class behind the same Protocol, selected by 
 
 ### PHASE 7 — Hardening, testing, evaluation (Req 8 + non-functional)
 
-#### T7.1 Synthetic data generator — **PLACEHOLDER**
-
-To be designed in a separate session (reference §15). Interface to keep stable:
+#### T7.1 Synthetic data generator — **DONE** (`synthetic/`, see `synthetic/README.md`) — owner #4
 
 ```
-python -m synthetic.generate --institutions 30 --students 50000 --faults faults.yaml --out data/ --seed 42
+python -m synthetic.generate --institutions 30 --students 50000 --out data/ --seed 42
+python -m synthetic.generate --preset demo --out data_demo/ --seed 7
+python -m synthetic.selfcheck data/
 ```
 
-Outputs: messy CSV/XLSX per institution, plus `ground_truth.json` listing every injected fault with its expected code(s).
+- **Outputs:** messy CSV/XLSX uploads, mock APAAR and AICTE registries, 3-year history, `manifest.json`, `mutations.json` and `ground_truth.json`. The answer key covers row codes, duplicate groups, programme and batch faults, anomalies and negative controls.
+- **Remaining work:**
+  - Re-run with `--seat-config rules/apaar_rules/seat_categories.yaml` once T0.4 is done; the TFW and lateral caps are placeholders.
+  - Set the real admission window and reporting deadline in `faults.yaml`.
+- **Accept:** `selfcheck` prints OK, and two runs with the same seed are byte-identical.
 
 #### T7.2 Detection evaluation harness — owner #4
 
