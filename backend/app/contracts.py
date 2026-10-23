@@ -313,7 +313,8 @@ class StudentProfile(BaseModel):
     provisional_id: str | None
     apaar_status: str
     enrolments: list[StudentEnrolment]
-    passkey_cooldown_until: datetime | None = Field(None, description="a passkey registered from a reissued code can't "
+    passkey_cooldown_until: datetime | None = Field(None, description="a new passkey (first activation: "
+                                                    "PASSKEY_FIRST_COOLDOWN_HOURS; reissued code: 24 h) can't "
                                                     "approve consent until then; the portal shows a notice")
     viewer: Literal["student", "guardian"] = "student"
 
@@ -507,5 +508,5 @@ class ActivationCodeOut(BaseModel):
     expires_at: datetime | None
     revoked_passkeys: int
     reissue: bool
-    cooldown_hours: int
+    cooldown_hours: int = Field(description="hours before the passkey registered from this code can approve consent")
     detail: str | None = None

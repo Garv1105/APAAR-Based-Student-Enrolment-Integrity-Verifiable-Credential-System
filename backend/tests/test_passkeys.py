@@ -19,6 +19,7 @@ def pk(client, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "false")
     monkeypatch.setenv("WEBAUTHN_RP_ID", "localhost")
     monkeypatch.setenv("WEBAUTHN_ORIGINS", ORIGIN)
+    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "0")  # most tests approve right after activation; cooldown tests set it
     upload(client, "inst-a", "A1.csv")
     return client
 
@@ -295,3 +296,45 @@ def test_code_dies_with_the_enrolment(pk):
     eid = enrolment(pk, ADULT)
     assert pk.patch(f"/v1/enrolments/{eid}", json={"status": "withdrawn", "reason": "left"}, headers=login(pk, "inst-a")).status_code == 200
     assert activate(pk, ADULT, code).status_code == 401
+
+
+# ---------- P1.1 ----------
+def test_first_passkey_cooldown_default_24h_and_zero(pk, monkeypatch, tmp_path):
+    """M2: every new passkey waits PASSKEY_FIRST_COOLDOWN_HOURS (default 24) before its first consent approval."""
+    from app import db
+    with monkeypatch.context() as m:                                             # nothing set anywhere -> 24
+        m.delenv("PASSKEY_FIRST_COOLDOWN_HOURS")
+        m.setattr(db, "ENV_FILE", tmp_path / "no.env")
+        assert passkeys.first_cooldown_hours() == 24
+    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "24")                     # the default, explicitly
+    r = issue(pk, ADULT)
+    assert r.json()["reissue"] is False and r.json()["cooldown_hours"] == 24
+    s = activate(pk, ADULT, r.json()["code"]).json()
+    h = {"Authorization": f"Bearer {s['setup_token']}"}
+    a = SoftAuthenticator()
+    opts = pk.post("/v1/passkeys/register/options", headers=h).json()
+    assert pk.post("/v1/passkeys/register/verify", json={"credential": a.register(opts)}, headers=h).status_code == 201
+    hs = session(pk, a)
+    assert pk.get("/v1/students/me", headers=hs).json()["passkey_cooldown_until"] is not None
+    r = approve(pk, hs, request_consent(pk, ADULT), a)
+    assert r.status_code == 403 and "unlocks at" in r.json()["title"]
+    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "0")                      # demo setting
+    b = setup(pk, ADULT_2)
+    assert approve(pk, session(pk, b), request_consent(pk, ADULT_2), b).status_code == 200
+    rei = issue(pk, ADULT_2, reason="Lost phone, reissue for the demo test")     # reissue keeps 24 h even at 0
+    assert rei.json()["reissue"] is True and rei.json()["cooldown_hours"] == 24
+
+
+def test_false_positive_resolution_unblocks_activation_codes(pk, dbconn):
+    from app import crypto
+    upload(pk, "inst-b", "B1.csv")
+    hb = login(pk, "inst-b")
+    eid = pk.get("/v1/enrolments", params={"apaar": "590573056992"}, headers=hb).json()[0]["id"]
+    body = {"kind": "student", "reason": REASON}
+    assert pk.post(f"/v1/enrolments/{eid}/activation-code", json=body, headers=hb).status_code == 409
+    case = dbconn.execute("SELECT d.id FROM duplicate_cases d JOIN students s ON s.id = d.student_id WHERE s.apaar_bi=%s",
+                          (crypto.apaar_bi("590573056992"),)).fetchone()["id"]
+    assert pk.post(f"/v1/cases/{case}/resolve", json={"status": "false_positive", "note": "different people, same APAAR typo"},
+                   headers=login(pk, "aicte")).status_code == 200
+    r = pk.post(f"/v1/enrolments/{eid}/activation-code", json=body, headers=hb)
+    assert r.status_code == 200 and r.json()["code"]

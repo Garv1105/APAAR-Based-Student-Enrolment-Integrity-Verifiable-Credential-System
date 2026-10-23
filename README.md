@@ -299,7 +299,9 @@ These are the main ones; the full list is in [`TASKS.md`](TASKS.md).
 - **No migrations.** Schema changes need `app.seed --reset`.
 - **Passkey consent (P1).** Knowing a student's DOB no longer gets anyone in. Students and guardians register WebAuthn passkeys using one-time activation codes from the institution, and consent approval needs a passkey assertion bound to that request's terms.
   - **Code delivery:** in the prototype the institution hands codes over in person; production delivers them via DigiLocker or the registered mobile number.
-  - **Insider risk:** a reissued code puts a 24 h consent cooldown on the new passkey, the student sees a notice and the reason, and AICTE sees a per-institution reissue count.
+  - **Insider risk:** every new passkey waits `PASSKEY_FIRST_COOLDOWN_HOURS` (default 24) before its first consent approval, and a reissued code always waits 24 h. The student sees a notice and the reason, and AICTE sees a per-institution reissue count.
+  - **Demo setting:** `python -m app.demo --live` writes `PASSKEY_FIRST_COOLDOWN_HOURS=0` to `backend/.env`, so the first passkey can approve on stage.
+  - **Cross-institution block:** codes are refused while the person is active at another institution or in an open duplicate case, until AICTE resolves the case as a false positive.
   - **Not checked:** attestation (we accept any passkey).
   - **Throttles** are per process.
   - **DEMO_MODE:** the old MOCK DOB/OTP path remains only with `DEMO_MODE=true`.

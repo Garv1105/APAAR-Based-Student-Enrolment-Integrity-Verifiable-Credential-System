@@ -1180,7 +1180,10 @@ export interface components {
             revoked_passkeys: number;
             /** Reissue */
             reissue: boolean;
-            /** Cooldown Hours */
+            /**
+             * Cooldown Hours
+             * @description hours before the passkey registered from this code can approve consent
+             */
             cooldown_hours: number;
             /** Detail */
             detail?: string | null;
@@ -1963,7 +1966,7 @@ export interface components {
             enrolments: components["schemas"]["StudentEnrolment"][];
             /**
              * Passkey Cooldown Until
-             * @description a passkey registered from a reissued code can't approve consent until then; the portal shows a notice
+             * @description a new passkey (first activation: PASSKEY_FIRST_COOLDOWN_HOURS; reissued code: 24 h) can't approve consent until then; the portal shows a notice
              */
             passkey_cooldown_until?: string | null;
             /**

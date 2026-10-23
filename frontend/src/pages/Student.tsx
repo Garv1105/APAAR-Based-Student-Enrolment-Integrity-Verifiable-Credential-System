@@ -39,9 +39,9 @@ export default function StudentHome() {
 
       {me.data.passkey_cooldown_until && (
         <div role="alert" className="rounded-lg border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
-          A new passkey was registered from an activation code your institution reissued. It can approve consent requests from
-          {" "}{fmtTime(me.data.passkey_cooldown_until)}. If this wasn't you, contact your institution and AICTE: the reissue and its
-          reason are listed under "Who accessed my data".
+          A new passkey was registered for this account. As a safety measure it can approve consent requests only from
+          {" "}{fmtTime(me.data.passkey_cooldown_until)}. If this wasn't you, contact your institution and AICTE: every activation
+          code, with its reason, is listed under "Who accessed my data".
         </div>
       )}
 

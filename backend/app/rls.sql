@@ -489,8 +489,10 @@ BEGIN
   END IF;
   -- H1: no codes for a person who is active at another institution or in an open duplicate case: an institution
   -- uploading someone else's APAAR must not be able to take over that student's passkey identity.
-  IF EXISTS (SELECT 1 FROM enrolments o JOIN programmes op ON op.id = o.programme_id
-              WHERE o.student_id = e.student_id AND o.status = 'active' AND op.institution_id <> app_inst())
+  -- A case AICTE resolved as a false positive lifts the "active elsewhere" block for that person.
+  IF (EXISTS (SELECT 1 FROM enrolments o JOIN programmes op ON op.id = o.programme_id
+               WHERE o.student_id = e.student_id AND o.status = 'active' AND op.institution_id <> app_inst())
+      AND NOT EXISTS (SELECT 1 FROM duplicate_cases d WHERE d.student_id = e.student_id AND d.status = 'false_positive'))
      OR EXISTS (SELECT 1 FROM duplicate_cases d WHERE d.student_id = e.student_id AND d.status IN ('flagged', 'under_investigation')) THEN
     RAISE EXCEPTION 'issue_activation_code: record under review' USING ERRCODE = 'P0004';
   END IF;
@@ -565,7 +567,9 @@ END $$;
 
 -- L1/L2: the only way to add a passkey. Bound to the setup session's own redeemed code (app.code_id comes from the
 -- signed setup token); one passkey per code; the 24 h cooldown is set here from the code row, not by the caller.
-CREATE OR REPLACE FUNCTION register_passkey(p_credential bytea, p_public_key bytea, p_sign_count bigint, p_transports text[])
+DROP FUNCTION IF EXISTS register_passkey(bytea, bytea, bigint, text[]);
+CREATE OR REPLACE FUNCTION register_passkey(p_credential bytea, p_public_key bytea, p_sign_count bigint, p_transports text[],
+                                            p_first_cooldown_hours int)
 RETURNS SETOF passkeys
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE c record;
@@ -578,7 +582,8 @@ BEGIN
   UPDATE activation_codes SET registered_at = now() WHERE id = c.id;
   RETURN QUERY INSERT INTO passkeys (student_id, kind, credential_id, public_key, sign_count, transports, approve_after, activation_code_id)
     VALUES (c.student_id, c.kind, p_credential, p_public_key, p_sign_count, p_transports,
-            now() + CASE WHEN c.reissue THEN interval '24 hours' ELSE interval '0' END, c.id)
+            -- reissued codes always wait 24 h; every new passkey waits PASSKEY_FIRST_COOLDOWN_HOURS (M2), whichever is longer
+            now() + make_interval(hours => GREATEST(CASE WHEN c.reissue THEN 24 ELSE 0 END, GREATEST(p_first_cooldown_hours, 0))), c.id)
     RETURNING *;
 END $$;
 
@@ -607,7 +612,7 @@ REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text)
   enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb),
   issue_activation_code(bigint, text, text, text, text), redeem_activation_code(text, text),
   store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
-  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[]), revoke_own_passkey(bigint) FROM PUBLIC;
+  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
@@ -616,4 +621,4 @@ GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], te
   enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb),
   issue_activation_code(bigint, text, text, text, text), redeem_activation_code(text, text),
   store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
-  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[]), revoke_own_passkey(bigint) TO app_user;
+  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint) TO app_user;

@@ -71,8 +71,8 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - Attestation is not checked (`none`): we trust that the user has *a* passkey, not a specific authenticator model.
   - Students without an APAAR (provisional ID only) can't activate yet.
   - The guardian's identity rests on the institution issuing the guardian code to the right person.
-  - **Open (security review M2, by design for now):** a student's *first* code (and a minor's first guardian code) has no cooldown, so an insider who intercepts a first code could approve consent at once. The planned fix is delivery through a channel the institution doesn't control (DigiLocker or the registered mobile number); the alternative is a cooldown on every new passkey.
-  - No activation codes while the person is active at another institution or in an open duplicate case. A case resolved as a false positive with both enrolments still active keeps blocking codes until AICTE intervenes.
+  - **M2 closed (P1.1):** every new passkey waits `PASSKEY_FIRST_COOLDOWN_HOURS` (default 24) before its first consent approval, so an intercepted first code can't be used at once; reissued codes always wait 24 h. The live demo sets it to 0: `python -m app.demo --live` writes `PASSKEY_FIRST_COOLDOWN_HOURS=0` into `backend/.env`. Production should also deliver codes via DigiLocker or the registered mobile number.
+  - No activation codes while the person is active at another institution or in an open duplicate case, unless AICTE resolved their case as a false positive (P1.1). After a false positive both institutions can issue codes for the shared person row; each revokes only the passkeys its own codes created.
   - Throttles: activation 5 per APAAR + 20 per client per 15 min; sign-in options 30 per client per minute; approvals 10 per student per 15 min. All in-process.
   - The lockout (5 tries per APAAR per 15 min) is in-process only, can be abused to lock out a known APAAR, and has no per-IP throttle.
   - Guardian approval is self-asserted and labelled MOCK.

@@ -8,6 +8,7 @@ backdated withdrawal (E501), open duplicate cases, one student with an Enrolment
 cross-institution duplicates with A open live). The E501 event is then recorded on an A student instead.
 """
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -27,6 +28,18 @@ def _ok(r, *codes):
     if r.status_code not in codes:
         sys.exit(f"demo seed failed: {r.request.method} {r.request.url.path} -> {r.status_code} {r.text[:300]}")
     return r.json()
+
+
+def demo_env() -> str:
+    """Live demo: let a freshly registered passkey approve at once (PASSKEY_FIRST_COOLDOWN_HOURS=0 in backend/.env,
+    which the API reads on every request). Reissued codes keep their 24 h cooldown regardless."""
+    text = db.ENV_FILE.read_text(encoding="utf-8") if db.ENV_FILE.exists() else ""
+    m = re.search(r"^PASSKEY_FIRST_COOLDOWN_HOURS=(.*)$", text, re.M)
+    if m is None:
+        with open(db.ENV_FILE, "a", encoding="utf-8") as f:
+            f.write("\n# demo: a first passkey may approve consent at once (production default: 24 h)\nPASSKEY_FIRST_COOLDOWN_HOURS=0\n")
+        return "0 (written to backend/.env)"
+    return f"{m.group(1).strip()} (from backend/.env; 0 lets a first passkey approve at once)"
 
 
 def run(live: bool = False) -> dict:
@@ -80,6 +93,7 @@ def run(live: bool = False) -> dict:
 
 if __name__ == "__main__":
     live = "--live" in sys.argv
+    cooldown = demo_env() if live else None
     out = run(live)
     print(f"""
 Demo database ready (MOCK data).
@@ -92,3 +106,4 @@ Demo database ready (MOCK data).
          {out['post_deadline_mutations']} post-deadline change(s) (E501)""")
     if live:
         print("  LIVE mode: Institution B has not uploaded. Sign in as inst-b and upload backend/data/synthetic/B1.csv")
+        print(f"  PASSKEY_FIRST_COOLDOWN_HOURS = {cooldown}")

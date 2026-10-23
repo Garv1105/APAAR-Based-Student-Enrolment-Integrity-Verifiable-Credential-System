@@ -35,6 +35,16 @@ def demo_mode() -> bool:
     return (db._env("DEMO_MODE") or "").lower() == "true"
 
 
+def first_cooldown_hours() -> int:
+    """PASSKEY_FIRST_COOLDOWN_HOURS (default 24): hours before ANY new passkey can approve consent (M2: an intercepted
+    first code can't be used at once). Reissued codes always wait 24 h regardless. The demo sets it to 0."""
+    raw = db._env("PASSKEY_FIRST_COOLDOWN_HOURS")
+    try:
+        return max(0, int(raw)) if raw not in (None, "") else 24
+    except ValueError:
+        return 24
+
+
 def rp_id() -> str:
     return db._env("WEBAUTHN_RP_ID") or "localhost"
 
@@ -101,14 +111,14 @@ def issue_code(conn, user: dict, enrolment_id: int, kind: str, reason: str, idem
         raise
     if r["replay"]:  # the plaintext was never stored, so it can't be shown again
         return {"status": "already_issued", "code": None, "kind": kind, "expires_at": r["expires_at"], "revoked_passkeys": 0,
-                "reissue": r["reissue"], "cooldown_hours": 24 if r["reissue"] else 0,
+                "reissue": r["reissue"], "cooldown_hours": max(24 if r["reissue"] else 0, first_cooldown_hours()),
                 "detail": "Code already issued; issue a new one if lost."}
     auth.audit(conn, user, "activation_code.issue", "activation_code", r["code_id"], student_id=r["student_id"],
                reason=f"{kind} code: {reason}" + (f" (revoked {r['revoked']} passkey(s))" if r["revoked"] else "")
                + (" [reissue: 24 h consent cooldown]" if r["reissue"] else ""))
     conn.commit()
     return {"status": "issued", "code": code, "kind": kind, "expires_at": r["expires_at"], "revoked_passkeys": r["revoked"],
-            "reissue": r["reissue"], "cooldown_hours": 24 if r["reissue"] else 0, "detail": None}
+            "reissue": r["reissue"], "cooldown_hours": max(24 if r["reissue"] else 0, first_cooldown_hours()), "detail": None}
 
 
 # ---------- student / guardian: activation + registration ----------
@@ -159,9 +169,9 @@ def register_verify(conn, user: dict, credential: dict) -> dict:
         raise HTTPException(400, REGISTER_FAILED) from None
     transports = credential.get("response", {}).get("transports")
     try:  # the definer binds it to this session's code, allows one passkey per code and sets the cooldown itself
-        k = conn.execute("SELECT * FROM register_passkey(%s, %s, %s, %s)",
+        k = conn.execute("SELECT * FROM register_passkey(%s, %s, %s, %s, %s)",
                          (v.credential_id, v.credential_public_key, v.sign_count,
-                          [str(t) for t in transports] if isinstance(transports, list) else None)).fetchone()
+                          [str(t) for t in transports] if isinstance(transports, list) else None, first_cooldown_hours())).fetchone()
     except psycopg.errors.UniqueViolation:
         conn.rollback()
         raise HTTPException(409, "This passkey is already registered") from None
@@ -171,7 +181,9 @@ def register_verify(conn, user: dict, credential: dict) -> dict:
             raise HTTPException(409, "This activation code already registered a passkey; ask your institution for a new code") from None
         raise
     auth.audit(conn, user, "passkey.register", "passkey", k["id"], student_id=user["student_id"],
-               reason=f"{user['role']} passkey" + (" from a reissued code: consent approval locked for 24 h" if user["reissue"] else ""))
+               reason=f"{user['role']} passkey" + (" from a reissued code" if user["reissue"] else "")
+               + (f"; consent approval from {k['approve_after'].isoformat(timespec='minutes')}"
+                  if k["approve_after"] > datetime.now(timezone.utc) else ""))
     conn.commit()
     return passkey_out(k)
 

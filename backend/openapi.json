@@ -2518,7 +2518,8 @@
      },
      "cooldown_hours": {
       "type": "integer",
-      "title": "Cooldown Hours"
+      "title": "Cooldown Hours",
+      "description": "hours before the passkey registered from this code can approve consent"
      },
      "detail": {
       "anyOf": [
@@ -4346,7 +4347,7 @@
        }
       ],
       "title": "Passkey Cooldown Until",
-      "description": "a passkey registered from a reissued code can't approve consent until then; the portal shows a notice"
+      "description": "a new passkey (first activation: PASSKEY_FIRST_COOLDOWN_HOURS; reissued code: 24 h) can't approve consent until then; the portal shows a notice"
      },
      "viewer": {
       "type": "string",
