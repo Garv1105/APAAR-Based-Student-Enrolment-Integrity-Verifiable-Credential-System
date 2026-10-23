@@ -1,0 +1,2383 @@
+{
+"seed": 42,
+"rows": [
+{
+"file": "A1.csv",
+"row_no": 1,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 2,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 3,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 4,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 5,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 6,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 7,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 8,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 9,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 10,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 11,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 12,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 13,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 14,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 15,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 16,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 17,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 18,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 19,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 20,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 21,
+"expected": [
+"E101W"
+]
+},
+{
+"file": "A1.csv",
+"row_no": 22,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 23,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 24,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 25,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 26,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 27,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 28,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 29,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 30,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 31,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 32,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 33,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 34,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 35,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 36,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 37,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 38,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 39,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 40,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 41,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 42,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 43,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 44,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 45,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 46,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 47,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 48,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 49,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 50,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 51,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 52,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 53,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 54,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 55,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 56,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 57,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 58,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 59,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 60,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 61,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 62,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 63,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 64,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 65,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 66,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 67,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 68,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 69,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 70,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 71,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 72,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 73,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 74,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 75,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 76,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 77,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 78,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 79,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 80,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 81,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 82,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 83,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 84,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 85,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 86,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 87,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 88,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 89,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 90,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 91,
+"expected": [
+"E101W"
+]
+},
+{
+"file": "A1.csv",
+"row_no": 92,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 93,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 94,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 95,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 96,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 97,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 98,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 99,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 100,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 101,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 102,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 103,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 104,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 105,
+"expected": []
+},
+{
+"file": "A1.csv",
+"row_no": 106,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 1,
+"expected": [
+"E403"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 2,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 3,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 4,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 5,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 6,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 7,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 8,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 9,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 10,
+"expected": [
+"E304"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 11,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 12,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 13,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 14,
+"expected": [
+"E303"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 15,
+"expected": [
+"E101"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 16,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 17,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 18,
+"expected": [
+"E101"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 19,
+"expected": [
+"E101W"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 20,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 21,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 22,
+"expected": [
+"E101W"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 23,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 24,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 25,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 26,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 27,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 28,
+"expected": [
+"E404"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 29,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 30,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 31,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 32,
+"expected": [
+"E201"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 33,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 34,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 35,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 36,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 37,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 38,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 39,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 40,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 41,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 42,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 43,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 44,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 45,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 46,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 47,
+"expected": [
+"E102"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 48,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 49,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 50,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 51,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 52,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 53,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 54,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 55,
+"expected": [
+"E103"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 56,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 57,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 58,
+"expected": [
+"E401"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 59,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 60,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 61,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 62,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 63,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 64,
+"expected": [
+"E401"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 65,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 66,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 67,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 68,
+"expected": [
+"E402"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 69,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 70,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 71,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 72,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 73,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 74,
+"expected": [
+"E104"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 75,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 76,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 77,
+"expected": [
+"E402"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 78,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 79,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 80,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 81,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 82,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 83,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 84,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 85,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 86,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 87,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 88,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 89,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 90,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 91,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 92,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 93,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 94,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 95,
+"expected": [
+"E304"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 96,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 97,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 98,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 99,
+"expected": [
+"E103"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 100,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 101,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 102,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 103,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 104,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 105,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 106,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 107,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 108,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 109,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 110,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 111,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 112,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 113,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 114,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 115,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 116,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 117,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 118,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 119,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 120,
+"expected": [
+"E201"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 121,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 122,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 123,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 124,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 125,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 126,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 127,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 128,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 129,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 130,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 131,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 132,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 133,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 134,
+"expected": [
+"E203"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 135,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 136,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 137,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 138,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 139,
+"expected": [
+"E201"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 140,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 141,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 142,
+"expected": [
+"E102"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 143,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 144,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 145,
+"expected": [
+"E101W"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 146,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 147,
+"expected": [
+"E203"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 148,
+"expected": [
+"E104"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 149,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 150,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 151,
+"expected": [
+"E302"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 152,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 153,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 154,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 155,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 156,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 157,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 158,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 159,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 160,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 161,
+"expected": [
+"E001"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 162,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 163,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 164,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 165,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 166,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 167,
+"expected": [
+"E401"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 168,
+"expected": [
+"E103"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 169,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 170,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 171,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 172,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 173,
+"expected": [
+"E203"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 174,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 175,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 176,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 177,
+"expected": [
+"E403"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 178,
+"expected": [
+"E001"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 179,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 180,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 181,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 182,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 183,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 184,
+"expected": [
+"E104"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 185,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 186,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 187,
+"expected": [
+"E302"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 188,
+"expected": [
+"E101"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 189,
+"expected": [
+"E302"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 190,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 191,
+"expected": [
+"E102"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 192,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 193,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 194,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 195,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 196,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 197,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 198,
+"expected": [
+"E301"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 199,
+"expected": [
+"E301"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 200,
+"expected": [
+"E302"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 201,
+"expected": [
+"E301"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 202,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 203,
+"expected": [
+"E302"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 204,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 205,
+"expected": [
+"E301"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 206,
+"expected": []
+},
+{
+"file": "B1.csv",
+"row_no": 207,
+"expected": [
+"E301"
+]
+},
+{
+"file": "B1.csv",
+"row_no": 208,
+"expected": [
+"E404"
+]
+},
+{
+"file": "C1.csv",
+"row_no": 1,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 2,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 3,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 4,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 5,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 6,
+"expected": [
+"E403"
+]
+},
+{
+"file": "C1.csv",
+"row_no": 7,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 8,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 9,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 10,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 11,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 12,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 13,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 14,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 15,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 16,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 17,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 18,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 19,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 20,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 21,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 22,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 23,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 24,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 25,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 26,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 27,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 28,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 29,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 30,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 31,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 32,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 33,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 34,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 35,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 36,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 37,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 38,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 39,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 40,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 41,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 42,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 43,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 44,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 45,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 46,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 47,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 48,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 49,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 50,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 51,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 52,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 53,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 54,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 55,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 56,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 57,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 58,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 59,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 60,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 61,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 62,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 63,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 64,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 65,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 66,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 67,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 68,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 69,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 70,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 71,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 72,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 73,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 74,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 75,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 76,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 77,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 78,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 79,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 80,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 81,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 82,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 83,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 84,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 85,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 86,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 87,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 88,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 89,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 90,
+"expected": [
+"E403"
+]
+},
+{
+"file": "C1.csv",
+"row_no": 91,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 92,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 93,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 94,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 95,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 96,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 97,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 98,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 99,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 100,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 101,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 102,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 103,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 104,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 105,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 106,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 107,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 108,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 109,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 110,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 111,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 112,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 113,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 114,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 115,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 116,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 117,
+"expected": []
+},
+{
+"file": "C1.csv",
+"row_no": 118,
+"expected": []
+},
+{
+"file": "D1.csv",
+"row_no": 1,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 2,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 3,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 4,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 5,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 6,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 7,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 8,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 9,
+"expected": [
+"E304"
+]
+},
+{
+"file": "D1.csv",
+"row_no": 10,
+"expected": [
+"E304"
+]
+},
+{
+"file": "B2.csv",
+"row_no": 1,
+"expected": [
+"E202"
+]
+},
+{
+"file": "B2.csv",
+"row_no": 2,
+"expected": [
+"E202"
+]
+},
+{
+"file": "B2.csv",
+"row_no": 3,
+"expected": [
+"E202"
+]
+},
+{
+"file": "B2.csv",
+"row_no": 4,
+"expected": [
+"E202"
+]
+},
+{
+"file": "B2.csv",
+"row_no": 5,
+"expected": [
+"E202"
+]
+},
+{
+"file": "B2.csv",
+"row_no": 6,
+"expected": []
+},
+{
+"file": "B2.csv",
+"row_no": 7,
+"expected": []
+},
+{
+"file": "B2.csv",
+"row_no": 8,
+"expected": []
+}
+]
+}
