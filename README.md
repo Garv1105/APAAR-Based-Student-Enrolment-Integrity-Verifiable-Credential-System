@@ -103,6 +103,9 @@ py -3.14 -m venv .venv
 # 3. Create the 'apaar' database, the non-owner 'app_user' role, schema + RLS, and seed the mock registry
 cd backend
 ..\.venv\Scripts\python.exe -m app.seed --reset
+#    Or, for a ready demo (all uploads replayed, E501, duplicate cases, a credential + pending consent;
+#    student sign-in APAAR 328865551724, DOB 2006-11-05):
+..\.venv\Scripts\python.exe -m app.demo
 
 # 4. Run the API
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload

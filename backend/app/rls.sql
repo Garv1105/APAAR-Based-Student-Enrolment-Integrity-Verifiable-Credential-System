@@ -365,13 +365,39 @@ BEGIN
           left(p_result, 40), left(p_request_id, 64));
 END $$;
 
+-- Case resolution side effects on credentials (AICTE officer only). confirmed_duplicate: revoke the credentials of
+-- every enrolment in the case except the one the officer keeps. under_investigation: suspend all of them (reversible).
+-- false_positive / confirmed: lift the suspension of the enrolments that stand.
+CREATE OR REPLACE FUNCTION apply_case_resolution(p_case bigint, p_keep bigint) RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE k record; c record; n int := 0; bitpos int;
+BEGIN
+  IF app_role() <> 'aicte_officer' THEN RAISE EXCEPTION 'apply_case_resolution: not allowed'; END IF;
+  SELECT * INTO k FROM duplicate_cases WHERE id = p_case;
+  IF k.id IS NULL THEN RAISE EXCEPTION 'apply_case_resolution: no such case'; END IF;
+  IF k.status = 'confirmed_duplicate' AND (p_keep IS NULL OR NOT p_keep = ANY(k.enrolment_ids)) THEN
+    RAISE EXCEPTION 'apply_case_resolution: keep_enrolment_id must be one of the case enrolments';
+  END IF;
+  FOR c IN SELECT * FROM credentials WHERE enrolment_id = ANY(k.enrolment_ids) LOOP
+    bitpos := (c.status_index / 8) * 8 + 7 - (c.status_index % 8);
+    IF k.status = 'confirmed_duplicate' AND c.enrolment_id <> p_keep THEN
+      UPDATE status_lists SET bits = set_bit(bits, bitpos, 1), version = version + 1
+       WHERE issuer_did = c.issuer_did AND purpose = 'revocation';
+    END IF;
+    UPDATE status_lists SET bits = set_bit(bits, bitpos, CASE WHEN k.status = 'under_investigation' THEN 1 ELSE 0 END), version = version + 1
+     WHERE issuer_did = c.issuer_did AND purpose = 'suspension';
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END $$;
+
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
-  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count() FROM PUBLIC;
+  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
-  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count() TO app_user;
+  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint) TO app_user;

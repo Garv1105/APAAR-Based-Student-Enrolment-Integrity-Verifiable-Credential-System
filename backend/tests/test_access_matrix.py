@@ -41,6 +41,10 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/ledger/verify", {}, expect(REG)),
         ("POST", "/v1/ledger/checkpoints", {}, expect({"aicte": 200})),
         ("GET", "/v1/ledger/checkpoints/latest", {}, {u: 200 for u in USERS}),
+        # duplicate cases (PRD §10): institutions list their own (RLS-filtered), only the AICTE officer resolves/unmasks
+        ("GET", "/v1/cases", {}, expect({"inst-a": 200, "inst-b": 200} | REG)),
+        ("POST", "/v1/cases/999999/resolve", {"json": {"status": "false_positive", "note": "test"}}, expect({"aicte": 404})),
+        ("POST", "/v1/cases/999999/unmask", {"json": {"reason": "access matrix test"}}, expect({"aicte": 404})),
         # credentials (Req 5, 6, 10)
         ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "EnrolmentCredential"}}, expect({"inst-a": 201}, 404)),
         ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "DegreeCredential"}},

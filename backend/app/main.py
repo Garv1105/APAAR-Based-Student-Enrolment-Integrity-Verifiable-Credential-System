@@ -11,9 +11,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports, risk
+from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports, risk
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, CaseOut, CaseResolve, CaseUnmask, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
                         EnrolmentPatch, InstitutionDashboard, IssueIn, IssuesPage, LedgerVerifyOut, LoginIn, LoginOut,
                         ProgrammeSeats, RegistryIssuer, StudentLoginIn, StudentProfile, VerifyIn, VerifyOut)
@@ -315,6 +315,27 @@ def report_csv(kind: str, request: Request, institution_id: str | None = None,
     auth.audit(conn, user, "report.export", "report", kind, reason=institution_id, request=request)
     conn.commit()
     return csv_response(header, rows, f"{kind}.csv")
+
+
+# ---------- duplicate cases (Req 3, 8; PRD §10 steps 4-5) ----------
+@app.get("/v1/cases", response_model=list[CaseOut],
+         description="Institutions: cases touching their own enrolments, neutral text, own enrolment ids only. Regulators: all.")
+def list_cases(status: str | None = None, user=Depends(require("institution_admin", "aicte_officer", "auditor")),
+               conn=Depends(get_conn)):
+    return cases.list_cases(conn, user, status)
+
+
+@app.post("/v1/cases/{case_id}/resolve", response_model=CaseOut,
+          description="AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; "
+                      "under_investigation suspends them. Audited; visible to the student (D6).")
+def resolve_case(case_id: int, body: CaseResolve, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    return cases.resolve(conn, user, case_id, body.model_dump(), request)
+
+
+@app.post("/v1/cases/{case_id}/unmask", response_model=CaseOut,
+          description="AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).")
+def unmask_case(case_id: int, body: CaseUnmask, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    return cases.unmask(conn, user, case_id, body.reason, request)
 
 
 # ---------- verifiable credentials (Req 5, 6, 10) ----------
