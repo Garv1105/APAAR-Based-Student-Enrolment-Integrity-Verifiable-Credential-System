@@ -11,7 +11,7 @@ Institutions upload student-level records keyed by **APAAR ID**. The platform va
 > - The APAAR registry, the AICTE approval (EOA) registry, OTP and the identity provider are **mocks**, labelled `MOCK` in API responses.
 > - There is **no** integration with real APAAR, ABC, DigiLocker or AICTE systems.
 > - The design follows the principles of the DPDP Act 2023. It has **not** been assessed for compliance.
-> - The backend vertical slice is built and tested. The frontend and the credential/consent features are **not built yet** (see [Status](#status)).
+> - The upload → validation → monitoring slice is built and tested (backend and web UI). The credential/consent features are **not built yet** (see [Status](#status)).
 
 ---
 
@@ -50,7 +50,7 @@ How far each PS requirement has got, with the evidence in the test suite:
 | 1. Secure upload/API keyed by APAAR, and updates | ✅ Backend | CSV and JSON batch upload, `Idempotency-Key`, `PATCH` withdraw/migrate/correct |
 | 2. Approved intake, enrolment, supernumerary, NRI/OCI/FN fields | ✅ | Approved intake comes from the registry only. FN/OCI/CIWG supernumerary pool at 15% of intake, with a 1/3 CIWG sub-cap |
 | 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | ✅ | 17 validation codes, one unit test each. Labelled scenario passes 450/450 rows through the API |
-| 4. Real-time dashboards (AICTE + institutions) | 🟡 API only | Dashboard endpoints exist; UI not built. Updates are per request (no push yet) |
+| 4. Real-time dashboards (AICTE + institutions) | ✅ | Institution and AICTE web dashboards that refresh every 3 s by polling (no SSE push yet) |
 | 5. Secure verification for stakeholders | ❌ Planned | W3C VC verify endpoint + consent |
 | 6. Verifiable student records | ❌ Planned | W3C VC 2.0, `eddsa-jcs-2022`, Bitstring Status List |
 | 7. Integration/API | 🟡 | REST API + OpenAPI. Webhooks and the ERP connector are deferred |
@@ -78,7 +78,7 @@ FastAPI app (backend/app)
 PostgreSQL 18: schema.sql + rls.sql (FORCE row-level security, SECURITY DEFINER cross-institution functions)
 ```
 
-**Stack:** Python 3.14, FastAPI, psycopg 3 (raw SQL), PostgreSQL 18, `cryptography`, `rfc8785`, `rapidfuzz`, `jellyfish`, `argon2-cffi`, PyJWT. Exact versions are pinned in `requirements.txt`.
+**Stack:** React 19 + TypeScript + Vite + Tailwind CSS 4 + Recharts (frontend); Python 3.14, FastAPI, psycopg 3 (raw SQL), PostgreSQL 18, `cryptography`, `rfc8785`, `rapidfuzz`, `jellyfish`, `argon2-cffi`, PyJWT. Exact versions are pinned in `requirements.txt`.
 
 **Design rules** (full list in [`CLAUDE.md`](CLAUDE.md)):
 - Validity, seat limits and duplicate detection are decided by deterministic code. No LLM decides anything.
@@ -107,6 +107,23 @@ cd backend
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
 # → http://127.0.0.1:8000/docs  (Swagger UI)
 ```
+
+```powershell
+# 5. Web UI (second terminal; Node 20+). The dev server proxies /v1 to the API on :8000
+cd frontend
+npm install
+npm run dev
+# → http://localhost:5173
+```
+
+**Web UI pages:**
+- **Sign-in:** pick a demo identity.
+- **Institution:** drag-and-drop CSV upload with instant validation results, plus a downloadable template. Re-uploading the same file returns the original batch (the Idempotency-Key is the file's SHA-256). Also shows seats vs approved intake per category with over-cap highlighting, neutral AICTE notices, and upload history.
+- **Batch issues:** row-level issues with severity and code filters, fix hints, and a CSV report.
+- **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, and seat-ledger verify / sign checkpoint.
+- **Verifier and registrar:** placeholder pages for now.
+
+API types in `frontend/src/api/schema.d.ts` are generated from `backend/openapi.json` with `npm run gen:api`. Never edit them by hand.
 
 On first run, the app generates:
 - `APP_DB_PASSWORD`, appended to `backend/.env`, for the `app_user` role
@@ -145,6 +162,7 @@ curl.exe -s -H "Authorization: Bearer $tok" http://127.0.0.1:8000/v1/batches/<ba
 |---|---|---|
 | POST | `/v1/auth/login` | anyone |
 | POST | `/v1/batches` | institution_admin. CSV (multipart `file` or `text/csv`) or JSON `{rows:[…]}`, plus `Idempotency-Key` |
+| GET | `/v1/batches/template.csv` | institution_admin. Empty upload template (header row) |
 | GET | `/v1/batches/{id}`, `/issues`, `/report.csv?lang=en` | own institution, AICTE, auditor |
 | GET | `/v1/enrolments?apaar=…` or `?student_id=…` | institution_admin, own institution only |
 | PATCH | `/v1/enrolments/{id}` | institution_admin. Withdraw/migrate/correct, recorded in the ledger, `E501` after deadline |
@@ -209,6 +227,10 @@ cd backend
 ## Repository layout
 
 ```
+frontend/
+  src/api/        typed API client + generated schema.d.ts
+  src/pages/      Login, Institution (upload + dashboard), Batch (issues), Aicte (national monitoring)
+  src/ui.tsx      shared components, polling hook
 backend/
   app/            FastAPI app, validation, ingest, ledger, crypto, schema.sql, rls.sql
   data/seed/      MOCK AICTE registry (registry.json) and MOCK APAAR registry

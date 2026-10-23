@@ -122,6 +122,28 @@
     }
    }
   },
+  "/v1/batches/template.csv": {
+   "get": {
+    "summary": "Batch Template",
+    "description": "Empty upload template: the header row of the data dictionary.",
+    "operationId": "batch_template_v1_batches_template_csv_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/batches/{batch_id}": {
    "get": {
     "summary": "Get Batch",
@@ -517,7 +539,9 @@
       "description": "Successful Response",
       "content": {
        "application/json": {
-        "schema": {}
+        "schema": {
+         "$ref": "#/components/schemas/LedgerVerifyOut"
+        }
        }
       }
      }
@@ -538,7 +562,17 @@
       "description": "Successful Response",
       "content": {
        "application/json": {
-        "schema": {}
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/CheckpointOut"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Ledger Checkpoint V1 Ledger Checkpoints Post"
+        }
        }
       }
      }
@@ -578,31 +612,21 @@
    "AicteDashboard": {
     "properties": {
      "totals": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "type": "object",
-      "title": "Totals"
+      "$ref": "#/components/schemas/AicteTotals"
      },
      "excess_ranking": {
       "items": {
-       "additionalProperties": true,
-       "type": "object"
+       "$ref": "#/components/schemas/ExcessRow"
       },
       "type": "array",
       "title": "Excess Ranking"
      },
      "category_mix": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "type": "object",
-      "title": "Category Mix"
+      "$ref": "#/components/schemas/CategoryMix"
      },
      "by_state": {
       "items": {
-       "additionalProperties": true,
-       "type": "object"
+       "$ref": "#/components/schemas/StateRow"
       },
       "type": "array",
       "title": "By State"
@@ -613,8 +637,7 @@
      },
      "upload_compliance": {
       "items": {
-       "additionalProperties": true,
-       "type": "object"
+       "$ref": "#/components/schemas/ComplianceRow"
       },
       "type": "array",
       "title": "Upload Compliance"
@@ -635,6 +658,82 @@
      "ledger_ok"
     ],
     "title": "AicteDashboard"
+   },
+   "AicteTotals": {
+    "properties": {
+     "institutions": {
+      "type": "integer",
+      "title": "Institutions"
+     },
+     "active_enrolments": {
+      "type": "integer",
+      "title": "Active Enrolments"
+     },
+     "approved_intake": {
+      "type": "integer",
+      "title": "Approved Intake"
+     },
+     "excess_seats": {
+      "type": "integer",
+      "title": "Excess Seats"
+     },
+     "batches": {
+      "type": "integer",
+      "title": "Batches"
+     },
+     "post_deadline_mutations": {
+      "type": "integer",
+      "title": "Post Deadline Mutations"
+     }
+    },
+    "type": "object",
+    "required": [
+     "institutions",
+     "active_enrolments",
+     "approved_intake",
+     "excess_seats",
+     "batches",
+     "post_deadline_mutations"
+    ],
+    "title": "AicteTotals"
+   },
+   "BatchCounts": {
+    "properties": {
+     "rows": {
+      "type": "integer",
+      "title": "Rows",
+      "default": 0
+     },
+     "accepted": {
+      "type": "integer",
+      "title": "Accepted",
+      "default": 0
+     },
+     "rejected": {
+      "type": "integer",
+      "title": "Rejected",
+      "default": 0
+     },
+     "warnings": {
+      "type": "integer",
+      "title": "Warnings",
+      "description": "rows with at least one warning",
+      "default": 0
+     },
+     "flags": {
+      "type": "integer",
+      "title": "Flags",
+      "description": "rows with at least one AICTE-review flag",
+      "default": 0
+     },
+     "cases_opened": {
+      "type": "integer",
+      "title": "Cases Opened",
+      "default": 0
+     }
+    },
+    "type": "object",
+    "title": "BatchCounts"
    },
    "BatchOut": {
     "properties": {
@@ -669,12 +768,7 @@
       "title": "Created At"
      },
      "counts": {
-      "additionalProperties": {
-       "type": "integer"
-      },
-      "type": "object",
-      "title": "Counts",
-      "description": "rows, accepted, rejected, warnings, flags"
+      "$ref": "#/components/schemas/BatchCounts"
      },
      "replayed": {
       "type": "boolean",
@@ -693,6 +787,124 @@
      "counts"
     ],
     "title": "BatchOut"
+   },
+   "CategoryMix": {
+    "properties": {
+     "regular": {
+      "type": "integer",
+      "title": "Regular"
+     },
+     "nri": {
+      "type": "integer",
+      "title": "Nri"
+     },
+     "oci": {
+      "type": "integer",
+      "title": "Oci"
+     },
+     "fn": {
+      "type": "integer",
+      "title": "Fn"
+     },
+     "ciwg": {
+      "type": "integer",
+      "title": "Ciwg"
+     },
+     "no_apaar": {
+      "type": "integer",
+      "title": "No Apaar"
+     }
+    },
+    "type": "object",
+    "required": [
+     "regular",
+     "nri",
+     "oci",
+     "fn",
+     "ciwg",
+     "no_apaar"
+    ],
+    "title": "CategoryMix"
+   },
+   "CheckpointOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "upto_seq": {
+      "type": "integer",
+      "title": "Upto Seq"
+     },
+     "root_hash": {
+      "type": "string",
+      "title": "Root Hash"
+     },
+     "aicte_sig": {
+      "type": "string",
+      "title": "Aicte Sig"
+     },
+     "published_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Published At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "upto_seq",
+     "root_hash",
+     "aicte_sig",
+     "published_at"
+    ],
+    "title": "CheckpointOut"
+   },
+   "ComplianceRow": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "last_upload": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Upload"
+     },
+     "batches": {
+      "type": "integer",
+      "title": "Batches"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "state",
+     "status",
+     "last_upload",
+     "batches"
+    ],
+    "title": "ComplianceRow"
    },
    "EnrolmentOut": {
     "properties": {
@@ -823,6 +1035,54 @@
      "reason"
     ],
     "title": "EnrolmentPatch"
+   },
+   "ExcessRow": {
+    "properties": {
+     "programme_id": {
+      "type": "string",
+      "title": "Programme Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "institution": {
+      "type": "string",
+      "title": "Institution"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "category_code": {
+      "type": "string",
+      "title": "Category Code"
+     },
+     "filled": {
+      "type": "integer",
+      "title": "Filled"
+     },
+     "cap": {
+      "type": "integer",
+      "title": "Cap"
+     },
+     "excess": {
+      "type": "integer",
+      "title": "Excess"
+     }
+    },
+    "type": "object",
+    "required": [
+     "programme_id",
+     "name",
+     "institution",
+     "state",
+     "category_code",
+     "filled",
+     "cap",
+     "excess"
+    ],
+    "title": "ExcessRow"
    },
    "HTTPValidationError": {
     "properties": {
@@ -973,6 +1233,38 @@
     ],
     "title": "IssuesPage"
    },
+   "LedgerVerifyOut": {
+    "properties": {
+     "ok": {
+      "type": "boolean",
+      "title": "Ok"
+     },
+     "entries": {
+      "type": "integer",
+      "title": "Entries"
+     },
+     "checkpoint_ok": {
+      "type": "boolean",
+      "title": "Checkpoint Ok"
+     },
+     "problems": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Problems",
+      "description": "first 20 problems found (chain, checkpoint, or live-row mismatches)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ok",
+     "entries",
+     "checkpoint_ok",
+     "problems"
+    ],
+    "title": "LedgerVerifyOut"
+   },
    "LoginIn": {
     "properties": {
      "user_id": {
@@ -1103,6 +1395,41 @@
      "excess"
     ],
     "title": "SeatLine"
+   },
+   "StateRow": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "approved": {
+      "type": "integer",
+      "title": "Approved"
+     },
+     "filled": {
+      "type": "integer",
+      "title": "Filled"
+     },
+     "fill_pct": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fill Pct"
+     }
+    },
+    "type": "object",
+    "required": [
+     "state",
+     "approved",
+     "filled",
+     "fill_pct"
+    ],
+    "title": "StateRow"
    },
    "ValidationError": {
     "properties": {

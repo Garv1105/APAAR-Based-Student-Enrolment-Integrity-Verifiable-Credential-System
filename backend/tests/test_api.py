@@ -1,4 +1,4 @@
-﻿"""Vertical slice through the real API + Postgres (apaar_test database)."""
+"""Vertical slice through the real API + Postgres (apaar_test database)."""
 import csv
 import io
 import json
@@ -104,7 +104,8 @@ def test_error_report_and_dashboards(client):
     assert da["open_notices"]  # the other side is notified too
     agg = client.get("/v1/dashboard/aicte", headers=login(client, "aicte")).json()
     # 3 injected duplicates + the 2 "legitimate move" students, who A has NOT withdrawn in this test
-    assert agg["open_cases"] == 5 and agg["totals"]["excess_seats"] >= 5 and agg["ledger_ok"]
+    # excess seats = 5 regular (125/120) + 4 supernumerary (22/18); the CIWG sub-cap overflow (8/6) is inside those 4
+    assert agg["open_cases"] == 5 and agg["totals"]["excess_seats"] == 9 and agg["ledger_ok"]
 
 
 def test_parallel_batches_cannot_both_slip_under_intake(client, dbconn):

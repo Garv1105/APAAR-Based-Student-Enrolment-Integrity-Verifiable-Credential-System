@@ -61,7 +61,8 @@ def aicte(conn) -> dict:
         "totals": {"institutions": one("SELECT count(*) n FROM institutions"),
                    "active_enrolments": one("SELECT count(*) n FROM enrolments WHERE academic_year=%s AND status='active'", year),
                    "approved_intake": one("SELECT coalesce(sum(approved_intake),0)::int n FROM approved_intake WHERE academic_year=%s", year),
-                   "excess_seats": sum(r["excess"] for r in excess),
+                   # sub-cap rows (e.g. SN_FN_OCI_CIWG:CIWG) overflow inside their parent pool: don't count them twice
+                   "excess_seats": sum(r["excess"] for r in excess if ":" not in r["category_code"]),
                    "batches": one("SELECT count(*) n FROM upload_batches"),
                    "post_deadline_mutations": one("SELECT count(*) n FROM anomaly_flags WHERE type='E501'")},
         "excess_ranking": excess, "category_mix": mix, "by_state": by_state, "open_cases": open_cases,

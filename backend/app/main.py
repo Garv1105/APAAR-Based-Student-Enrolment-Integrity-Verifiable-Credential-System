@@ -1,4 +1,4 @@
-﻿"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
+"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
 import csv
 import io
 import uuid
@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from . import auth, crypto, dashboards, db, i18n, ingest, ledger
 from .auth import require
-from .contracts import (AicteDashboard, BatchJsonIn, BatchOut, EnrolmentOut, EnrolmentPatch, InstitutionDashboard, IssuesPage,
+from .contracts import (CSV_COLUMNS, AicteDashboard, CheckpointOut, LedgerVerifyOut, BatchJsonIn, BatchOut, EnrolmentOut, EnrolmentPatch, InstitutionDashboard, IssuesPage,
                         LoginIn, LoginOut, ProgrammeSeats)
 from .validation import missing_columns
 
@@ -112,6 +112,12 @@ async def create_batch(request: Request, idempotency_key: str | None = Header(No
         return problem(413, "Too many rows", f"Limit is {MAX_ROWS}")
     out = ingest.process_batch(conn, user, rows, channel, idempotency_key, crypto.sha256_hex(raw), request)
     return JSONResponse(BatchOut(**out).model_dump(mode="json"), status_code=200 if out["replayed"] else 201)
+
+
+@app.get("/v1/batches/template.csv", description="Empty upload template: the header row of the data dictionary.")
+def batch_template(user=Depends(require("institution_admin"))):
+    return Response(",".join(CSV_COLUMNS) + "\n", media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="apaar-upload-template.csv"'})
 
 
 def _own_batch(conn, user, batch_id):
@@ -215,12 +221,12 @@ def dash_aicte(user=Depends(require("aicte_officer", "auditor")), conn=Depends(g
     return dashboards.aicte(conn)
 
 
-@app.get("/v1/ledger/verify")
+@app.get("/v1/ledger/verify", response_model=LedgerVerifyOut)
 def ledger_verify(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
     return ledger.verify(conn)
 
 
-@app.post("/v1/ledger/checkpoints")
+@app.post("/v1/ledger/checkpoints", response_model=CheckpointOut | None)
 def ledger_checkpoint(user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
     cp = ledger.checkpoint(conn)
     conn.commit()

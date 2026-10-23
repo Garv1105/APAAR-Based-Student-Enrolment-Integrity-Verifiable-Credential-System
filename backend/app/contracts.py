@@ -67,13 +67,22 @@ class Issue(BaseModel):
     fix_hint: str
 
 
+class BatchCounts(BaseModel):
+    rows: int = 0
+    accepted: int = 0
+    rejected: int = 0
+    warnings: int = Field(0, description="rows with at least one warning")
+    flags: int = Field(0, description="rows with at least one AICTE-review flag")
+    cases_opened: int = 0
+
+
 class BatchOut(BaseModel):
     batch_id: int
     institution_id: str
     status: Literal["processing", "completed", "failed"]
     channel: Literal["portal_csv", "api_json"]
     created_at: datetime
-    counts: dict[str, int] = Field(description="rows, accepted, rejected, warnings, flags")
+    counts: "BatchCounts"
     replayed: bool = Field(False, description="true when returned for a repeated Idempotency-Key")
 
 
@@ -128,14 +137,74 @@ class InstitutionDashboard(BaseModel):
     apaar_coverage: dict[str, int]
 
 
+class AicteTotals(BaseModel):
+    institutions: int
+    active_enrolments: int
+    approved_intake: int
+    excess_seats: int
+    batches: int
+    post_deadline_mutations: int
+
+
+class ExcessRow(BaseModel):
+    programme_id: str
+    name: str
+    institution: str
+    state: str
+    category_code: str
+    filled: int
+    cap: int
+    excess: int
+
+
+class CategoryMix(BaseModel):
+    regular: int
+    nri: int
+    oci: int
+    fn: int
+    ciwg: int
+    no_apaar: int
+
+
+class StateRow(BaseModel):
+    state: str
+    approved: int
+    filled: int
+    fill_pct: float | None
+
+
+class ComplianceRow(BaseModel):
+    id: str
+    name: str
+    state: str
+    status: str
+    last_upload: datetime | None
+    batches: int
+
+
 class AicteDashboard(BaseModel):
-    totals: dict[str, int]
-    excess_ranking: list[dict]
-    category_mix: dict[str, int]
-    by_state: list[dict]
+    totals: AicteTotals
+    excess_ranking: list[ExcessRow]
+    category_mix: CategoryMix
+    by_state: list[StateRow]
     open_cases: int
-    upload_compliance: list[dict]
+    upload_compliance: list[ComplianceRow]
     ledger_ok: bool
+
+
+class LedgerVerifyOut(BaseModel):
+    ok: bool
+    entries: int
+    checkpoint_ok: bool
+    problems: list[str] = Field(description="first 20 problems found (chain, checkpoint, or live-row mismatches)")
+
+
+class CheckpointOut(BaseModel):
+    id: int
+    upto_seq: int
+    root_hash: str
+    aicte_sig: str
+    published_at: datetime
 
 
 class CaseOut(BaseModel):
