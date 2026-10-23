@@ -4,29 +4,30 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 
 ## ▶ Next steps and open decisions (handoff, updated 2026-10-23)
 
-**Where things stand:** `main` = `5703b37` on GitHub.
+**Decisions made (2026-10-23):**
+- **Order:** credentials and consent first (Req 5, 6 and 10). The teammate's dataset integration happens in parallel on a separate branch.
+- **`pyyaml`:** pinned in `requirements-dev.txt` (script-only); YAML is read with `safe_load` only.
+- **Student ID:** required and unique per institution. Codes **E105** (blank) and **E205** (duplicate in the file, or matching an active enrolment at the same institution) are done. The teammate is adding the column to `synthetic/`.
+- **Plan file:** `IMPLEMENTATION_PLAN.md` kept, with the T7.1 section merged in. The generator source is committed in `synthetic/`. `*.zip`, `/data/` and `/data_demo/` are gitignored.
+
+**Where things stand:** `main` = `36c3bf4` on GitHub, plus local commits T7.1 (generator) and T2.2 (student ID).
 - **Backend:** upload, deterministic validation (17 codes), intake engine with row locks, cross-institution duplicates, seat ledger, RLS (`app_user`), audit, typed contract.
 - **Frontend:** sign-in, upload, batch issues, institution and AICTE dashboards.
-- **Checks:** 51 backend tests green; frontend build green; headless UI check passed at desktop and 390 px.
+- **Checks:** 54 backend tests green (455-row labelled scenario exact through the API); frontend build green; headless UI check passed at desktop and 390 px.
 - **How to run:** README "Quick start", or the CLAUDE.md commands.
 
-**Untracked files, waiting on decision 4 below (not committed):**
-- `IMPLEMENTATION_PLAN_Dataset.md`: the same plan with T7.1 marked DONE.
-- `synthetic.zip`: a teammate's generator plus an independent `selfcheck.py`. Reviewed: no network or subprocess use. Needs `pyyaml`.
-- `data_demo.zip`: generator output, seed 7: 4 institutions, 1,897 rows, answer key.
-
-**Open decisions for the user** (asked, not yet answered):
-1. **Order:** build credentials and consent first (Req 5, 6 and 10 are still at zero; recommended), or integrate the teammate's dataset first?
-2. **`pyyaml`:** may it be added as a dependency so `synthetic/` generate and selfcheck can run?
-3. **Student ID:** the teammate's uploads have no `institution_student_id`, which Req 10 prints on certificates. Either (a) make it optional and show a platform-generated ID, or (b) ask the teammate to add the column.
-4. **Plan file and zips:** replace `IMPLEMENTATION_PLAN.md` with the Dataset version? Keep the zips out of git and extract only the generator into `synthetic/`?
+**Open items (not started):**
+- **D3 anomaly engine, DQS and inspection queue:** explainable rules (fill ratio vs 3-year history by robust z, category-mix shift, DOB cluster, sequential APAAR, deadline dump), evidence shown on every flag, a Data Quality Score with visible components, and a risk-ranked inspection queue. `synthetic/` ground truth already labels these anomalies.
+- **D7 multilingual error reports (hi, kn):** translate `backend/i18n/en.json` templates only (no data); every placeholder must survive; a human reviewer signs off and is recorded in each file; a placeholder-integrity test; a language switcher in the UI. The rendering path (`?lang=`) already exists.
+- **D2 duplicate pre-check:** consent-gated endpoint that returns only CLEAR or NEEDS_REVIEW; single-use signed student consent token; rate-limited and audit-logged; no oracle.
+- **Gemini column mapping (use case A):** headers plus synthetic samples only, behind a PII scrubber and audit, paid tier only, confirm before apply, outputs limited to enum targets. Needs a billing-enabled key and a dependency decision. Deterministic alias mapping (dataset branch) is the fallback.
 
 **Next task options:**
-- **A. Credentials (T5.1–T5.8):**
+- **A. Credentials (T5.1–T5.8), in progress:**
   - Fetch the official `eddsa-jcs-2022` test vectors from the W3C spec and match them exactly before trusting the implementation.
   - Then build the trust registry (`did:web` style), the Bitstring Status List (confirm the 131,072 minimum in the spec), consent (request → mock OTP approve → scoped VerificationCredential), the verifier page (VALID/REVOKED/UNTRUSTED/TAMPERED/EXPIRED) and the printable certificate with APAAR ID, student ID and QR.
   - Credential, consent and issuer tables already exist with RLS deny-by-default; add policies with each feature.
-- **B. Dataset integration (~5–7 h):**
+- **B. Dataset integration (~5–7 h), owned by the teammate on a separate branch:**
   - Deterministic header-alias and value normalisation: dates in `dd/mm/yyyy`, `dd-mm-yyyy`, `dd.mm.yyyy` and Excel serials; Y/Yes/1/TRUE booleans; APAAR with spaces or hyphens is valid; category spellings.
   - XLSX input, title rows, `;` delimiter.
   - Seat model with REGULAR/FN/OCI/CIWG/NRI in a FOREIGN pool (TFW and LATERAL caps are unverified placeholders, so don't treat them as real).
