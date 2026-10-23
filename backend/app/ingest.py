@@ -9,7 +9,7 @@ from datetime import date, datetime, timezone
 
 from psycopg.types.json import Jsonb
 
-from . import anomaly, crypto, ledger
+from . import anomaly, crypto, ledger, webhooks
 from .auth import audit
 from .mocks import apaar_registry
 from .validation import Ctx, counter_keys, student_id_key, validate_batch
@@ -104,6 +104,12 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                   "cases_opened": len(set(new_cases))}
         b = conn.execute("UPDATE upload_batches SET status='completed', row_counts_json=%s WHERE id=%s RETURNING *",
                          (Jsonb(counts), b["id"])).fetchone()
+        codes = {}
+        for i in issues:
+            codes[i[2]] = codes.get(i[2], 0) + 1
+        webhooks.emit(conn, "batch.validated", inst_id, batch_id=b["id"], counts=counts, codes=codes)
+        for cid in sorted(set(new_cases)):  # fires whenever a batch adds an enrolment to a case (new or existing)
+            webhooks.emit_case(conn, "case.opened", cid)
         audit(conn, user, "batch.upload", "upload_batch", b["id"], request=request)
     return batch_out(b)
 
@@ -158,6 +164,7 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
         if e is None:
             raise ApiError(404, "Enrolment not found")  # same answer for "not yours" (no oracle)
         new_status = body.get("status") or e["status"]
+        was_active = e["status"] == "active"
         if e["status"] != "active" and new_status == "active":
             raise ApiError(422, "Re-admission must go through a new upload so it is validated against intake")
         flags = []
@@ -175,6 +182,11 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
         ledger.append(conn, user["institution_id"], "enrolment.updated", e)
         if new_status in ("withdrawn", "migrated"):  # PRD §11.7: leaving the institution revokes its credentials
             conn.execute("SELECT revoke_enrolment_credentials(%s)", (e["id"],))
+            if was_active:
+                for c in conn.execute("SELECT id FROM credentials WHERE enrolment_id=%s AND type <> 'VerificationCredential'",
+                                      (e["id"],)).fetchall():
+                    webhooks.emit(conn, "credential.revoked", user["institution_id"], credential_id=c["id"], enrolment_id=e["id"],
+                                  reason=new_status)
         if flags:
             conn.execute("INSERT INTO anomaly_flags (institution_id, programme_id, type, score, evidence_json) VALUES (%s,%s,'E501',1,%s)",
                          (user["institution_id"], e["programme_id"],

@@ -4,6 +4,7 @@ import io
 import json
 import uuid
 import zlib
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,9 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports, risk
+from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, CaseOut, CaseResolve, CaseUnmask, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
+                        WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
                         EnrolmentPatch, InstitutionDashboard, IssueIn, IssuesPage, LedgerVerifyOut, LoginIn, LoginOut,
                         ProgrammeSeats, RegistryIssuer, StudentLoginIn, StudentProfile, VerifyIn, VerifyOut)
@@ -22,7 +24,13 @@ from .validation import missing_columns
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 50_000
 
-app = FastAPI(title="APAAR Student Data & Verification Platform (SIH26263 prototype)", version="0.1.0",
+@asynccontextmanager
+async def lifespan(_app):
+    webhooks.start_poller()  # off with WEBHOOK_DISPATCH=off (tests, demo seed)
+    yield
+
+
+app = FastAPI(title="APAAR Student Data & Verification Platform (SIH26263 prototype)", version="0.1.0", lifespan=lifespan,
               description="Prototype. APAAR registry, AICTE approval registry, OTP and identity provider are MOCKS. Synthetic data only.")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-Id"])
@@ -338,6 +346,56 @@ def unmask_case(case_id: int, body: CaseUnmask, request: Request, user=Depends(r
     return cases.unmask(conn, user, case_id, body.reason, request)
 
 
+# ---------- webhooks (Req 7) ----------
+@app.post("/v1/webhooks", response_model=WebhookCreated, status_code=201,
+          description="Register an endpoint. The signing secret is returned once (Standard Webhooks). Max 5 active per "
+                      "institution. Accepts Idempotency-Key.")
+def create_webhook(body: WebhookIn, request: Request, idempotency_key: str | None = Header(None),
+                   user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.register(conn, user, body.url, list(body.events), idempotency_key, crypto.sha256_hex(body.model_dump_json().encode()))
+    auth.audit(conn, user, "webhook.create", "webhook_endpoint", out["id"], request=request)
+    conn.commit()
+    return out
+
+
+@app.get("/v1/webhooks", response_model=list[WebhookOut], description="The institution's webhook endpoints (no secrets).")
+def list_webhooks(user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    return [webhooks.endpoint_out(w) for w in conn.execute("SELECT * FROM webhook_endpoints ORDER BY id")]
+
+
+@app.delete("/v1/webhooks/{endpoint_id}", response_model=WebhookOut,
+            description="Deactivate an endpoint and cancel its pending deliveries.")
+def delete_webhook(endpoint_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.deactivate(conn, endpoint_id)
+    auth.audit(conn, user, "webhook.delete", "webhook_endpoint", endpoint_id, request=request)
+    conn.commit()
+    return out
+
+
+@app.post("/v1/webhooks/{endpoint_id}/rotate", response_model=WebhookCreated,
+          description="New secret, returned once. The previous secret keeps signing (a second v1 signature) for 24 h.")
+def rotate_webhook(endpoint_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.rotate(conn, endpoint_id)
+    auth.audit(conn, user, "webhook.rotate", "webhook_endpoint", endpoint_id, request=request)
+    conn.commit()
+    return out
+
+
+@app.get("/v1/webhooks/{endpoint_id}/deliveries", response_model=WebhookDeliveriesPage, description="Delivery log (cursor paged).")
+def webhook_deliveries(endpoint_id: int, cursor: int = 0, limit: int = 100, user=Depends(require("institution_admin")),
+                       conn=Depends(get_conn)):
+    return webhooks.deliveries(conn, endpoint_id, cursor, max(1, min(limit, 500)))
+
+
+@app.post("/v1/webhooks/deliveries/{delivery_id}/redeliver", response_model=WebhookDelivery,
+          description="Queue another attempt now (same event id, freshly signed).")
+def redeliver_webhook(delivery_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.redeliver(conn, delivery_id)
+    auth.audit(conn, user, "webhook.redeliver", "webhook_delivery", delivery_id, request=request)
+    conn.commit()
+    return out
+
+
 # ---------- verifiable credentials (Req 5, 6, 10) ----------
 REGULATORS = ("aicte_officer", "auditor")
 
@@ -363,6 +421,9 @@ def issue_credential(enrolment_id: int, body: IssueIn, request: Request, idempot
     if not replayed:
         auth.audit(conn, user, "credential.issue", "credential", vc["id"], student_id=row["subject_student_id"], reason=body.type,
                    request=request)
+        if user["role"] == "institution_admin":
+            webhooks.emit(conn, "credential.issued", user["institution_id"], credential_id=row["id"], type=row["type"],
+                          enrolment_id=row["enrolment_id"])
     conn.commit()
     out = CredentialOut(**_credential_out(conn, row, user)).model_dump(mode="json")
     return JSONResponse(out, status_code=200 if replayed else 201)
@@ -406,6 +467,9 @@ def change_credential_status(body: CredentialStatusIn, request: Request,
     if body.purpose == "revocation" and not body.value:
         raise HTTPException(422, "Revocation is permanent; issue a new credential instead")
     conn.execute("SELECT set_credential_status(%s, %s, %s)", (row["id"], body.purpose, body.value))
+    if body.purpose == "revocation" and user["role"] == "institution_admin":
+        webhooks.emit(conn, "credential.revoked", user["institution_id"], credential_id=row["id"], enrolment_id=row["enrolment_id"],
+                      reason="revoked_by_issuer")
     auth.audit(conn, user, f"credential.{body.purpose}.{'set' if body.value else 'clear'}", "credential", row["id"],
                student_id=row["subject_student_id"], reason=body.reason, request=request)
     conn.commit()

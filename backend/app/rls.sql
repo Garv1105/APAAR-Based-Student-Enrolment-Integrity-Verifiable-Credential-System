@@ -34,6 +34,8 @@ GRANT SELECT ON institutions, programmes, approved_intake, seat_categories, acad
   issuer_registry, affiliations, status_lists TO app_user;   -- registry + status lists: public, written only by admin/definer fns
 GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, students, programme_category_counters,
   duplicate_cases, anomaly_flags, consents TO app_user;
+GRANT SELECT, INSERT, UPDATE ON webhook_endpoints TO app_user;
+GRANT SELECT, UPDATE ON webhook_deliveries TO app_user;   -- inserts only via enqueue_event() / enqueue_case_event()
 GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints, credentials, batch_features TO app_user;
 GRANT SELECT ON ledger_entries TO app_user;            -- writes only via ledger_append()
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
@@ -87,6 +89,23 @@ ALTER TABLE duplicate_cases ENABLE ROW LEVEL SECURITY; ALTER TABLE duplicate_cas
 DROP POLICY IF EXISTS sel ON duplicate_cases; DROP POLICY IF EXISTS upd ON duplicate_cases;
 CREATE POLICY sel ON duplicate_cases FOR SELECT USING (app_is_regulator() OR EXISTS (SELECT 1 FROM enrolments e WHERE e.id = ANY(enrolment_ids)));
 CREATE POLICY upd ON duplicate_cases FOR UPDATE USING (app_role() = 'aicte_officer') WITH CHECK (app_role() = 'aicte_officer');
+
+-- webhooks (Req 7): an institution manages its own endpoints and sees its own deliveries; regulators read deliveries.
+-- The in-process dispatcher connects with app.role='webhook_dispatcher' (no user row can hold that role: users.role CHECK).
+ALTER TABLE webhook_endpoints ENABLE ROW LEVEL SECURITY; ALTER TABLE webhook_endpoints FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON webhook_endpoints; DROP POLICY IF EXISTS ins ON webhook_endpoints; DROP POLICY IF EXISTS upd ON webhook_endpoints;
+CREATE POLICY sel ON webhook_endpoints FOR SELECT USING ((app_role() = 'institution_admin' AND institution_id = app_inst())
+  OR app_role() = 'webhook_dispatcher');
+CREATE POLICY ins ON webhook_endpoints FOR INSERT WITH CHECK (app_role() = 'institution_admin' AND institution_id = app_inst());
+CREATE POLICY upd ON webhook_endpoints FOR UPDATE USING (app_role() = 'institution_admin' AND institution_id = app_inst())
+  WITH CHECK (institution_id = app_inst());
+
+ALTER TABLE webhook_deliveries ENABLE ROW LEVEL SECURITY; ALTER TABLE webhook_deliveries FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON webhook_deliveries; DROP POLICY IF EXISTS upd ON webhook_deliveries;
+CREATE POLICY sel ON webhook_deliveries FOR SELECT USING (app_is_regulator() OR app_role() = 'webhook_dispatcher'
+  OR EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id));   -- endpoints RLS decides (own institution)
+CREATE POLICY upd ON webhook_deliveries FOR UPDATE USING (app_role() = 'webhook_dispatcher'
+  OR (app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id)));
 
 -- anomaly_flags (incl. E501)
 ALTER TABLE anomaly_flags ENABLE ROW LEVEL SECURITY; ALTER TABLE anomaly_flags FORCE ROW LEVEL SECURITY;
@@ -391,13 +410,52 @@ BEGIN
   RETURN n;
 END $$;
 
+-- Webhook events (Req 7). The app builds the payload from an allowlist (ids, counts, codes); these functions only
+-- fan it out to the subscribed endpoints, so a caller never sees another institution's endpoints.
+-- enqueue_event: an institution for itself, or an AICTE officer for an institution its action affected.
+CREATE OR REPLACE FUNCTION enqueue_event(p_type text, p_payload jsonb, p_inst text) RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE n int;
+BEGIN
+  IF NOT ((app_role() = 'institution_admin' AND p_inst = app_inst()) OR app_role() = 'aicte_officer') THEN
+    RAISE EXCEPTION 'enqueue_event: not allowed';
+  END IF;
+  INSERT INTO webhook_deliveries (endpoint_id, event_id, event_type, payload)
+  SELECT w.id, gen_random_uuid(), p_type, p_payload FROM webhook_endpoints w
+   WHERE w.institution_id = p_inst AND w.active AND p_type = ANY(w.events);
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
+-- enqueue_case_event: notify every institution with an enrolment in the case (neutral payload built by the app).
+-- Caller: an AICTE officer, or an institution that itself has an enrolment in the case.
+CREATE OR REPLACE FUNCTION enqueue_case_event(p_case bigint, p_type text, p_payload jsonb) RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE k record; insts text[]; n int;
+BEGIN
+  SELECT * INTO k FROM duplicate_cases WHERE id = p_case;
+  IF k.id IS NULL THEN RAISE EXCEPTION 'enqueue_case_event: no such case'; END IF;
+  SELECT array_agg(DISTINCT p.institution_id) INTO insts FROM enrolments e JOIN programmes p ON p.id = e.programme_id
+   WHERE e.id = ANY(k.enrolment_ids);
+  IF NOT (app_role() = 'aicte_officer' OR (app_role() = 'institution_admin' AND app_inst() = ANY(insts))) THEN
+    RAISE EXCEPTION 'enqueue_case_event: not allowed';
+  END IF;
+  INSERT INTO webhook_deliveries (endpoint_id, event_id, event_type, payload)
+  SELECT w.id, gen_random_uuid(), p_type, p_payload FROM webhook_endpoints w
+   WHERE w.institution_id = ANY(insts) AND w.active AND p_type = ANY(w.events);
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
-  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint) FROM PUBLIC;
+  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint),
+  enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
-  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint) TO app_user;
+  request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint),
+  enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb) TO app_user;

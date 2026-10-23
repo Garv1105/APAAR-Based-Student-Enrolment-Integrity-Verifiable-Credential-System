@@ -11,6 +11,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **Credentials (Req 5, 6, 10):** W3C VCs with `eddsa-jcs-2022` (the official vectors pass); trust registry (MOCK); status lists; consent with a guardian path (MOCK); student access log; certificate QR.
 - **Reports and monitoring:** Req 9 CSV reports; D3 anomaly rules, DQS and inspection queue.
 - **UI:** institution, AICTE, student, verifier and registrar portals.
+- **W1 webhooks + ERP connector (Req 7):** Standard Webhooks signing; outbox with retries and backoff; delivery log; redeliver; secret rotation (24 h overlap); max 5 endpoints; SSRF guard that pins the validated IP (Host + SNI); `tools/erp_connector/` (YAML mapping, file-hash Idempotency-Key, verifying receiver).
 - **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
 **Decisions:**
@@ -25,7 +26,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **D7 hi/kn error reports:** translate the templates only; placeholder-integrity test; human sign-off; UI switcher (`?lang=` already works).
 - **D2 duplicate pre-check:** consent-gated, returns CLEAR/NEEDS_REVIEW only, single-use token, rate-limited, audited.
 - **Gemini column mapping (use case A):** headers and synthetic samples only, PII scrubber, paid tier, confirm before apply. The fallback is the deterministic alias mapping on the dataset branch.
-- **Req 7:** webhooks and the ERP connector. DigiLocker mock push (T5.10). SSE. Isolation Forest (on the cut list).
+- DigiLocker mock push (T5.10). SSE. Isolation Forest (on the cut list).
 - **H30–36:** rehearse `docs/demo-runbook.md` three times (under 6 min), record a backup video, final limitations pass.
 - **Dataset branch (teammate):**
   - header aliases; date, boolean and APAAR normalisation
@@ -67,4 +68,11 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - Unmask-with-reason exists only for duplicate cases.
   - Racing issuance requests with the same Idempotency-Key get a 500.
   - The consent-request APAAR oracle is fixed.
+- Webhooks (W1):
+  - The dispatcher is one in-process poller thread (restart-safe through the outbox table). There is no separate worker.
+  - Institutions only; university registrars can't register endpoints.
+  - `case.opened` fires whenever a batch adds an enrolment to a case, new or existing.
+  - Up to ~5 s per attempt is spent holding the delivery row lock.
+  - The connector's receiver remembers seen event ids in memory only.
+  - No UI yet (API + connector only).
 - Keys live in a local `backend/.keys.json` (prototype; production = KMS/HSM).
