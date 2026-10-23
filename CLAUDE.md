@@ -4,9 +4,9 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 
 36-hour judging prototype (hybrid of the PRD and the implementation plan; see MVP_SCOPE.md for what is in/out).
 
-- Requirements and design: @APAAR_SIH_PRD.md (v2.1)
-- Phased task plan and task IDs: @IMPLEMENTATION_PLAN.md (6-person reference plan; only the tasks in MVP_SCOPE.md are in scope)
-- Scope, deferred features: @MVP_SCOPE.md. Progress, blockers, limitations: @TASKS.md
+- Requirements and design: `APAAR_SIH_PRD.md` (v2.1)
+- Phased task plan and task IDs: `IMPLEMENTATION_PLAN.md` (6-person reference plan; only the tasks in MVP_SCOPE.md are in scope)
+- Scope, deferred features: `MVP_SCOPE.md`. Progress, blockers, limitations: `TASKS.md`
 - API contract (source of truth): `backend/app/contracts.py` (pydantic). `backend/openapi.json` is generated from it; never hand-edit the JSON. Change the contract first, then backend and frontend.
 
 ## Stack (actual)

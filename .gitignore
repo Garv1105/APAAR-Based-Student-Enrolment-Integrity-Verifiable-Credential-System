@@ -9,3 +9,4 @@ frontend/dist/
 # synthetic/ generator output (root-anchored: backend/data/ holds tracked seed + fixtures)
 /data/
 /data_demo/
+.claude/settings.local.json
