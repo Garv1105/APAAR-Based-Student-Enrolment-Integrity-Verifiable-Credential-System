@@ -87,20 +87,46 @@ def test_review_findings_m1_m2_m3(client, dbconn):
         with as_app(role, inst) as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("SELECT password_hash FROM users")
     assert login(client, "inst-a")
-    # M3: checkpoints can't be rewritten; credential tables deny by default
+    # M3: checkpoints can't be rewritten; registry and status lists are public-read (W3C model) but not writable
     with as_app("aicte_officer") as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
         c.execute("UPDATE ledger_checkpoints SET upto_seq = 1")
     with as_app("institution_admin", A) as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
         c.execute("INSERT INTO ledger_checkpoints (upto_seq, root_hash, aicte_sig) VALUES (1, 'x', 'y')")
+    for stmt in ("INSERT INTO issuer_registry (did, kind, name, public_keys_json, status, valid_from) "
+                 "VALUES ('did:x', 'institution', 'fake', '[]', 'active', now())",
+                 "UPDATE issuer_registry SET status = 'active'",
+                 "UPDATE status_lists SET bits = bits",
+                 "UPDATE credentials SET vc_hash = 'x'",
+                 "DELETE FROM credentials"):
+        with as_app("institution_admin", A) as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
+            c.execute(stmt)
     with as_app("institution_admin", B) as c:
-        for t in ("consents", "credentials", "status_lists", "issuer_registry"):
-            assert c.execute(f"SELECT count(*) n FROM {t}").fetchone()["n"] == 0
-        with pytest.raises(psycopg.errors.InsufficientPrivilege):
-            c.execute("INSERT INTO issuer_registry (did, name, public_keys_json, status, valid_from) "
-                      "VALUES ('did:x', 'fake', '[]', 'active', now())")
+        assert c.execute("SELECT count(*) n FROM issuer_registry").fetchone()["n"] == 5   # public
+        assert c.execute("SELECT count(*) n FROM status_lists").fetchone()["n"] == 10     # public
     # LOW 3: bounded inputs
     with as_app("institution_admin", B) as c, pytest.raises(psycopg.errors.RaiseException):
         c.execute("SELECT * FROM active_enrolment_owners(ARRAY['x'], '2025-26')")
+
+
+def test_credential_functions_enforce_issuer_and_student_rules(client, dbconn):
+    upload(client, "inst-a", "A1.csv")
+    e = dbconn.execute("SELECT e.id, e.student_id FROM enrolments e JOIN students s ON s.id=e.student_id "
+                       "WHERE s.apaar_bi IS NOT NULL LIMIT 1").fetchone()
+    vc = client.post(f"/v1/credentials/{e['id']}/issue", json={"type": "EnrolmentCredential"}, headers=login(client, "inst-a")).json()
+    a_did = vc["issuer_did"]
+    for args in ((("institution_admin", B), "SELECT * FROM allocate_status_index(%s)", (a_did,)),           # B can't use A's list
+                 (("verifier", ""), "SELECT * FROM allocate_status_index(%s)", (a_did,)),
+                 (("institution_admin", B), "SELECT set_credential_status(%s, 'revocation', true)", (vc["id"],)),
+                 (("student", "", "x", e["student_id"]), "SELECT set_credential_status(%s, 'revocation', true)", (vc["id"],))):
+        role = args[0]
+        with db.app_connect({"role": role[0], "institution_id": role[1], "id": "x",
+                             "student_id": role[3] if len(role) > 3 else None}) as c, pytest.raises(psycopg.errors.RaiseException):
+            c.execute(args[1], args[2])  # last: a student may not revoke an institution's EnrolmentCredential
+    with as_app("institution_admin", B) as c, pytest.raises(psycopg.errors.InsufficientPrivilege):
+        c.execute("INSERT INTO credentials (id, type, subject_student_id, issuer_did, status_list_id, status_index, vc_enc, vc_hash) "
+                  "VALUES ('urn:x', 'EnrolmentCredential', %s, %s, 'inst-1-0000000001-revocation', 5, 'x', 'x')", (e["student_id"], a_did))
+    with as_app("institution_admin", B) as c:
+        assert c.execute("SELECT count(*) n FROM credentials").fetchone()["n"] == 0
 
 
 def test_definer_functions_refuse_other_roles(client):

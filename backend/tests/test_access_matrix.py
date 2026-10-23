@@ -36,6 +36,21 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/ledger/verify", {}, expect(REG)),
         ("POST", "/v1/ledger/checkpoints", {}, expect({"aicte": 200})),
         ("GET", "/v1/ledger/checkpoints/latest", {}, {u: 200 for u in USERS}),
+        # credentials (Req 5, 6, 10)
+        ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "EnrolmentCredential"}}, expect({"inst-a": 201}, 404)),
+        ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "DegreeCredential"}},
+         expect({"univ": 201, "inst-a": 403}, 404)),  # inst-b: RLS hides A's enrolment before the role check
+        ("GET", "/v1/credentials", {}, expect({"inst-a": 200, "inst-b": 200, "univ": 200} | REG)),  # RLS filters rows
+        ("POST", "/v1/credentials/status",
+         {"json": {"credential_id": "urn:uuid:nope", "purpose": "suspension", "value": True, "reason": "test"}},
+         expect({"inst-a": 404, "inst-b": 404, "univ": 404})),
+        ("POST", "/v1/verify", {"json": {"credential": {}}},
+         expect({"inst-a": 200, "inst-b": 200, "employer": 200, "univ": 200} | REG)),
+        ("GET", "/v1/demo/forged-credential", {}, expect({"employer": 200} | REG)),
+        ("GET", "/v1/registry/issuers", {}, {u: 200 for u in USERS}),
+        ("GET", "/v1/registry/snapshot", {}, {u: 200 for u in USERS}),
+        ("GET", "/status/inst-1-0000000001-revocation", {}, {u: 200 for u in USERS}),
+        ("GET", "/dids/inst/1-0000000001/did.json", {}, {u: 200 for u in USERS}),
         ("GET", "/healthz", {}, {u: 200 for u in USERS}),
     ]
     headers = {u: ({} if u == "anon" else login(client, u)) for u in USERS}

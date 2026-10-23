@@ -57,6 +57,21 @@
     {"id": "aicte", "role": "aicte_officer", "display_name": "AICTE Monitoring Officer"},
     {"id": "auditor", "role": "auditor", "display_name": "Regulator (read-only auditor)"},
     {"id": "employer", "role": "verifier", "display_name": "Acme Hiring Pvt Ltd (verifier)"},
-    {"id": "univ", "role": "university_registrar", "display_name": "Registrar, Demo Technological University"}
-  ]
+    {"id": "univ", "role": "university_registrar", "issuer_did": "did:web:registry.aicte-demo.in:univ:dtu-demo",
+     "display_name": "Registrar, Demo Technological University"}
+  ],
+  "_trust_note": "MOCK trust registry (D4). DIDs use did:web style ids on a demo host; keys are generated locally at seed time.",
+  "trust_registry": {
+    "host": "registry.aicte-demo.in",
+    "institutions": [
+      {"institution_id": "1-0000000001", "valid_from": "2020-07-01T00:00:00Z", "valid_until": null},
+      {"institution_id": "1-0000000002", "valid_from": "2020-07-01T00:00:00Z", "valid_until": null},
+      {"institution_id": "1-0000000003", "valid_from": "2020-07-01T00:00:00Z", "valid_until": null},
+      {"institution_id": "1-0000000004", "valid_from": "2015-07-01T00:00:00Z", "valid_until": "2026-06-30T23:59:59Z"}
+    ],
+    "universities": [
+      {"did": "did:web:registry.aicte-demo.in:univ:dtu-demo", "name": "Demo Technological University (MOCK)",
+       "valid_from": "2010-01-01T00:00:00Z", "valid_until": null, "affiliated": ["1-0000000001", "1-0000000002"]}
+    ]
+  }
 }

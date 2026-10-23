@@ -1,0 +1,170 @@
+"""T5.1-T5.4: trust registry, Bitstring Status List, issuance and verification through the API."""
+import copy
+import csv
+from datetime import timedelta
+from pathlib import Path
+
+from app import credentials, crypto
+from conftest import login
+from test_api import upload
+
+SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
+D_DID = "did:web:registry.aicte-demo.in:inst:1-0000000004"
+
+
+def a_rows():
+    return list(csv.DictReader(open(SYN / "A1.csv", encoding="utf-8")))
+
+
+def a_enrolment(client, dbconn, n=0):
+    """An active A enrolment that has an APAAR, plus its CSV row."""
+    upload(client, "inst-a", "A1.csv")
+    r = [r for r in a_rows() if r["apaar_id"]][n]
+    e = client.get("/v1/enrolments", params={"apaar": r["apaar_id"]}, headers=login(client, "inst-a")).json()[0]
+    return e, r
+
+
+def issue(client, user, enrolment_id, vc_type):
+    return client.post(f"/v1/credentials/{enrolment_id}/issue", json={"type": vc_type}, headers=login(client, user))
+
+
+def verify(client, vc, user="employer"):
+    r = client.post("/v1/verify", json={"credential": vc}, headers=login(client, user))
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_enrolment_credential_lifecycle_valid_tampered_suspended_revoked(client, dbconn):
+    e, row = a_enrolment(client, dbconn)
+    r = issue(client, "inst-a", e["id"], "EnrolmentCredential")
+    assert r.status_code == 201, r.text
+    vc = r.json()["credential"]
+    s = vc["credentialSubject"]
+    assert s["apaarId"] == row["apaar_id"] and s["studentId"] == row["institution_student_id"] and s["status"] == "ACTIVE"
+    assert vc["proof"]["cryptosuite"] == "eddsa-jcs-2022" and vc["issuer"]["id"].endswith("inst:1-0000000001")
+    assert verify(client, vc)["result"] == "VALID"
+
+    forged = copy.deepcopy(vc)
+    forged["credentialSubject"]["programme"] = "MBBS"
+    out = verify(client, forged)
+    assert out["result"] == "TAMPERED" and out["subject"] is None
+
+    st = {"credential_id": vc["id"], "purpose": "suspension", "reason": "under investigation"}
+    assert client.post("/v1/credentials/status", json=st | {"value": True}, headers=login(client, "inst-a")).status_code == 200
+    assert verify(client, vc)["result"] == "SUSPENDED"
+    assert client.post("/v1/credentials/status", json=st | {"value": False}, headers=login(client, "inst-a")).status_code == 200
+    assert verify(client, vc)["result"] == "VALID"
+    # another institution can't touch it, and revocation can't be undone
+    assert client.post("/v1/credentials/status", json=st | {"value": True}, headers=login(client, "inst-b")).status_code == 404
+    assert client.post("/v1/credentials/status", json=st | {"purpose": "revocation", "value": False},
+                       headers=login(client, "inst-a")).status_code == 422
+
+    # PRD §11.7: withdrawal revokes automatically
+    assert client.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "reason": "left"},
+                        headers=login(client, "inst-a")).status_code == 200
+    assert verify(client, vc)["result"] == "REVOKED"
+    # the verification shows up in the student's audit trail (D6), recorded without telling the verifier anything
+    rows = dbconn.execute("SELECT actor, reason FROM audit_logs WHERE action='credential.verify' AND entity_id=%s ORDER BY id",
+                          (vc["id"],)).fetchall()
+    assert [r["reason"] for r in rows][-1] == "REVOKED" and all(r["actor"] == "employer" for r in rows)
+    assert dbconn.execute("SELECT count(*) n FROM audit_logs WHERE action='credential.verify' AND student_id IS NULL").fetchone()["n"] == 0
+
+
+def test_status_list_credential_is_spec_shaped_and_signed(client, dbconn):
+    e, _ = a_enrolment(client, dbconn)
+    vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
+    entry = next(x for x in vc["credentialStatus"] if x["statusPurpose"] == "revocation")
+    idx = int(entry["statusListIndex"])
+    client.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "reason": "left"}, headers=login(client, "inst-a"))
+    path = entry["statusListCredential"].split("/status/")[1]
+    slc = client.get(f"/status/{path}").json()  # public, no auth
+    assert slc["type"] == ["VerifiableCredential", "BitstringStatusListCredential"]
+    bits = credentials.decode_list(slc["credentialSubject"]["encodedList"])
+    assert len(bits) * 8 >= 131_072 and credentials.bit_is_set(bits, idx) and sum(bin(b).count("1") for b in bits) == 1
+    did_doc = client.get("/dids/inst/1-0000000001/did.json").json()
+    pub = crypto.public_from_multikey(did_doc["verificationMethod"][0]["publicKeyMultibase"])
+    assert crypto.eddsa_jcs_2022_verify(slc, pub)
+
+
+def test_status_list_bit_order_matches_spec():
+    bits = bytearray(16384)
+    bits[0] = 0b1000_0000  # index 0 is the left-most bit
+    assert credentials.bit_is_set(bytes(bits), 0) and not credentials.bit_is_set(bytes(bits), 7)
+    assert credentials.decode_list(credentials.encode_list(bytes(bits))) == bytes(bits)
+
+
+def test_degree_credential_by_affiliated_university_only(client, dbconn):
+    e, row = a_enrolment(client, dbconn)
+    r = issue(client, "univ", e["id"], "DegreeCredential")
+    assert r.status_code == 201, r.text
+    s = r.json()["credential"]["credentialSubject"]
+    assert s["apaarId"] == row["apaar_id"] and s["studentId"] == row["institution_student_id"]  # Req 10
+    assert "validUntil" not in r.json()["credential"] and verify(client, r.json()["credential"])["result"] == "VALID"
+    assert issue(client, "inst-a", e["id"], "DegreeCredential").status_code == 403
+    assert issue(client, "univ", e["id"], "EnrolmentCredential").status_code == 403
+    assert issue(client, "inst-b", e["id"], "EnrolmentCredential").status_code == 404   # RLS: not B's enrolment
+    upload(client, "inst-c", "C1.csv")  # C is not affiliated to the university
+    c_row = next(r for r in csv.DictReader(open(SYN / "C1.csv", encoding="utf-8")) if r["apaar_id"] and r["institution_student_id"])
+    c_e = client.get("/v1/enrolments", params={"apaar": c_row["apaar_id"]}, headers=login(client, "inst-c")).json()[0]
+    assert issue(client, "univ", c_e["id"], "DegreeCredential").status_code == 404
+
+
+def test_untrusted_issuers_and_registry_window(client, dbconn):
+    assert verify(client, client.get("/v1/demo/forged-credential", headers=login(client, "employer")).json())["result"] == "UNTRUSTED_ISSUER"
+    # a closed institution's credential issued after its approval window is untrusted; an earlier one still verifies
+    base = {"@context": credentials.VC_CONTEXT, "id": "urn:uuid:00000000-0000-0000-0000-000000000004",
+            "type": ["VerifiableCredential", "EnrolmentCredential"], "issuer": {"id": D_DID, "name": "Closed Polytechnic"},
+            "credentialSubject": {"name": "X", "studentId": "D/1"}}
+    key = crypto.signing_key(D_DID)
+    late = crypto.eddsa_jcs_2022_sign(base | {"validFrom": "2026-08-01T00:00:00Z"}, credentials._proof_options(f"{D_DID}#key-1"), key)
+    early = crypto.eddsa_jcs_2022_sign(base | {"validFrom": "2025-08-01T00:00:00Z"}, credentials._proof_options(f"{D_DID}#key-1"), key)
+    assert verify(client, late)["result"] == "UNTRUSTED_ISSUER"
+    assert verify(client, early)["result"] == "VALID"
+    wrong_key = copy.deepcopy(early)
+    wrong_key["proof"]["verificationMethod"] = "did:web:registry.aicte-demo.in:inst:1-0000000001#key-1"
+    assert verify(client, wrong_key)["result"] == "UNTRUSTED_ISSUER"
+    assert verify(client, {"hello": "world"})["result"] == "MALFORMED"
+
+
+def test_expired_credential(client, dbconn):
+    e, _ = a_enrolment(client, dbconn)
+    vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
+    later = credentials.parse_iso(vc["validUntil"]) + timedelta(days=1)
+    assert credentials.verify(dbconn, vc, at=later)["result"] == "EXPIRED"
+
+
+def test_registry_snapshot_is_signed_by_aicte(client):
+    body = client.get("/v1/registry/snapshot").json()
+    snap = body["snapshot"]
+    assert crypto.eddsa_jcs_2022_verify(snap, crypto.public_from_multikey(body["aicte_public_key"]))
+    dids = {i["did"] for i in snap["credentialSubject"]["issuers"]}
+    assert "did:web:registry.aicte-demo.in:univ:dtu-demo" in dids and len(dids) == 5
+    assert all(i["source"] == "mock" for i in client.get("/v1/registry/issuers").json())
+
+
+def test_student_login_and_credential_visibility(client, dbconn):
+    e, row = a_enrolment(client, dbconn)
+    issue(client, "inst-a", e["id"], "EnrolmentCredential")
+    bad = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "otp": "000000"})
+    assert bad.status_code == 401
+    assert client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "otp": "123456"}).status_code == 401
+    tok = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "otp": "123456"}).json()
+    hs = {"Authorization": f"Bearer {tok['access_token']}"}
+    assert tok["role"] == "student"
+    mine = client.get("/v1/credentials", headers=hs).json()
+    assert len(mine) == 1 and mine[0]["credential"]["credentialSubject"]["apaarId"] == row["apaar_id"]
+    # another student and another institution see none of it
+    other = next(r for r in a_rows() if r["apaar_id"] and r["apaar_id"] != row["apaar_id"])
+    t2 = client.post("/v1/auth/student-login", json={"apaar_id": other["apaar_id"], "otp": "123456"}).json()
+    assert client.get("/v1/credentials", headers={"Authorization": f"Bearer {t2['access_token']}"}).json() == []
+    assert client.get("/v1/credentials", headers=login(client, "inst-b")).json() == []
+    assert len(client.get("/v1/credentials", headers=login(client, "aicte")).json()) == 1
+
+
+def test_status_indexes_are_random_not_sequential(client, dbconn):
+    e1, _ = a_enrolment(client, dbconn, 0)
+    e2 = client.get("/v1/enrolments", params={"apaar": [r for r in a_rows() if r["apaar_id"]][1]["apaar_id"]},
+                    headers=login(client, "inst-a")).json()[0]
+    i1 = issue(client, "inst-a", e1["id"], "EnrolmentCredential").json()["credential"]["credentialStatus"][0]["statusListIndex"]
+    i2 = issue(client, "inst-a", e2["id"], "EnrolmentCredential").json()["credential"]["credentialStatus"][0]["statusListIndex"]
+    assert i1 != i2 and {i1, i2} != {"0", "1"}

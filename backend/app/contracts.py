@@ -244,16 +244,69 @@ class VerifyIn(BaseModel):
     credential: dict
 
 
+class VerifyChecks(BaseModel):
+    well_formed: bool
+    issuer_trusted: bool
+    signature_valid: bool
+    within_validity: bool
+    not_revoked: bool
+    not_suspended: bool
+
+
 class VerifyOut(BaseModel):
     result: Literal["VALID", "REVOKED", "SUSPENDED", "UNTRUSTED_ISSUER", "TAMPERED", "EXPIRED", "MALFORMED"]
-    checks: dict[str, bool]
+    checks: VerifyChecks
     issuer_name: str | None = None
-    subject: dict | None = None
+    subject: dict | None = Field(None, description="credentialSubject, omitted when the signature fails")
+
+
+CredentialType = Literal["EnrolmentCredential", "DegreeCredential", "VerificationCredential"]
+
+
+class IssueIn(BaseModel):
+    type: Literal["EnrolmentCredential", "DegreeCredential"]
+
+
+class CredentialStatusFlags(BaseModel):
+    revocation: bool
+    suspension: bool
+
+
+class CredentialOut(BaseModel):
+    id: str
+    type: CredentialType
+    issuer_did: str
+    issued_at: datetime
+    status: CredentialStatusFlags
+    credential: dict = Field(description="the signed W3C VC 2.0 document (eddsa-jcs-2022 DataIntegrityProof)")
+
+
+class CredentialStatusIn(BaseModel):
+    credential_id: str
+    purpose: Literal["revocation", "suspension"]
+    value: bool
+    reason: str = Field(min_length=3)
+
+
+class RegistryIssuer(BaseModel):
+    did: str
+    kind: Literal["institution", "university"]
+    name: str
+    status: str
+    validFrom: str
+    validUntil: str | None
+    verificationMethod: list[dict]
+    source: Literal["mock"] = "mock"
 
 
 class LoginIn(BaseModel):
     user_id: str
     password: str
+
+
+class StudentLoginIn(BaseModel):
+    apaar_id: str = Field(description="12-digit APAAR ID")
+    otp: str = Field(description="MOCK OTP; demo value is 123456")
 
 
 class LoginOut(BaseModel):

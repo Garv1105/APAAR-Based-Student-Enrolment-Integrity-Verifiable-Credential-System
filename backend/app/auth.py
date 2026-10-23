@@ -21,11 +21,27 @@ def login(conn, user_id: str, password: str) -> dict | None:
         PasswordHasher().verify(u["password_hash"], password)
     except VerifyMismatchError:
         return None
+    return issue_token(u["id"], u["role"], u["display_name"], institution_id=u["institution_id"],
+                       student_id=u["student_id"], issuer_did=u["issuer_did"])
+
+
+def issue_token(sub: str, role: str, display_name: str, *, institution_id=None, student_id=None, issuer_did=None) -> dict:
     now = datetime.now(timezone.utc)
-    claims = {"sub": u["id"], "role": u["role"], "inst": u["institution_id"], "stu": u["student_id"],
+    claims = {"sub": sub, "role": role, "inst": institution_id, "stu": student_id, "idid": issuer_did,
               "iat": now, "exp": now + TOKEN_TTL}
     return {"access_token": jwt.encode(claims, crypto.secret("k_jwt"), algorithm="HS256"),
-            "role": u["role"], "institution_id": u["institution_id"], "display_name": u["display_name"]}
+            "role": role, "institution_id": institution_id, "display_name": display_name}
+
+
+def student_login(conn, apaar_id: str, otp: str) -> dict | None:
+    """MOCK student sign-in: APAAR ID + fixed demo OTP. Production would use APAAR/DigiLocker authentication."""
+    from .mocks import MOCK_OTP
+    if otp != MOCK_OTP or not (apaar_id.isdigit() and len(apaar_id) == 12):
+        return None
+    sid = conn.execute("SELECT student_id_for_login(%s) id", (crypto.apaar_bi(apaar_id),)).fetchone()["id"]
+    if sid is None:
+        return None
+    return issue_token(f"student:{sid}", "student", f"Student ({crypto.mask_apaar(apaar_id)})", student_id=sid)
 
 
 def current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict:
@@ -35,7 +51,7 @@ def current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -
         c = jwt.decode(cred.credentials, crypto.secret("k_jwt"), algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid or expired token")
-    return {"id": c["sub"], "role": c["role"], "institution_id": c["inst"], "student_id": c["stu"]}
+    return {"id": c["sub"], "role": c["role"], "institution_id": c["inst"], "student_id": c["stu"], "issuer_did": c.get("idid")}
 
 
 def optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict | None:
