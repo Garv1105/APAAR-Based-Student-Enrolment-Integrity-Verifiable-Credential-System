@@ -31,7 +31,9 @@ def test_access_matrix(client, dbconn):
         ("GET", f"/v1/batches/{bid}", {}, expect(INST | REG, 404)),
         ("GET", f"/v1/batches/{bid}/issues", {}, expect(INST | REG, 404)),
         ("GET", f"/v1/batches/{bid}/report.csv", {}, expect(INST | REG, 404)),
-        ("GET", "/v1/enrolments?student_id=A/CSE/2026/0001", {}, expect({"inst-a": 200, "inst-b": 200})),  # b gets []
+        ("GET", "/v1/enrolments?student_id=A/CSE/2026/0001", {}, expect({"inst-a": 200, "inst-b": 200, "univ": 200})),  # b: []
+        ("GET", "/v1/credentials/certificate?id=urn:uuid:nope", {},
+         expect({"inst-a": 404, "inst-b": 404, "univ": 404, "student": 404})),
         ("PATCH", f"/v1/enrolments/{eid}", {"json": {"year_of_study": 1, "reason": "access test"}}, expect(INST, 404)),
         ("GET", "/v1/programmes/1-0000000001:CSE/seats", {}, expect(INST | REG, 404)),
         ("GET", "/v1/dashboard/institution", {}, expect({"inst-a": 200, "inst-b": 200})),

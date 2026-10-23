@@ -113,16 +113,20 @@ DROP POLICY IF EXISTS sel ON issuer_registry;
 CREATE POLICY sel ON issuer_registry FOR SELECT USING (true);
 
 -- credentials: the issuer (institution / registrar), the subject student and regulators can read.
--- Insert: an issuer for its own DID; a student only for a VerificationCredential about themselves,
--- issued by an institution where they hold an active enrolment (minted when they approve consent).
+-- VerificationCredentials are the student's (D5): the issuing institution can't see them (they reveal which
+-- employer the student shares data with) — only the student, regulators and the consent requester (definer fn).
+-- Insert: an issuer for its own DID; a student only for the single VerificationCredential of a consent they
+-- granted, issued by an institution where they hold an active enrolment.
 ALTER TABLE credentials ENABLE ROW LEVEL SECURITY; ALTER TABLE credentials FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON credentials; DROP POLICY IF EXISTS ins ON credentials;
-CREATE POLICY sel ON credentials FOR SELECT USING (app_is_regulator() OR subject_student_id = app_student() OR app_may_issue_for(issuer_did));
+CREATE POLICY sel ON credentials FOR SELECT USING (app_is_regulator() OR subject_student_id = app_student()
+  OR (app_may_issue_for(issuer_did) AND type <> 'VerificationCredential'));
 CREATE POLICY ins ON credentials FOR INSERT WITH CHECK (
   (app_may_issue_for(issuer_did) AND type <> 'VerificationCredential')
-  OR (type = 'VerificationCredential' AND subject_student_id = app_student() AND EXISTS (
-        SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
-        WHERE e.student_id = app_student() AND e.status = 'active' AND r.did = issuer_did)));
+  OR (type = 'VerificationCredential' AND subject_student_id = app_student()
+      AND EXISTS (SELECT 1 FROM consents k WHERE k.id = consent_id AND k.student_id = app_student() AND k.status = 'granted')
+      AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
+                  WHERE e.student_id = app_student() AND e.status = 'active' AND r.did = issuer_did)));
 
 -- consents: verifier sees/creates its own requests; the student sees and answers requests about them
 ALTER TABLE consents ENABLE ROW LEVEL SECURITY; ALTER TABLE consents FORCE ROW LEVEL SECURITY;
@@ -184,7 +188,7 @@ BEGIN
   IF p_purpose = 'revocation' AND NOT p_value THEN RAISE EXCEPTION 'set_credential_status: revocation is permanent'; END IF;
   SELECT * INTO c FROM credentials WHERE id = p_cred;
   IF c.id IS NULL THEN RAISE EXCEPTION 'set_credential_status: no such credential'; END IF;
-  IF NOT (app_may_issue_for(c.issuer_did)
+  IF NOT ((app_may_issue_for(c.issuer_did) AND c.type <> 'VerificationCredential')  -- consent-scoped VCs are the student's
           OR (c.type = 'VerificationCredential' AND c.subject_student_id = app_student() AND p_purpose = 'revocation' AND p_value)) THEN
     RAISE EXCEPTION 'set_credential_status: not allowed';
   END IF;
@@ -258,6 +262,23 @@ BEGIN
           v_ts);
 END $$;
 
+-- Withdrawal/migration revokes every credential of that enrolment, including the student's consent-scoped
+-- VerificationCredentials (which the institution can't otherwise see or change). Caller must own the enrolment.
+CREATE OR REPLACE FUNCTION revoke_enrolment_credentials(p_enrolment bigint) RETURNS int
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE c record; n int := 0;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM enrolments e WHERE e.id = p_enrolment AND app_owns_programme(e.programme_id) AND e.status IN ('withdrawn', 'migrated')) THEN
+    RAISE EXCEPTION 'revoke_enrolment_credentials: not allowed';
+  END IF;
+  FOR c IN SELECT * FROM credentials WHERE enrolment_id = p_enrolment AND type IN ('EnrolmentCredential', 'VerificationCredential') LOOP
+    UPDATE status_lists SET bits = set_bit(bits, (c.status_index / 8) * 8 + 7 - (c.status_index % 8), 1), version = version + 1
+     WHERE issuer_did = c.issuer_did AND purpose = 'revocation';
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END $$;
+
 -- The verifier that requested a consent may fetch the VerificationCredential minted for it (D5).
 -- Returns nothing unless the caller is that requester; the app checks status/expiry and audits the fetch.
 CREATE OR REPLACE FUNCTION consent_credential(p_consent bigint)
@@ -288,8 +309,8 @@ END $$;
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_id_for_login(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
-  consent_credential(bigint) FROM PUBLIC;
+  consent_credential(bigint), revoke_enrolment_credentials(bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_id_for_login(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
-  consent_credential(bigint) TO app_user;
+  consent_credential(bigint), revoke_enrolment_credentials(bigint) TO app_user;

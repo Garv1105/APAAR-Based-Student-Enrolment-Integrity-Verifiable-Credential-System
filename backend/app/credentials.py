@@ -8,6 +8,7 @@ import gzip
 import json
 import os
 import uuid
+import zlib
 from datetime import date, datetime, timedelta, timezone
 
 from psycopg.types.json import Jsonb
@@ -309,6 +310,63 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
     if checks["signature_valid"]:  # never show unsigned data next to a registered issuer's name
         out["subject"], out["issuer_name"] = vc["credentialSubject"], reg["name"]
     return out
+
+
+# ---------- printed-certificate QR (PRD §11.8): "AV1:" + Base45(zlib(VC JSON)) ----------
+B45 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # RFC 9285: the QR alphanumeric charset
+QR_PREFIX = "AV1:"
+
+
+def b45encode(data: bytes) -> str:
+    out = []
+    for i in range(0, len(data) - 1, 2):
+        n = data[i] * 256 + data[i + 1]
+        n, c = divmod(n, 45)
+        e, d = divmod(n, 45)
+        out += [B45[c], B45[d], B45[e]]
+    if len(data) % 2:
+        d, c = divmod(data[-1], 45)
+        out += [B45[c], B45[d]]
+    return "".join(out)
+
+
+def b45decode(s: str) -> bytes:
+    vals = [B45.index(ch) for ch in s]  # ValueError on characters outside the alphabet
+    if len(vals) % 3 == 1:
+        raise ValueError("invalid Base45 length")
+    out = bytearray()
+    for i in range(0, len(vals), 3):
+        chunk = vals[i:i + 3]
+        n = sum(v * 45 ** k for k, v in enumerate(chunk))
+        if len(chunk) == 3:
+            if n > 0xFFFF:
+                raise ValueError("invalid Base45 triplet")
+            out += n.to_bytes(2, "big")
+        else:
+            if n > 0xFF:
+                raise ValueError("invalid Base45 pair")
+            out.append(n)
+    return bytes(out)
+
+
+def qr_payload(vc: dict) -> str:
+    # separators without spaces keep the QR small; JCS canonicalisation makes the proof independent of formatting
+    return QR_PREFIX + b45encode(zlib.compress(json.dumps(vc, separators=(",", ":"), ensure_ascii=False).encode(), 9))
+
+
+def from_qr_payload(payload: str) -> dict:
+    if not payload.startswith(QR_PREFIX):
+        raise ValueError("not an AV1 credential QR")
+    raw = zlib.decompressobj().decompress(b45decode(payload[len(QR_PREFIX):]), 64 * 1024)  # cap inflated size
+    return json.loads(raw)
+
+
+def qr_svg(payload: str) -> str:
+    import qrcode
+    import qrcode.image.svg
+    img = qrcode.make(payload, image_factory=qrcode.image.svg.SvgPathImage, error_correction=qrcode.constants.ERROR_CORRECT_M,
+                      box_size=4, border=2)
+    return img.to_string(encoding="unicode")
 
 
 def forged_credential() -> dict:

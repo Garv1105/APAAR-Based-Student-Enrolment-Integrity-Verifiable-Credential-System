@@ -111,6 +111,27 @@ def test_isolation_between_verifiers_and_students(client, dbconn):
     assert request_consent(client, r["apaar_id"], user="aicte").status_code == 403
 
 
+def test_verification_credentials_belong_to_the_student_not_the_institution(client):
+    r = adult_a_student(client)
+    cid = request_consent(client, r["apaar_id"]).json()["id"]
+    vc = client.post(f"/v1/consents/{cid}/approve", json={"otp": OTP}, headers=student(client, r["apaar_id"])).json()["credential"]
+    ha = login(client, "inst-a")
+    assert all(c["type"] != "VerificationCredential" for c in client.get("/v1/credentials", headers=ha).json())
+    st = {"credential_id": vc["id"], "purpose": "suspension", "value": True, "reason": "test"}
+    assert client.post("/v1/credentials/status", json=st, headers=ha).status_code == 404
+    assert verify(client, vc) == "VALID"
+    # the verifier doesn't learn who approved (guardian would reveal the student is a minor)
+    assert all(c["granted_by"] is None for c in client.get("/v1/consents", headers=login(client, "employer")).json())
+
+
+def test_purpose_text_is_bounded(client):
+    r = adult_a_student(client)
+    for purpose in ("x" * 201, "Click <a href=//evil>here</a>"):
+        resp = client.post("/v1/consents/requests", headers=login(client, "employer"),
+                           json={"apaar_id": r["apaar_id"], "purpose": purpose, "fields": ["name"]})
+        assert resp.status_code == 422
+
+
 def test_under_18_needs_guardian(client):
     upload(client, "inst-b", "B1.csv")
     young = next(r for r in rows("B1.csv") if r["apaar_id"] and r["dob"] >= "2012-01-01")

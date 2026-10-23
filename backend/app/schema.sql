@@ -203,7 +203,8 @@ CREATE TABLE IF NOT EXISTS credentials (
   idempotency_key text,                         -- issuance retries return the same credential
   request_hash   text,                          -- enrolment + type the key was first used for
   UNIQUE (status_list_id, status_index),
-  UNIQUE (issuer_did, idempotency_key)
+  UNIQUE (issuer_did, idempotency_key),
+  UNIQUE (consent_id)                           -- one VerificationCredential per consent
 );
 
 CREATE TABLE IF NOT EXISTS ledger_entries (      -- D1 hash chain

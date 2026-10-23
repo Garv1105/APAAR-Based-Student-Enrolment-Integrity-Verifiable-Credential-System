@@ -361,7 +361,7 @@
   "/v1/enrolments": {
    "get": {
     "summary": "Find Enrolments",
-    "description": "Own institution only. Lookup by APAAR or institution student id.",
+    "description": "Institution: own enrolments. University registrar: its affiliated institutions' enrolments (RLS). Lookup by APAAR or institution student id.",
     "operationId": "find_enrolments_v1_enrolments_get",
     "security": [
      {
@@ -760,6 +760,51 @@
           "$ref": "#/components/schemas/CredentialOut"
          },
          "title": "Response List Credentials V1 Credentials Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/credentials/certificate": {
+   "get": {
+    "summary": "Credential Certificate",
+    "description": "Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.",
+    "operationId": "credential_certificate_v1_credentials_certificate_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CertificateOut"
         }
        }
       }
@@ -1611,6 +1656,37 @@
     ],
     "title": "CategoryMix"
    },
+   "CertificateOut": {
+    "properties": {
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential"
+     },
+     "qr_payload": {
+      "type": "string",
+      "title": "Qr Payload",
+      "description": "offline QR: 'AV1:' + Base45(zlib(VC JSON))"
+     },
+     "qr_payload_chars": {
+      "type": "integer",
+      "title": "Qr Payload Chars"
+     },
+     "qr_svg": {
+      "type": "string",
+      "title": "Qr Svg",
+      "description": "QR code image (SVG), error correction level M"
+     }
+    },
+    "type": "object",
+    "required": [
+     "credential",
+     "qr_payload",
+     "qr_payload_chars",
+     "qr_svg"
+    ],
+    "title": "CertificateOut"
+   },
    "CheckpointOut": {
     "properties": {
      "id": {
@@ -1835,8 +1911,11 @@
      },
      "purpose": {
       "type": "string",
+      "maxLength": 200,
       "minLength": 3,
-      "title": "Purpose"
+      "pattern": "^[\\w .,:;()'/&-]+$",
+      "title": "Purpose",
+      "description": "shown to the student; plain text only"
      },
      "fields": {
       "items": {
@@ -1852,6 +1931,7 @@
        ]
       },
       "type": "array",
+      "minItems": 1,
       "title": "Fields"
      },
      "valid_days": {
@@ -2751,15 +2831,32 @@
    "VerifyIn": {
     "properties": {
      "credential": {
-      "additionalProperties": true,
-      "type": "object",
-      "title": "Credential"
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credential",
+      "description": "the VC JSON document"
+     },
+     "qr": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Qr",
+      "description": "or the scanned certificate QR text: 'AV1:' + Base45(zlib(VC))"
      }
     },
     "type": "object",
-    "required": [
-     "credential"
-    ],
     "title": "VerifyIn"
    },
    "VerifyOut": {

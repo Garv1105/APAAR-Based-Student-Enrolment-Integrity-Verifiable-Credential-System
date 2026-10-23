@@ -158,9 +158,7 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
                          (new_status, ended, body.get("year_of_study") or e["year_of_study"], enrolment_id)).fetchone()
         ledger.append(conn, user["institution_id"], "enrolment.updated", e)
         if new_status in ("withdrawn", "migrated"):  # PRD §11.7: leaving the institution revokes its credentials
-            for c in conn.execute("SELECT id FROM credentials WHERE enrolment_id=%s AND type IN ('EnrolmentCredential','VerificationCredential')",
-                                  (e["id"],)).fetchall():
-                conn.execute("SELECT set_credential_status(%s, 'revocation', true)", (c["id"],))
+            conn.execute("SELECT revoke_enrolment_credentials(%s)", (e["id"],))
         if flags:
             conn.execute("INSERT INTO anomaly_flags (institution_id, programme_id, type, score, evidence_json) VALUES (%s,%s,'E501',1,%s)",
                          (user["institution_id"], e["programme_id"],

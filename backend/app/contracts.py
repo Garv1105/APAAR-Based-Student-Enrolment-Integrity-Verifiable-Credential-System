@@ -222,8 +222,9 @@ class CaseResolve(BaseModel):
 
 class ConsentRequestIn(BaseModel):
     apaar_id: str
-    purpose: str = Field(min_length=3)
-    fields: list[Literal["name", "programme", "institution", "academic_year", "status", "apaar_id", "student_id"]]
+    purpose: str = Field(min_length=3, max_length=200, pattern=r"^[\w .,:;()'/&-]+$",
+                         description="shown to the student; plain text only")
+    fields: list[Literal["name", "programme", "institution", "academic_year", "status", "apaar_id", "student_id"]] = Field(min_length=1)
     valid_days: int = Field(7, ge=1, le=30)
 
 
@@ -266,7 +267,15 @@ class StudentProfile(BaseModel):
 
 
 class VerifyIn(BaseModel):
+    credential: dict | None = Field(None, description="the VC JSON document")
+    qr: str | None = Field(None, description="or the scanned certificate QR text: 'AV1:' + Base45(zlib(VC))")
+
+
+class CertificateOut(BaseModel):
     credential: dict
+    qr_payload: str = Field(description="offline QR: 'AV1:' + Base45(zlib(VC JSON))")
+    qr_payload_chars: int
+    qr_svg: str = Field(description="QR code image (SVG), error correction level M")
 
 
 class VerifyChecks(BaseModel):

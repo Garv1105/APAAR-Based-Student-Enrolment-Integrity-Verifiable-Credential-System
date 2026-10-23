@@ -84,7 +84,7 @@ def test_regulators_see_masked_credentials_only(client, dbconn):
     issue(client, "inst-a", e["id"], "EnrolmentCredential")
     for user in ("aicte", "auditor"):
         c = client.get("/v1/credentials", headers=login(client, user)).json()[0]["credential"]
-        assert c["redacted"] and "name" not in c["credentialSubject"] and "proof" not in c
+        assert c["redacted"] and "proof" not in c and not {"name", "studentId", "provisionalId"} & set(c["credentialSubject"])
         assert c["credentialSubject"]["apaarId"] == crypto.mask_apaar(row["apaar_id"])
 
 

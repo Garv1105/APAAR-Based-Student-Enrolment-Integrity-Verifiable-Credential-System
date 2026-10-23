@@ -18,10 +18,12 @@ FIELD_CLAIMS = {"name": "name", "programme": "programme", "institution": "instit
 ADULT_AGE = 18  # DPDP treats under-18s as children: a guardian must consent
 
 
-def consent_out(r: dict, credential_id: str | None = None) -> dict:
+def consent_out(r: dict, credential_id: str | None = None, role: str = "student") -> dict:
     return {"id": r["id"], "requester": r["requester_name"], "purpose": r["purpose"], "fields": r["scope_fields"],
-            "status": effective_status(r), "granted_by": r["granted_by"], "requested_at": r["requested_at"],
-            "expires_at": r["expires_at"], "credential_id": credential_id}
+            "status": effective_status(r),
+            # "guardian" would tell a verifier the student is under 18 — an age fact outside the approved scope
+            "granted_by": r["granted_by"] if role != "verifier" else None,
+            "requested_at": r["requested_at"], "expires_at": r["expires_at"], "credential_id": credential_id}
 
 
 def effective_status(r: dict) -> str:
@@ -46,7 +48,8 @@ def _age_on(dob: date, on: date) -> int:
 
 
 def _own_pending(conn, user: dict, consent_id: int) -> dict:
-    k = conn.execute("SELECT * FROM consents WHERE id=%s", (consent_id,)).fetchone()  # RLS: the student's own only
+    # RLS: the student's own only; row lock so two concurrent approvals can't both mint a credential
+    k = conn.execute("SELECT * FROM consents WHERE id=%s FOR UPDATE", (consent_id,)).fetchone()
     if k is None:
         raise CredentialError(404, "Consent request not found")
     if effective_status(k) != "pending":
@@ -70,7 +73,10 @@ def approve(conn, user: dict, consent_id: int, otp: str, approved_by: str, guard
     granted_at = datetime.now(timezone.utc).replace(microsecond=0)
     granted_by = "guardian" if minor else "student"
     artifact = {"consentId": k["id"], "requester": k["requester_id"], "purpose": k["purpose"], "fields": k["scope_fields"],
-                "grantedBy": granted_by, "grantedAt": credentials.iso(granted_at), "expiresAt": credentials.iso(k["expires_at"])}
+                "grantedBy": granted_by, "grantedAt": credentials.iso(granted_at), "expiresAt": credentials.iso(k["expires_at"]),
+                # ponytail: guardian identity is NOT verified (the minor's own session supplies a MOCK OTP);
+                # production needs a guardian account linked to the student
+                "authentication": "MOCK-OTP" + ("; guardian self-asserted (MOCK)" if minor else "")}
     sig = crypto.multibase_b58(crypto.signing_key(CONSENT_SIGNER).sign(crypto.jcs(artifact)))
     k = conn.execute("UPDATE consents SET status='granted', granted_at=%s, granted_by=%s, artifact_sig=%s WHERE id=%s RETURNING *",
                      (granted_at, granted_by, sig, k["id"])).fetchone()
@@ -83,7 +89,10 @@ def approve(conn, user: dict, consent_id: int, otp: str, approved_by: str, guard
         else:
             claims[FIELD_CLAIMS[f]] = d[FIELD_CLAIMS[f]]
     claims["consent"] = {"id": k["id"], "purpose": k["purpose"], "verifier": k["requester_name"]}
-    issuer = conn.execute("SELECT did, name FROM issuer_registry WHERE institution_id=%s", (d["_institution_id"],)).fetchone()
+    reg = conn.execute("SELECT did FROM issuer_registry WHERE institution_id=%s", (d["_institution_id"],)).fetchone()
+    if reg is None:
+        raise CredentialError(409, "The student's institution is not in the AICTE trust registry (MOCK)")
+    issuer = credentials._issuer(conn, reg["did"])  # closed / suspended institutions can't issue new credentials
     vc = credentials.sign_and_store(conn, issuer_did=issuer["did"], issuer_name=issuer["name"], vc_type="VerificationCredential",
                                     subject=claims, student_id=k["student_id"], valid_until=k["expires_at"],
                                     enrolment_id=e["id"], consent_id=k["id"])
