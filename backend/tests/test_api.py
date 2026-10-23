@@ -89,7 +89,7 @@ def test_error_report_and_dashboards(client):
     bid = upload(client, "inst-b", "B1.csv").json()["batch_id"]
     hb = login(client, "inst-b")
     report = client.get(f"/v1/batches/{bid}/report.csv", headers=hb)
-    assert report.status_code == 200 and report.text.startswith("row_no,code,severity,field,message")
+    assert report.status_code == 200 and report.text.startswith("row_no,code,severity,field,message,fix_hint")
     codes = {r["code"] for r in csv.DictReader(io.StringIO(report.text))}
     assert {"E101", "E102", "E103", "E201", "E203", "E301", "E302", "E303", "E401"} <= codes
     d = client.get("/v1/dashboard/institution", headers=hb).json()

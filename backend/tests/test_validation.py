@@ -112,7 +112,21 @@ def test_e203_cross_institution_is_flag_and_accepted():
     c = ctx(other_active_bi={crypto.apaar_bi("100000000001")})
     o = one(row(), c)
     assert codes(o) == {"E203"} and o["accepted"]
-    assert "institution" not in o["issues"][0]["message"].lower()  # F4 neutral text
+    assert o["issues"][0]["params"]["detail"] == ""  # F4: carries nothing about the other side
+
+
+def test_every_code_has_english_template_and_fix_hint():
+    import string
+
+    from app.codes import CODES, PLACEHOLDERS
+    from app.i18n import catalogue, render
+    en = catalogue("en")
+    for code in CODES:
+        assert code in en and en[code]["template"] and en[code]["fix_hint"], code
+        used = {f for _, f, _, _ in string.Formatter().parse(en[code]["template"]) if f}
+        assert used <= PLACEHOLDERS, (code, used)
+        render(code, {"field": "x", "detail": "y"})
+    assert set(en) - {"_locale"} == set(CODES)
 
 
 def test_e301_excess_over_intake_flags_rows_beyond_cap():

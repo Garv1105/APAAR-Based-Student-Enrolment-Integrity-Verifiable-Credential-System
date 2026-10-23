@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS validation_issues (
   code      text   NOT NULL,
   severity  text   NOT NULL CHECK (severity IN ('error','warning','flag')),
   field     text,
-  message   text   NOT NULL
+  params    jsonb  NOT NULL DEFAULT '{}'      -- message rendered from i18n/<locale>.json on read
 );
 CREATE INDEX IF NOT EXISTS validation_issues_batch_idx ON validation_issues (batch_id);
 

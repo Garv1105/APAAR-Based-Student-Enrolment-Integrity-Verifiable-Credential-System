@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, crypto, dashboards, db, ingest, ledger
+from . import auth, crypto, dashboards, db, i18n, ingest, ledger
 from .auth import require
 from .contracts import (AicteDashboard, BatchJsonIn, BatchOut, EnrolmentOut, EnrolmentPatch, InstitutionDashboard, IssuesPage,
                         LoginIn, LoginOut, ProgrammeSeats)
@@ -127,14 +127,19 @@ def get_batch(batch_id: int, user=Depends(require(*READERS)), conn=Depends(get_c
     return ingest.batch_out(_own_batch(conn, user, batch_id))
 
 
+def _rendered(rows, lang):
+    return [{**r, **i18n.render(r["code"], r["params"], lang)} for r in rows]
+
+
 @app.get("/v1/batches/{batch_id}/issues", response_model=IssuesPage)
-def get_issues(batch_id: int, cursor: int = 0, limit: int = 200, user=Depends(require(*READERS)), conn=Depends(get_conn)):
+def get_issues(batch_id: int, cursor: int = 0, limit: int = 200, lang: str = "en",
+               user=Depends(require(*READERS)), conn=Depends(get_conn)):
     _own_batch(conn, user, batch_id)
     limit = min(max(limit, 1), 1000)
-    rows = conn.execute("SELECT id, row_no, code, severity, field, message FROM validation_issues WHERE batch_id=%s AND id > %s "
+    rows = conn.execute("SELECT id, row_no, code, severity, field, params FROM validation_issues WHERE batch_id=%s AND id > %s "
                         "ORDER BY id LIMIT %s", (batch_id, cursor, limit + 1)).fetchall()
     nxt = rows[limit - 1]["id"] if len(rows) > limit else None
-    return {"items": rows[:limit], "next_cursor": nxt}
+    return {"items": _rendered(rows[:limit], lang), "next_cursor": nxt}
 
 
 def csv_safe(v) -> str:
@@ -153,13 +158,14 @@ def csv_response(header: list[str], rows, filename: str) -> Response:
 
 
 @app.get("/v1/batches/{batch_id}/report.csv")
-def batch_report(batch_id: int, request: Request, user=Depends(require(*READERS)), conn=Depends(get_conn)):
+def batch_report(batch_id: int, request: Request, lang: str = "en", user=Depends(require(*READERS)), conn=Depends(get_conn)):
     _own_batch(conn, user, batch_id)
-    rows = conn.execute("SELECT row_no, code, severity, field, message FROM validation_issues WHERE batch_id=%s ORDER BY row_no, id",
+    rows = conn.execute("SELECT row_no, code, severity, field, params FROM validation_issues WHERE batch_id=%s ORDER BY row_no, id",
                         (batch_id,)).fetchall()
     auth.audit(conn, user, "report.export", "upload_batch", batch_id, request=request)
     conn.commit()
-    return csv_response(["row_no", "code", "severity", "field", "message"], rows, f"batch-{batch_id}-issues.csv")
+    return csv_response(["row_no", "code", "severity", "field", "message", "fix_hint"], _rendered(rows, lang),
+                        f"batch-{batch_id}-issues.csv")
 
 
 # ---------- enrolments ----------

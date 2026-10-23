@@ -66,7 +66,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                   own_active_bi=own, other_active_bi=other, counters=dict(counters))
         outcomes = validate_batch(rows, ctx)
 
-        issues = [(b["id"], i["row_no"], i["code"], i["severity"], i["field"], i["message"]) for o in outcomes for i in o["issues"]]
+        issues = [(b["id"], i["row_no"], i["code"], i["severity"], i["field"], Jsonb(i["params"])) for o in outcomes for i in o["issues"]]
         new_cases = []
         for o in outcomes:
             if not o["accepted"]:
@@ -85,7 +85,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                 new_cases.append(_open_case(conn, sid, year["code"]))
         if issues:
             with conn.cursor() as cur:
-                cur.executemany("INSERT INTO validation_issues (batch_id, row_no, code, severity, field, message) VALUES (%s,%s,%s,%s,%s,%s)", issues)
+                cur.executemany("INSERT INTO validation_issues (batch_id, row_no, code, severity, field, params) VALUES (%s,%s,%s,%s,%s,%s)", issues)
         for (pid, key), filled in ctx.counters.items():
             if counters.get((pid, key)) != filled:
                 conn.execute("UPDATE programme_category_counters SET filled=%s WHERE programme_id=%s AND academic_year=%s AND category_code=%s",

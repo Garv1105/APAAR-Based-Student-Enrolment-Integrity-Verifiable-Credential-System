@@ -1,0 +1,21 @@
+{
+  "_locale": "en",
+  "E001": {"template": "Field '{field}' is missing or not valid: {detail}", "fix_hint": "Fill the field; dates as YYYY-MM-DD, flags as Y or N."},
+  "E101": {"template": "APAAR ID is blank and no reason code was given", "fix_hint": "Enter the 12-digit APAAR ID, or set apaar_reason to REFUSED, NOT_GENERATED or PENDING."},
+  "E101W": {"template": "No APAAR ID ({detail}). Row accepted with a provisional ID and counted toward intake", "fix_hint": "Update the record with the APAAR ID once it is generated."},
+  "E102": {"template": "APAAR ID must be exactly 12 digits", "fix_hint": "Remove spaces or dashes and check the number of digits."},
+  "E103": {"template": "APAAR ID not found in the APAAR registry (MOCK)", "fix_hint": "Check the ID with the student's APAAR card or DigiLocker."},
+  "E104": {"template": "{detail} does not match the APAAR registry (MOCK) after normalisation", "fix_hint": "Correct the name or date of birth to match the APAAR record."},
+  "E201": {"template": "Same student already appears in row {detail} of this file", "fix_hint": "Remove the repeated row."},
+  "E202": {"template": "Student already has an active enrolment at this institution for this year", "fix_hint": "Use the enrolment update (PATCH) to correct the existing record instead of uploading it again."},
+  "E203": {"template": "A record in this batch needs AICTE review", "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."},
+  "E301": {"template": "Regular seats filled ({detail}) exceed AICTE approved intake", "fix_hint": "Check for admissions beyond the approved intake. Flagged for AICTE review."},
+  "E302": {"template": "Supernumerary cap exceeded for {detail}", "fix_hint": "Check the seat category of these admissions. Flagged for AICTE review."},
+  "E303": {"template": "Declared intake {detail} differs from the AICTE registry; the registry value is used", "fix_hint": "Use the intake from your latest AICTE approval letter (EOA)."},
+  "E304": {"template": "{detail}", "fix_hint": "Upload only programmes approved for this academic year in your EOA."},
+  "E401": {"template": "{detail}", "fix_hint": "Set only one of NRI, OCI or FN, and match the seat category to the student's status."},
+  "E402": {"template": "Age {detail} at admission is outside 16-35", "fix_hint": "Check the date of birth."},
+  "E403": {"template": "Admission date {detail} is outside the admission window", "fix_hint": "Check the admission date."},
+  "E404": {"template": "Lateral entry is only valid in year 2 (got year {detail})", "fix_hint": "Set year_of_study to 2 for lateral entry students."},
+  "E501": {"template": "Change made after the submission deadline; recorded in the seat ledger", "fix_hint": "Post-deadline changes are visible to AICTE. Keep supporting documents."}
+}
