@@ -1,0 +1,85 @@
+{
+ "steps": [
+  {
+   "op": "set_deadline",
+   "academic_year": "2026-27",
+   "deadline": "2030-01-01T00:00:00+05:30"
+  },
+  {
+   "op": "upload",
+   "user": "inst-a",
+   "file": "A1.csv"
+  },
+  {
+   "op": "patch",
+   "user": "inst-a",
+   "apaar": "590573056992",
+   "body": {
+    "status": "withdrawn",
+    "ended_on": "2026-08-30",
+    "reason": "Student withdrew"
+   },
+   "expected": []
+  },
+  {
+   "op": "patch",
+   "user": "inst-a",
+   "apaar": "275259659197",
+   "body": {
+    "status": "migrated",
+    "ended_on": "2026-08-30",
+    "reason": "Migrated to another institution"
+   },
+   "expected": []
+  },
+  {
+   "op": "upload",
+   "user": "inst-b",
+   "file": "B1.csv"
+  },
+  {
+   "op": "upload",
+   "user": "inst-c",
+   "file": "C1.csv"
+  },
+  {
+   "op": "upload",
+   "user": "inst-d",
+   "file": "D1.csv"
+  },
+  {
+   "op": "upload",
+   "user": "inst-b",
+   "file": "B2.csv"
+  },
+  {
+   "op": "patch",
+   "user": "inst-b",
+   "apaar": "726310343049",
+   "body": {
+    "status": "withdrawn",
+    "ended_on": "2026-10-01",
+    "reason": "Withdrawal before deadline"
+   },
+   "expected": []
+  },
+  {
+   "op": "set_deadline",
+   "academic_year": "2026-27",
+   "deadline": "2026-10-01T00:00:00+05:30"
+  },
+  {
+   "op": "patch",
+   "user": "inst-b",
+   "apaar": "590573056992",
+   "body": {
+    "status": "withdrawn",
+    "ended_on": "2026-09-01",
+    "reason": "Backdated withdrawal"
+   },
+   "expected": [
+    "E501"
+   ]
+  }
+ ]
+}
