@@ -31,10 +31,8 @@ export default function AppLayout({
 }: AppLayoutProps) {
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#0B0F19] text-white antialiased selection:bg-blue-600 selection:text-white px-4 py-4 sm:px-6">
-        <main className="mx-auto w-full max-w-7xl">
-          {children}
-        </main>
+      <div className="min-h-screen bg-[#050816] text-white antialiased selection:bg-blue-600 selection:text-white">
+        {children}
       </div>
     );
   }
