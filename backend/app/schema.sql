@@ -198,7 +198,7 @@ CREATE TABLE IF NOT EXISTS ledger_entries (      -- D1 hash chain
   payload_hash   text NOT NULL,
   prev_hash      text NOT NULL,
   entry_hash     text NOT NULL,
-  ts             timestamptz NOT NULL DEFAULT now()
+  ts             text NOT NULL                  -- UTC ISO-8601 exactly as hashed
 );
 
 CREATE TABLE IF NOT EXISTS ledger_checkpoints (

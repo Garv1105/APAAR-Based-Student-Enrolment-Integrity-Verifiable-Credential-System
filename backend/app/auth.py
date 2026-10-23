@@ -14,7 +14,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def login(conn, user_id: str, password: str) -> dict | None:
-    u = conn.execute("select * from users where id = %s", (user_id,)).fetchone()
+    u = conn.execute("SELECT * FROM login_lookup(%s)", (user_id,)).fetchone()  # users table itself is not granted
     if not u:
         return None
     try:
@@ -36,6 +36,15 @@ def current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -
     except jwt.PyJWTError:
         raise HTTPException(401, "Invalid or expired token")
     return {"id": c["sub"], "role": c["role"], "institution_id": c["inst"], "student_id": c["stu"]}
+
+
+def optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict | None:
+    """Caller identity for the RLS settings; None for anonymous or invalid tokens
+    (protected routes still reject those through require())."""
+    try:
+        return current_user(cred)
+    except HTTPException:
+        return None
 
 
 def require(*roles: str):

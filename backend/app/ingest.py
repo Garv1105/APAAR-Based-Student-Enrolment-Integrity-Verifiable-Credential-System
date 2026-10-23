@@ -57,10 +57,9 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
         for bi in bis:
             conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (bi,))
         own, other = set(), set()
-        for r in conn.execute("SELECT s.apaar_bi, p.institution_id FROM enrolments e JOIN students s ON s.id=e.student_id "
-                              "JOIN programmes p ON p.id=e.programme_id "
-                              "WHERE s.apaar_bi = ANY(%s) AND e.academic_year=%s AND e.status='active'", (bis, year["code"])):
-            (own if r["institution_id"] == inst_id else other).add(r["apaar_bi"])
+        # RLS hides other institutions' rows; this definer function answers only own / someone-else
+        for r in conn.execute("SELECT * FROM active_enrolment_owners(%s, %s)", (bis, year["code"])):
+            (own if r["own"] else other).add(r["apaar_bi"])
 
         ctx = Ctx(institution_id=inst_id, institution_status=inst["status"],
                   year={"code": year["code"], "window_start": year["window_start"], "window_end": year["window_end"]},
@@ -104,9 +103,9 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
 
 
 def _student_id(conn, d: dict, o: dict) -> int:
-    if o["bi"]:
-        s = conn.execute("SELECT id FROM students WHERE apaar_bi=%s", (o["bi"],)).fetchone()
-        if s:
+    if o["bi"]:  # the person row is shared across institutions; RLS hides it until we enrol them
+        s = conn.execute("SELECT student_id_by_bi(%s) id", (o["bi"],)).fetchone()
+        if s["id"]:
             return s["id"]
     sid = conn.execute("SELECT nextval('students_id_seq') id").fetchone()["id"]  # id first: it is part of the AAD
     enc = lambda col, v: crypto.encrypt("students", col, sid, v)  # noqa: E731
@@ -123,14 +122,7 @@ def _student_id(conn, d: dict, o: dict) -> int:
 
 
 def _open_case(conn, student_id: int, year: str) -> int:
-    ids = [r["id"] for r in conn.execute("SELECT id FROM enrolments WHERE student_id=%s AND academic_year=%s AND status='active' ORDER BY id",
-                                         (student_id, year))]
-    case = conn.execute("SELECT id FROM duplicate_cases WHERE student_id=%s AND status IN ('flagged','under_investigation')", (student_id,)).fetchone()
-    if case:
-        conn.execute("UPDATE duplicate_cases SET enrolment_ids=%s WHERE id=%s", (ids, case["id"]))
-        return case["id"]
-    return conn.execute("INSERT INTO duplicate_cases (student_id, enrolment_ids, status) VALUES (%s,%s,'flagged') RETURNING id",
-                        (student_id, ids)).fetchone()["id"]
+    return conn.execute("SELECT open_duplicate_case(%s, %s) id", (student_id, year)).fetchone()["id"]
 
 
 class ApiError(Exception):

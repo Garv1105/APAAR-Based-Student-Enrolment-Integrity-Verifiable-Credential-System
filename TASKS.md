@@ -1,4 +1,4 @@
-# Tasks, risks, blockers
+﻿# Tasks, risks, blockers
 
 Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 
@@ -24,6 +24,14 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 - [ ] Frontend shell: login/role switch, upload page, two dashboards  ← NEXT
 - [x] Eval through API + Postgres: 450/450 rows exact, E501 patch steps correct
 
+### Hybrid hardening (CLAUDE.md rules adopted)
+- [x] T0.2 CLAUDE.md matches actual stack; security-reviewer agent
+- [x] T1.3 AES-GCM AAD = table|column|row_id
+- [x] T0.8 codes in app/codes.py, messages from i18n/en.json (+ fix hints)
+- [x] T1.4 Idempotency-Key bound to request hash (reuse with other body → 422)
+- [x] T0.6 Postgres RLS: app_user non-owner, FORCE RLS, SECURITY DEFINER cross-institution functions, raw-SQL isolation tests
+- [x] T5.11 access matrix: 13 endpoints × 7 callers
+
 ### H10–15 Integrity (pulled forward, backend done)
 - [x] E202/E203 against DB, duplicate cases, neutral notice to both institutions
 - [ ] Case resolve endpoint + AICTE unmask-with-reason
@@ -42,7 +50,6 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 ### H27–30 Stretch (drop first)
 - [ ] Anomaly rules + DQS
 - [ ] SSE
-- [ ] RLS
 
 ### H30–36 Reliability only
 - [ ] Full eval, security checks, demo seed, rehearsal, final limitations
@@ -59,7 +66,7 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 6. eddsa-jcs-2022: interoperability depends on matching the W3C spec test vector; until checked it is "self-consistent only".
 
 ## Not implemented (see MVP_SCOPE.md Deferred)
-Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy matching, Merkle checkpoints, D2 pre-check, Isolation Forest, PDF reports, RLS (stretch), guardian consent flow, SSE (stretch).
+Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy matching, Merkle checkpoints, D2 pre-check, Isolation Forest, PDF reports, guardian consent flow, SSE (stretch).
 
 ## Known limitations
 - APAAR format rule is "exactly 12 digits"; no checksum (real algorithm not public). Stated as mock rule.
@@ -69,7 +76,9 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
 - Order-dependent labels (E201, E301, E302, E303) are derived in `gen.py` by re-applying the PRD §9.2 counting rule, so those four are a consistency check, not independent ground truth.
 - E303 fires once per programme per batch, on the first accepted row with a mismatching declaration.
 - Validation runs synchronously in the request (no 202 + background task / SSE); fine for demo-sized batches, measured later.
-- Institution isolation is enforced in API queries (tested), not yet by Postgres RLS.
+- RLS settings are session-level per request connection (no pool). student_id_by_bi() reveals to an institution, during ingestion only, whether a person row already exists for an APAAR it is submitting.
 - Ledger writes are serialised by one global advisory lock.
+- Security review t0.6 (no high findings; M1–M3, L3–L5 fixed). Open lows: L1 student_id_by_bi tells an institution, during ingestion, whether a person row exists for a submitted APAAR; L2 an institution can read the full enrolment_ids array of a duplicate case it is part of (other side's internal ids, no PII) — fix with a scoped view when case resolution is built.
+- Schema changes need `app.seed --reset` (drops and rebuilds the demo DB); there are no migrations.
 - Name matching is Latin-script only (no Indic transliteration).
 - Keys come from a local `backend/.keys.json` file generated at first run (prototype only; production = KMS/HSM).

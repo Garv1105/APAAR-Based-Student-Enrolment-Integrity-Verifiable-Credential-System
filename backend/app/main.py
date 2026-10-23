@@ -52,9 +52,10 @@ async def api_problem(_, exc: ingest.ApiError):
     return problem(exc.status, exc.detail)
 
 
-def get_conn():
-    # ponytail: connection per request; add psycopg_pool if load testing shows connect cost matters
-    with db.connect() as conn:
+def get_conn(user=Depends(auth.optional_user)):
+    """Non-owner app_user connection with RLS settings for the caller.
+    ponytail: connection per request; add psycopg_pool if load testing shows connect cost matters"""
+    with db.app_connect(user) as conn:
         yield conn
 
 
