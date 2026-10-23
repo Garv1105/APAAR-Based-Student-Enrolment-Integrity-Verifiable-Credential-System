@@ -94,7 +94,7 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 ### H22–27 Outputs
 - [x] Certificate print page + QR with APAAR ID and student ID (T5.7)
 - [x] Student access log (T5.9)
-- [ ] CSV policy/accreditation reports (Req 9)
+- [x] CSV reports (Req 9): accreditation pack, state summary, category utilisation, excess-admission case file; formula-safe, audited, RLS-scoped (T4.7)
 
 ### H27–30 Stretch (drop first)
 - [ ] Anomaly rules + DQS

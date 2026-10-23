@@ -650,6 +650,87 @@
     ]
    }
   },
+  "/v1/reports": {
+   "get": {
+    "summary": "Report Index",
+    "description": "Available reports for the caller's role.",
+    "operationId": "report_index_v1_reports_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/reports/{kind}.csv": {
+   "get": {
+    "summary": "Report Csv",
+    "description": "CSV report (formula-injection safe). Institutions: accreditation and category-utilisation for their own data. Regulators: all reports; accreditation needs ?institution_id=.",
+    "operationId": "report_csv_v1_reports__kind__csv_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "institution_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Institution Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/credentials/{enrolment_id}/issue": {
    "post": {
     "summary": "Issue Credential",

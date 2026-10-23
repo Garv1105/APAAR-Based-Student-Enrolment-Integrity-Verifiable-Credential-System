@@ -55,7 +55,7 @@ How far each PS requirement has got, with the evidence in the test suite:
 | 6. Verifiable student records | ✅ | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the **official W3C test vectors**. Trust registry (MOCK) and Bitstring Status Lists |
 | 7. Integration/API | 🟡 | REST API + OpenAPI, public status lists, DID documents and a signed registry snapshot. Webhooks and the ERP connector are deferred |
 | 8. Security, privacy, auth, RBAC, audit, consent | ✅ | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent with OTP (MOCK), guardian path for under-18s (MOCK, self-asserted). Student transparency log |
-| 9. Reports | 🟡 | Per-batch error report CSV. Policy/accreditation reports planned |
+| 9. Reports | ✅ | CSV reports, all safe against spreadsheet-formula injection and audited: accreditation pack (per institution), state summary, category-quota utilisation, excess-admission case file (each over-cap row with batch/row evidence and the ledger checkpoint), plus the per-batch error report. Institutions get their own data only (RLS) |
 | 10. APAAR ID + student ID on certificates | ✅ | Printable certificate showing both IDs in full, with a QR holding the signed credential (`AV1:` + Base45(zlib), RFC 9285). Measured at 1,012 chars, which fits one QR at error-correction level M |
 
 Day-to-day progress, blockers and limitations are tracked in [`TASKS.md`](TASKS.md). What is in or out of scope is in [`MVP_SCOPE.md`](MVP_SCOPE.md).

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ApiError, getJson, sendJson, type Role, type S } from "../api/client";
-import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, Stat, Table, Td, Updated, usePoll } from "../ui";
+import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, ReportsCard, Stat, Table, Td, Updated, usePoll } from "../ui";
 
 export default function AicteHome({ role }: { role: Role }) {
   const { data, error, updatedAt, refresh } = usePoll(() => getJson<S["AicteDashboard"]>("/v1/dashboard/aicte"));
@@ -96,6 +96,8 @@ export default function AicteHome({ role }: { role: Role }) {
           </Table>
         </Card>
       </div>
+
+      <ReportsCard institutions={data.upload_compliance.map((c) => ({ id: c.id, name: c.name }))} />
     </div>
   );
 }
