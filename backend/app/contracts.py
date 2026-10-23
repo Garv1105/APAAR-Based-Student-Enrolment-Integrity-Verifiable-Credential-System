@@ -247,13 +247,22 @@ class CaseOut(BaseModel):
     id: int
     status: str
     created_at: datetime
-    notice: str
-    detail: dict | None = Field(None, description="AICTE only, after unmask with reason")
+    notice: str = Field(description="Neutral text: names no other institution (F4)")
+    enrolment_ids: list[int] = Field(description="Institutions: only their own enrolments in the case. Regulators: all")
+    resolution_note: str | None = Field(None, description="Regulators only")
+    resolved_at: datetime | None = None
+    detail: list[dict] | None = Field(None, description="AICTE officer only, from POST /v1/cases/{id}/unmask with a reason")
 
 
 class CaseResolve(BaseModel):
     status: Literal["confirmed_duplicate", "false_positive", "under_investigation"]
-    note: str = Field(min_length=3)
+    note: str = Field(min_length=3, max_length=500)
+    keep_enrolment_id: int | None = Field(None, description="Required for confirmed_duplicate: the enrolment that stands. "
+                                          "Credentials of the other enrolments in the case are revoked")
+
+
+class CaseUnmask(BaseModel):
+    reason: str = Field(min_length=10, max_length=300, description="Recorded in the audit log and shown to the student (D6)")
 
 
 class ConsentRequestIn(BaseModel):

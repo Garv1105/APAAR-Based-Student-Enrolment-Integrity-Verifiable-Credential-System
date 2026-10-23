@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ApiError, getJson, sendJson, type Role, type S } from "../api/client";
+import { CaseQueueCard } from "../cases";
 import { InspectionQueueCard } from "../risk";
 import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, ReportsCard, Stat, Table, Td, Updated, usePoll } from "../ui";
 
@@ -97,6 +98,8 @@ export default function AicteHome({ role }: { role: Role }) {
           </Table>
         </Card>
       </div>
+
+      <CaseQueueCard canResolve={role === "aicte_officer"} />
 
       <InspectionQueueCard />
 

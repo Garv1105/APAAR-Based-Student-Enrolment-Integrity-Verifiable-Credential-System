@@ -391,6 +391,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Cases
+         * @description Institutions: cases touching their own enrolments, neutral text, own enrolment ids only. Regulators: all.
+         */
+        get: operations["list_cases_v1_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cases/{case_id}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resolve Case
+         * @description AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; under_investigation suspends them. Audited; visible to the student (D6).
+         */
+        post: operations["resolve_case_v1_cases__case_id__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cases/{case_id}/unmask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unmask Case
+         * @description AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).
+         */
+        post: operations["unmask_case_v1_cases__case_id__unmask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/credentials/{enrolment_id}/issue": {
         parameters: {
             query?: never;
@@ -890,6 +950,65 @@ export interface components {
              * @default false
              */
             replayed: boolean;
+        };
+        /** CaseOut */
+        CaseOut: {
+            /** Id */
+            id: number;
+            /** Status */
+            status: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Notice
+             * @description Neutral text: names no other institution (F4)
+             */
+            notice: string;
+            /**
+             * Enrolment Ids
+             * @description Institutions: only their own enrolments in the case. Regulators: all
+             */
+            enrolment_ids: number[];
+            /**
+             * Resolution Note
+             * @description Regulators only
+             */
+            resolution_note?: string | null;
+            /** Resolved At */
+            resolved_at?: string | null;
+            /**
+             * Detail
+             * @description AICTE officer only, from POST /v1/cases/{id}/unmask with a reason
+             */
+            detail?: {
+                [key: string]: unknown;
+            }[] | null;
+        };
+        /** CaseResolve */
+        CaseResolve: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "confirmed_duplicate" | "false_positive" | "under_investigation";
+            /** Note */
+            note: string;
+            /**
+             * Keep Enrolment Id
+             * @description Required for confirmed_duplicate: the enrolment that stands. Credentials of the other enrolments in the case are revoked
+             */
+            keep_enrolment_id?: number | null;
+        };
+        /** CaseUnmask */
+        CaseUnmask: {
+            /**
+             * Reason
+             * @description Recorded in the audit log and shown to the student (D6)
+             */
+            reason: string;
         };
         /** CategoryMix */
         CategoryMix: {
@@ -2013,6 +2132,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_cases_v1_cases_get: {
+        parameters: {
+            query?: {
+                status?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_case_v1_cases__case_id__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseResolve"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmask_case_v1_cases__case_id__unmask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaseUnmask"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
                 };
             };
             /** @description Validation Error */

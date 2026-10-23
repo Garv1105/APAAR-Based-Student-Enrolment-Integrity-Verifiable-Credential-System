@@ -47,7 +47,7 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
   - Mutation `delete` maps to withdraw, because there is no delete endpoint by design.
   - Reseed from their `registry/`, and an evaluation script against their `ground_truth.json`. Programme-level E301/E302/E303 count as a hit if any row in that programme carries the code.
 
-**Also still open:** case resolution and AICTE unmask with reason (closes security-review L2), CSV policy reports (Req 9), anomaly rules and DQS, SSE.
+**Also still open:** SSE.
 
 ## Checklist
 ### H0–3 Foundation
@@ -81,7 +81,7 @@ Hour 0 = 2026-10-23 (session start). Feature freeze at hour 30.
 
 ### H10–15 Integrity (pulled forward, backend done)
 - [x] E202/E203 against DB, duplicate cases, neutral notice to both institutions
-- [ ] Case resolve endpoint + AICTE unmask-with-reason
+- [x] Case list/resolve + AICTE unmask-with-reason (T3.3): confirmed duplicate revokes the rejected side's credentials, investigation suspends; unmask reason shown in the student's access log
 - [x] PATCH enrolment (withdraw/migrate decrements counters), ledger chain + signed checkpoint + E501
 - [x] JWT auth, role guard, audit log on writes/reads/exports
 
@@ -146,6 +146,6 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
   - The consent-request audit row records the request id but no client IP hash (no audit row records IPs yet).
   - Verification is online only; there is no offline browser verifier and no camera scanner (both listed as open items).
   - The APAAR existence oracle on consent requests is **fixed**: identical responses, 20/hour per verifier, audited, and verifiers have no direct SQL access to `consents`.
-  - Regulators see credentials masked, but there is no unmask-with-reason endpoint yet.
+  - Regulators see credentials masked. Unmask-with-reason exists for duplicate cases only (`POST /v1/cases/{id}/unmask`), not for arbitrary credentials.
   - Two requests racing with the same issuance Idempotency-Key get a 500 instead of a replay.
 - Keys come from a local `backend/.keys.json` file generated at first run (prototype only; production = KMS/HSM).
