@@ -2,13 +2,8 @@ import { useRef, useState } from "react";
 import {
   AlertCircle,
   AlertTriangle,
-  Building,
-  CheckCircle2,
-  FileCheck,
   FileSpreadsheet,
-  FileText,
   History,
-  Info,
   ShieldCheck,
   UploadCloud,
   UserCheck,
@@ -223,7 +218,6 @@ export function SeatBar({ line }: { line: S["SeatLine"] }) {
   const max = Math.max(line.cap, line.filled, 1);
   const within = Math.min(line.filled, line.cap);
   const sub = line.category_code.includes(":");
-  const pct = Math.round((within / line.cap) * 100);
 
   return (
     <div className={sub ? "pl-4 border-l-2 border-accent-200" : ""}>

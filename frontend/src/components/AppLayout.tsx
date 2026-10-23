@@ -1,7 +1,7 @@
 import React from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, ExternalLink, FileCheck, Info, LogOut, ShieldCheck, User } from "lucide-react";
-import type { Role, Session } from "../api/client";
+import { CheckCircle2, FileCheck, LogOut, ShieldCheck, User } from "lucide-react";
+import type { Session } from "../api/client";
 
 interface AppLayoutProps {
   session?: Session | null;
@@ -29,26 +29,54 @@ export default function AppLayout({
   currentHash = "/",
   children,
 }: AppLayoutProps) {
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-[#0B0F19] text-white antialiased selection:bg-blue-600 selection:text-white px-4 py-4 sm:px-6">
+        <main className="mx-auto w-full max-w-7xl">
+          {children}
+        </main>
+      </div>
+    );
+  }
+
   const roleStyle = session?.role ? (ROLE_BADGE_STYLE[session.role] ?? "bg-slate-700 text-slate-200 border-slate-600") : "";
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-accent-600 selection:text-white">
-      {/* Official Gov Micro Accent Line */}
-      <div className="h-1 w-full bg-gradient-to-r from-amber-500 via-white to-emerald-600" aria-hidden="true" />
+      {/* Official Gov of India Tricolor Micro Accent */}
+      <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600" aria-hidden="true" />
+
+      {/* Official Bilingual National Portal Bar */}
+      <div className="border-b border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-700">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
+          <div className="flex items-center gap-2.5">
+            <span className="font-semibold text-slate-900 tracking-tight">भारत सरकार</span>
+            <span className="text-slate-300">|</span>
+            <span className="font-medium text-slate-600">Government of India</span>
+            <span className="hidden text-slate-300 md:inline">|</span>
+            <span className="hidden font-medium text-slate-600 md:inline">शिक्षा मंत्रालय · Ministry of Education</span>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] font-semibold text-accent-700">
+            <span className="rounded bg-accent-50 px-2 py-0.5 border border-accent-200/60">
+              SIH26263 Prototype
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Synthetic Prototype Notice Banner */}
       <div className="border-b border-amber-200/80 bg-amber-50/90 px-4 py-1.5 text-xs text-amber-900" role="note">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-amber-200/70 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-950">
-              Prototype
+            <span className="inline-flex items-center rounded-md bg-amber-200/80 px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider text-amber-950">
+              Sandbox
             </span>
             <span className="font-medium text-amber-900/90">
-              Synthetic Sandbox · APAAR registry, AICTE approval registry, OTP, and logins are MOCK simulations.
+              Synthetic Demonstration Data · APAAR registry, AICTE sanction limit registry, OTP, and logins are MOCK simulations.
             </span>
           </div>
           <span className="hidden font-mono text-[11px] text-amber-800/80 sm:inline-block">
-            SIH26263 · DPDP Aligned
+            DPDP Act 2023 Principles
           </span>
         </div>
       </div>
@@ -63,13 +91,15 @@ export default function AppLayout({
             title="Return to Dashboard Home"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-600 to-indigo-800 text-white shadow-md ring-1 ring-white/20 transition-transform group-hover:scale-105">
-              <ShieldCheck className="h-5 w-5 text-white" />
+              <ShieldCheck className="h-6 w-6 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold tracking-tight text-white sm:text-base">APAAR Seat Integrity</span>
-                <span className="rounded bg-accent-500/20 px-1.5 py-0.2 text-[10px] font-semibold text-accent-300 ring-1 ring-accent-400/30">
-                  GovTech
+                <span className="text-base font-extrabold tracking-tight text-white sm:text-lg">
+                  APAAR SEAT INTEGRITY
+                </span>
+                <span className="rounded bg-accent-500/20 px-1.5 py-0.2 text-[10px] font-bold text-accent-300 ring-1 ring-accent-400/30">
+                  AICTE
                 </span>
               </div>
               <span className="block text-[11px] font-medium text-slate-400">
@@ -102,7 +132,7 @@ export default function AppLayout({
                   <User className="h-4 w-4" />
                 </div>
                 <div className="text-left leading-tight">
-                  <div className="text-xs font-semibold text-white">{session.display_name}</div>
+                  <div className="text-xs font-bold text-white">{session.display_name}</div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`inline-block rounded px-1.5 py-0.2 text-[10px] font-semibold border ${roleStyle}`}>
                       {roleLabel ?? session.role}
@@ -125,7 +155,9 @@ export default function AppLayout({
             </div>
           ) : (
             <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span>National Academic Depository & AICTE Alignment</span>
+              <span className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-300">
+                National Academic Depository & W3C VC Node
+              </span>
             </div>
           )}
         </div>
@@ -152,14 +184,16 @@ export default function AppLayout({
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
           <div className="flex items-center gap-2 text-slate-600">
             <CheckCircle2 className="h-4 w-4 text-success" />
-            <span className="font-medium">
+            <span className="font-semibold text-slate-700">
               Architected in accordance with the Digital Personal Data Protection (DPDP) Act 2023
             </span>
           </div>
-          <div className="flex flex-wrap items-center gap-4 text-slate-500">
+          <div className="flex flex-wrap items-center gap-4 text-slate-500 font-medium">
             <span>W3C Verifiable Credentials (eddsa-jcs-2022)</span>
             <span className="hidden sm:inline">·</span>
-            <span>SIH26263 Enterprise Prototype</span>
+            <span>Cryptographic Merkle/Hash Ledger</span>
+            <span className="hidden sm:inline">·</span>
+            <span>SIH26263 Prototype</span>
           </div>
         </div>
       </footer>
