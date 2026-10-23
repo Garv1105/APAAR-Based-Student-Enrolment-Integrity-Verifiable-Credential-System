@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { AlertCircle, AlertTriangle, ArrowDownToLine, CheckCircle2, Clock, FileSpreadsheet, ShieldAlert } from "lucide-react";
 import { ApiError, download, loadSession } from "./api/client";
 
 export const go = (path: string) => { window.location.hash = path; };
@@ -9,7 +10,42 @@ export const CATEGORY_LABEL: Record<string, string> = {
   "SN_FN_OCI_CIWG:CIWG": "of which CIWG (⅓ of supernumerary)",
 };
 
-/** Fetch now and every `ms` while the tab is visible ("real-time" by polling; SSE is a later upgrade). */
+/** Smooth animated counter for numerical KPI values */
+export function AnimatedCounter({ value, duration = 0.5 }: { value: number; duration?: number }) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const prevValue = useRef(value);
+
+  useEffect(() => {
+    let startTime: number | null = null;
+    const startVal = prevValue.current;
+    const endVal = value;
+    prevValue.current = value;
+
+    if (startVal === endVal) {
+      setDisplayValue(endVal);
+      return;
+    }
+
+    let animationFrameId: number;
+    const step = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
+      // easeOutCubic
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(startVal + (endVal - startVal) * ease);
+      setDisplayValue(current);
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(step);
+      }
+    };
+    animationFrameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(animationFrameId);
+  }, [value, duration]);
+
+  return <span className="tabular-nums font-bold">{displayValue.toLocaleString()}</span>;
+}
+
+/** Fetch now and every `ms` while the tab is visible ("real-time" by polling). */
 export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -18,7 +54,7 @@ export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
   ref.current = fetcher;
 
   const refresh = useCallback(async () => {
-    if (!loadSession()) return;  // signed out between ticks: don't fire an unauthenticated request
+    if (!loadSession()) return;
     try {
       setData(await ref.current());
       setError(null);
@@ -39,62 +75,146 @@ export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
 
 export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`min-w-0 rounded-xl border border-slate-200 bg-white shadow-sm ${className}`}>
+    <section className={`min-w-0 rounded-2xl border border-slate-200/90 bg-white shadow-premium transition-all duration-200 ${className}`}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-3">
-          <h2 className="text-sm font-semibold text-slate-800">{title}</h2>
-          {actions}
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-6 py-4 rounded-t-2xl">
+          <div className="text-sm font-bold tracking-tight text-gov-900">{title}</div>
+          {actions && <div className="flex items-center gap-2">{actions}</div>}
         </header>
       )}
-      <div className="p-5">{children}</div>
+      <div className="p-6">{children}</div>
     </section>
   );
 }
 
 const TONES = {
-  neutral: "bg-slate-100 text-slate-700",
-  error: "bg-err-bg text-err",
-  warning: "bg-warn-bg text-warn",
-  flag: "bg-flag-bg text-flag",
-  ok: "bg-ok-bg text-ok",
-  brand: "bg-brand-50 text-brand-700",
+  neutral: "bg-slate-100 text-slate-700 border-slate-200",
+  error: "bg-critical-bg text-critical-text border-critical-border",
+  warning: "bg-warning-bg text-warning-text border-warning-border",
+  flag: "bg-flag-bg text-flag-text border-flag-border",
+  ok: "bg-success-bg text-success-text border-success-border",
+  brand: "bg-accent-50 text-accent-700 border-accent-200",
 } as const;
 export type Tone = keyof typeof TONES;
 
-export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${TONES[tone]}`}>{children}</span>;
+export function Badge({ tone = "neutral", children, dot = false }: { tone?: Tone; children: ReactNode; dot?: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${TONES[tone]}`}>
+      {dot && (
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${
+            tone === "ok" ? "bg-success" : tone === "error" ? "bg-critical" : tone === "warning" ? "bg-warning" : tone === "flag" ? "bg-flag" : "bg-slate-400"
+          }`}
+          aria-hidden="true"
+        />
+      )}
+      {children}
+    </span>
+  );
 }
 
-export function Stat({ label, value, tone = "neutral", hint }: { label: string; value: ReactNode; tone?: Tone; hint?: string }) {
-  const color = { neutral: "text-slate-900", error: "text-err", warning: "text-warn", flag: "text-flag", ok: "text-ok", brand: "text-brand-700" }[tone];
+export function Stat({
+  label,
+  value,
+  tone = "neutral",
+  hint,
+  icon,
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: Tone;
+  hint?: string;
+  icon?: ReactNode;
+}) {
+  const isNumber = typeof value === "number";
+  const colorMap = {
+    neutral: "text-gov-900",
+    error: "text-critical",
+    warning: "text-warning",
+    flag: "text-flag",
+    ok: "text-success",
+    brand: "text-accent-600",
+  };
+
+  const iconBgMap = {
+    neutral: "bg-slate-100 text-slate-600",
+    error: "bg-critical-bg text-critical",
+    warning: "bg-warning-bg text-warning",
+    flag: "bg-flag-bg text-flag",
+    ok: "bg-success-bg text-success",
+    brand: "bg-accent-50 text-accent-600",
+  };
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" title={hint}>
-      <div className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold tabular-nums ${color}`}>{value}</div>
-      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
+    <div
+      className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-premium transition-all duration-200 hover:border-slate-300 hover:shadow-premium-hover"
+      title={hint}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
+        {icon && <div className={`grid h-8 w-8 place-items-center rounded-xl p-1.5 ${iconBgMap[tone]}`}>{icon}</div>}
+      </div>
+      <div className="mt-3">
+        <div className={`text-2xl font-bold tracking-tight ${colorMap[tone]}`}>
+          {isNumber ? <AnimatedCounter value={value} /> : value}
+        </div>
+        {hint && (
+          <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 font-medium">
+            <span>{hint}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 export function ErrorNote({ children }: { children: ReactNode }) {
-  return <div role="alert" className="rounded-lg border border-err/20 bg-err-bg px-4 py-3 text-sm text-err">{children}</div>;
+  return (
+    <div role="alert" className="flex items-start gap-3 rounded-xl border border-critical-border bg-critical-bg p-4 text-sm text-critical-text">
+      <AlertCircle className="h-5 w-5 shrink-0 text-critical mt-0.5" aria-hidden="true" />
+      <div className="font-medium">{children}</div>
+    </div>
+  );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-sm text-slate-500">{children}</p>;
+  return (
+    <div className="flex flex-col items-center justify-center py-10 text-center">
+      <div className="rounded-full bg-slate-100 p-3 text-slate-400 mb-2">
+        <AlertTriangle className="h-5 w-5" />
+      </div>
+      <p className="text-sm font-medium text-slate-500 max-w-sm">{children}</p>
+    </div>
+  );
 }
 
 export function Loading() {
-  return <p className="py-6 text-center text-sm text-slate-500" aria-live="polite">Loading…</p>;
+  return (
+    <div className="flex flex-col items-center justify-center py-12 text-center" aria-live="polite">
+      <div className="h-8 w-8 animate-spin rounded-full border-3 border-accent-600 border-t-transparent" />
+      <p className="mt-3 text-xs font-medium text-slate-500 tracking-wide uppercase">Loading official data…</p>
+    </div>
+  );
 }
 
-export function Button({ variant = "primary", className = "", ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" }) {
+export function Button({
+  variant = "primary",
+  className = "",
+  ...p
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
   const v = {
-    primary: "bg-brand-600 text-white hover:bg-brand-700 disabled:bg-slate-300",
-    secondary: "border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 disabled:text-slate-400",
-    ghost: "text-brand-700 hover:bg-brand-50",
+    primary: "bg-accent-600 text-white hover:bg-accent-700 active:bg-accent-800 shadow-sm hover:shadow disabled:bg-slate-300 disabled:shadow-none",
+    secondary: "border border-slate-300/90 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-xs disabled:text-slate-400 disabled:border-slate-200",
+    ghost: "text-accent-600 hover:bg-accent-50 active:bg-accent-100 disabled:text-slate-400",
+    danger: "bg-critical text-white hover:bg-critical-hover shadow-sm disabled:bg-slate-300",
   }[variant];
-  return <button {...p} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:cursor-not-allowed ${v} ${className}`} />;
+
+  return (
+    <button
+      {...p}
+      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60 cursor-pointer ${v} ${className}`}
+    />
+  );
 }
 
 export const SEVERITY_TONE: Record<string, Tone> = { error: "error", warning: "warning", flag: "flag" };
@@ -105,58 +225,122 @@ export function fmtTime(iso: string | null | undefined) {
 }
 
 export function Updated({ at }: { at: Date | null }) {
-  return <span className="text-xs text-slate-500" aria-live="polite">{at ? `Live · updated ${at.toLocaleTimeString()}` : ""}</span>;
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-xs" aria-live="polite">
+      <span className="relative flex h-2 w-2">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+      </span>
+      <span>{at ? `Live sync · ${at.toLocaleTimeString()}` : "Connecting…"}</span>
+    </div>
+  );
 }
 
-/** Req 9 report downloads. `institutions` (AICTE view) enables the per-institution accreditation pack picker. */
+/** Req 9 report downloads. */
 export function ReportsCard({ institutions }: { institutions?: { id: string; name: string }[] }) {
   const [inst, setInst] = useState(institutions?.[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const get = async (kind: string, params = "") => {
     setError(null);
-    try { await download(`/v1/reports/${kind}.csv${params}`, `${kind}.csv`); } catch (e) { setError(e instanceof ApiError ? e.text : "Download failed"); }
+    try {
+      await download(`/v1/reports/${kind}.csv${params}`, `${kind}.csv`);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.text : "Download failed");
+    }
   };
+
   return (
-    <Card title="Reports (CSV)" actions={<span className="text-xs text-slate-500">Aggregates only · spreadsheet-formula safe · every export is audited</span>}>
-      <div className="flex flex-wrap items-end gap-2">
-        {institutions ? (<>
-          <Button variant="secondary" onClick={() => get("state-summary")}>State summary</Button>
-          <Button variant="secondary" onClick={() => get("category-utilisation")}>Category-quota utilisation</Button>
-          <Button variant="secondary" onClick={() => get("excess-case-file")}>Excess-admission case file</Button>
-          <span className="mx-2 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden />
-          <label className="text-xs text-slate-600">
-            <span className="sr-only">Institution</span>
-            <select value={inst} onChange={(e) => setInst(e.target.value)} className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
-              {institutions.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
-            </select>
-          </label>
-          <Button variant="secondary" disabled={!inst} onClick={() => get("accreditation", `?institution_id=${encodeURIComponent(inst)}`)}>Accreditation pack</Button>
-        </>) : (<>
-          <Button variant="secondary" onClick={() => get("accreditation")}>Accreditation pack</Button>
-          <Button variant="secondary" onClick={() => get("category-utilisation")}>Category-quota utilisation</Button>
-        </>)}
+    <Card
+      title={
+        <div className="flex items-center gap-2">
+          <FileSpreadsheet className="h-4 w-4 text-accent-600" />
+          <span>Statutory Compliance Reports (CSV)</span>
+        </div>
+      }
+      actions={<span className="text-xs text-slate-500 font-medium">Immutable audit export · Formula injection safe</span>}
+    >
+      <div className="flex flex-wrap items-center gap-2.5">
+        {institutions ? (
+          <>
+            <Button variant="secondary" onClick={() => get("state-summary")}>
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              <span>State summary</span>
+            </Button>
+            <Button variant="secondary" onClick={() => get("category-utilisation")}>
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              <span>Category quota utilisation</span>
+            </Button>
+            <Button variant="secondary" onClick={() => get("excess-case-file")}>
+              <ShieldAlert className="h-3.5 w-3.5 text-critical" />
+              <span>Excess admission case file</span>
+            </Button>
+            <span className="mx-2 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
+            <div className="flex items-center gap-2">
+              <label htmlFor="inst-select" className="sr-only">Institution</label>
+              <select
+                id="inst-select"
+                value={inst}
+                onChange={(e) => setInst(e.target.value)}
+                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gov-900 shadow-xs focus:border-accent-600 focus:ring-1 focus:ring-accent-600"
+              >
+                {institutions.map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <Button variant="primary" disabled={!inst} onClick={() => get("accreditation", `?institution_id=${encodeURIComponent(inst)}`)}>
+                <ArrowDownToLine className="h-3.5 w-3.5" />
+                <span>Accreditation pack</span>
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Button variant="secondary" onClick={() => get("accreditation")}>
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              <span>Accreditation pack</span>
+            </Button>
+            <Button variant="secondary" onClick={() => get("category-utilisation")}>
+              <ArrowDownToLine className="h-3.5 w-3.5" />
+              <span>Category quota utilisation</span>
+            </Button>
+          </>
+        )}
       </div>
-      {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
+      {error && (
+        <div className="mt-4">
+          <ErrorNote>{error}</ErrorNote>
+        </div>
+      )}
     </Card>
   );
 }
 
-/** Column header + rows with consistent styling; horizontal scroll on narrow screens. */
+/** Structured data table with responsive horizontal scroll and modern GovTech styling. */
 export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
-    <div className="-mx-5 overflow-x-auto">
-      <table className="min-w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-            {head.map((h, i) => <th key={i} scope="col" className="whitespace-nowrap px-5 py-2 font-medium">{h}</th>)}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">{children}</tbody>
-      </table>
+    <div className="-mx-6 -my-2 overflow-x-auto">
+      <div className="inline-block min-w-full align-middle">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead>
+            <tr className="bg-slate-50/70 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              {head.map((h, i) => (
+                <th key={i} scope="col" className="whitespace-nowrap px-6 py-3">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white">{children}</tbody>
+        </table>
+      </div>
     </div>
   );
 }
 
 export function Td({ children, className = "", wrap = false }: { children: ReactNode; className?: string; wrap?: boolean }) {
-  return <td className={`${wrap ? "whitespace-normal" : "whitespace-nowrap"} px-5 py-2.5 ${className}`}>{children}</td>;
+  return (
+    <td className={`${wrap ? "whitespace-normal" : "whitespace-nowrap"} px-6 py-3.5 text-slate-700 font-medium ${className}`}>
+      {children}
+    </td>
+  );
 }
