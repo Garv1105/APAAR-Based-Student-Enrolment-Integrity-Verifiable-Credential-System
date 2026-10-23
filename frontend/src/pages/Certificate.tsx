@@ -46,7 +46,7 @@ export default function Certificate({ id }: { id: string }) {
           </dl>
           <figure className="text-center">
             <img src={qrSrc} alt="Verification QR code containing the signed credential" className="mx-auto h-44 w-44" />
-            <figcaption className="mt-1 text-[10px] text-slate-500">Scan to verify · works offline<br />{cert.qr_payload_chars} chars, EC level M</figcaption>
+            <figcaption className="mt-1 text-[10px] text-slate-500">Contains the signed credential · verify at /verify<br />{cert.qr_payload_chars} chars, EC level M</figcaption>
           </figure>
         </div>
         <footer className="mt-8 border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500">

@@ -3,6 +3,9 @@ through the real API (no shortcuts past validation, RLS, ledger or audit). Idemp
 
 Result: A clean, B messy (errors, excess, duplicates), C enrolment spike, D closed institution, a post-deadline
 backdated withdrawal (E501), open duplicate cases, one student with an Enrolment credential and a pending consent request.
+
+`--live`: leave Institution B out so the presenter uploads data/synthetic/B1.csv on stage (errors, excess, and the
+cross-institution duplicates with A open live). The E501 event is then recorded on an A student instead.
 """
 import json
 import sys
@@ -13,6 +16,7 @@ from fastapi.testclient import TestClient
 from . import db, seed
 
 SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
+LIVE_E501 = "277145114059"  # A/CSE/2026/0013, withdrawn after the deadline in --live mode
 STUDENT = {"apaar": "328865551724", "dob": "2006-11-05", "name": "Asha Joshi"}  # A/ECE/2026/0081 in A1.csv
 
 
@@ -22,7 +26,7 @@ def _ok(r, *codes):
     return r.json()
 
 
-def run() -> dict:
+def run(live: bool = False) -> dict:
     sys.argv.append("--reset")
     seed.main()
     from .main import app  # after the schema exists
@@ -40,6 +44,8 @@ def run() -> dict:
                 conn.commit()
 
         for step in json.loads((SYN / "scenario.json").read_text())["steps"]:
+            if live and step.get("user") == "inst-b":
+                continue
             if step["op"] == "set_deadline":
                 set_deadline(step["academic_year"], step["deadline"])
             elif step["op"] == "upload":
@@ -48,6 +54,10 @@ def run() -> dict:
             elif step["op"] == "patch":
                 e = _ok(c.get("/v1/enrolments", params={"apaar": step["apaar"]}, headers=h(step["user"])), 200)[0]
                 _ok(c.patch(f"/v1/enrolments/{e['id']}", json=step["body"], headers=h(step["user"])), 200)
+        if live:  # deadline is now in the past: record one backdated withdrawal (E501) on an A student
+            e = _ok(c.get("/v1/enrolments", params={"apaar": LIVE_E501}, headers=h("inst-a")), 200)[0]
+            _ok(c.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "ended_on": "2026-09-01",
+                                                           "reason": "Backdated withdrawal"}, headers=h("inst-a")), 200)
         # scenario ends with the deadline in the past (to record E501); restore the real one so live edits behave normally
         real = next(y for y in json.loads(seed.SEED.read_text())["academic_years"] if y["code"] == "2026-27")
         set_deadline("2026-27", real["deadline"])
@@ -64,7 +74,8 @@ def run() -> dict:
 
 
 if __name__ == "__main__":
-    out = run()
+    live = "--live" in sys.argv
+    out = run(live)
     print(f"""
 Demo database ready (MOCK data).
   Staff logins (password: demo): inst-a, inst-b, inst-c, inst-d, aicte, auditor, employer, univ
@@ -72,3 +83,5 @@ Demo database ready (MOCK data).
   Enrolment credential: {out['credential_id']} (pending consent request from employer)
   AICTE: {out['active_enrolments']} active enrolments, {out['excess_seats']} excess seats, {out['open_cases']} open duplicate cases,
          {out['post_deadline_mutations']} post-deadline change(s) (E501)""")
+    if live:
+        print("  LIVE mode: Institution B has not uploaded. Sign in as inst-b and upload backend/data/synthetic/B1.csv")

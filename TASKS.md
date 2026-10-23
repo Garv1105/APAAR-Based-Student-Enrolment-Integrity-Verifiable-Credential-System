@@ -11,7 +11,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **Credentials (Req 5, 6, 10):** W3C VCs with `eddsa-jcs-2022` (the official vectors pass); trust registry (MOCK); status lists; consent with a guardian path (MOCK); student access log; certificate QR.
 - **Reports and monitoring:** Req 9 CSV reports; D3 anomaly rules, DQS and inspection queue.
 - **UI:** institution, AICTE, student, verifier and registrar portals.
-- **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request.
+- **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
 **Decisions:**
 - pyyaml is dev-only and read with `safe_load`.
@@ -26,7 +26,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **D2 duplicate pre-check:** consent-gated, returns CLEAR/NEEDS_REVIEW only, single-use token, rate-limited, audited.
 - **Gemini column mapping (use case A):** headers and synthetic samples only, PII scrubber, paid tier, confirm before apply. The fallback is the deterministic alias mapping on the dataset branch.
 - **Req 7:** webhooks and the ERP connector. DigiLocker mock push (T5.10). SSE. Isolation Forest (on the cut list).
-- **H30–36:** demo runbook (T8.2), rehearsal, final limitations.
+- **H30–36:** rehearse `docs/demo-runbook.md` three times (under 6 min), record a backup video, final limitations pass.
 - **Dataset branch (teammate):**
   - header aliases; date, boolean and APAAR normalisation
   - XLSX, title rows and `;` delimiter
