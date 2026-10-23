@@ -211,6 +211,24 @@ def test_student_login_locks_out_after_repeated_failures(client, dbconn):
     assert client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": row["dob"]}).status_code == 429
 
 
+def test_parallel_guesses_cannot_race_past_the_lockout(client, dbconn):
+    import threading
+    upload(client, "inst-a", "A1.csv")
+    row = [r for r in a_rows() if r["apaar_id"]][6]
+    codes = []
+
+    def guess(i):
+        codes.append(client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": f"1990-01-{i + 1:02d}"}).status_code)
+    ts = [threading.Thread(target=guess, args=(i,)) for i in range(20)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert sorted(codes) == [401] * 5 + [429] * 15   # exactly 5 attempts reach the DOB check
+    # an unknown APAAR is throttled the same way, so lock state reveals nothing about registration
+    for _ in range(5):
+        client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "dob": "2000-01-01"})
+    assert client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "dob": "2000-01-01"}).status_code == 429
+
+
 def test_migration_revokes_the_old_institutions_credential(client, dbconn):
     e, _ = a_enrolment(client, dbconn, 2)
     vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]

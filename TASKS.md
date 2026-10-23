@@ -131,7 +131,12 @@ Gemini features, D7 translations, ERP connector, webhooks, DigiLocker, fuzzy mat
 - Schema changes need `app.seed --reset` (drops and rebuilds the demo DB); there are no migrations.
 - Name matching is Latin-script only (no Indic transliteration).
 - Credentials:
-  - Student sign-in is MOCK (APAAR + DOB, with an in-process lockout after 5 failures per 15 min). Guardian approval is self-asserted, and labelled MOCK in the consent artifact.
+  - Student sign-in is MOCK and **not authentication**:
+    - APAAR + DOB plus a fixed consent OTP means anyone who knows a candidate's DOB (e.g. an employer) can sign in as the student and approve its own consent request.
+    - Lockout: 5 attempts per APAAR per 15 min, reserved before the lookup (race-safe). It is in-process only, can be abused to lock out a known APAAR, and there is no per-IP throttle.
+    - Guardian approval is self-asserted, and labelled MOCK in the consent artifact.
+    - Production needs APAAR/DigiLocker authentication and real OTP delivery.
+  - The consent-request audit row records the request id but no client IP hash (no audit row records IPs yet).
   - Verification is online only; there is no offline browser verifier and no camera scanner (both listed as open items).
   - The APAAR existence oracle on consent requests is **fixed**: identical responses, 20/hour per verifier, audited, and verifiers have no direct SQL access to `consents`.
   - Regulators see credentials masked, but there is no unmask-with-reason endpoint yet.

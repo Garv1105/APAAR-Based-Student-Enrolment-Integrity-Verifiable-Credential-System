@@ -24,8 +24,9 @@ def _test_db():
 def client(_test_db):
     from fastapi.testclient import TestClient
 
-    from app import db, seed
+    from app import auth, db, seed
     from app.main import app
+    auth._failures.clear()  # the sign-in throttle is process-wide; start each test clean
     with db.connect() as c:
         seed.reset(c)
         seed.seed(c)

@@ -2,7 +2,7 @@
 import hmac
 import threading
 import time
-from collections import defaultdict, deque
+from collections import deque
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -37,39 +37,53 @@ def issue_token(sub: str, role: str, display_name: str, *, institution_id=None, 
             "role": role, "institution_id": institution_id, "display_name": display_name}
 
 
-LOGIN_MAX_FAILURES, LOGIN_WINDOW = 5, 15 * 60
-_failures: dict[str, deque] = defaultdict(deque)   # apaar blind index -> failure timestamps
+LOGIN_MAX_FAILURES, LOGIN_WINDOW, LOGIN_MAX_KEYS = 5, 15 * 60, 100_000
+_failures: dict[str, deque] = {}   # apaar blind index -> attempt timestamps (insertion-ordered: oldest key first)
 _failures_lock = threading.Lock()
+_DUMMY_DOB = None  # ciphertext decrypted on a miss so unknown-APAAR and wrong-DOB paths do the same work
 
 
 class LoginThrottled(Exception):
     pass
 
 
-def _throttled(key: str, now: float) -> bool:
-    q = _failures[key]
-    while q and q[0] < now - LOGIN_WINDOW:
-        q.popleft()
-    return len(q) >= LOGIN_MAX_FAILURES
+def _reserve_attempt(key: str, now: float) -> None:
+    """Count the attempt BEFORE the lookup (under the lock), so parallel guesses can't all slip past the limit.
+    Raises LoginThrottled when the APAAR already has LOGIN_MAX_FAILURES attempts in the window."""
+    with _failures_lock:
+        q = _failures.get(key)
+        if q is not None:
+            while q and q[0] < now - LOGIN_WINDOW:
+                q.popleft()
+            if len(q) >= LOGIN_MAX_FAILURES:
+                raise LoginThrottled()
+        else:
+            if len(_failures) >= LOGIN_MAX_KEYS:  # bounded memory: drop the oldest tracked APAAR
+                _failures.pop(next(iter(_failures)))
+            q = _failures[key] = deque()
+        q.append(now)
 
 
 def student_login(conn, apaar_id: str, dob: str) -> dict | None:
-    """MOCK student sign-in: APAAR ID + date of birth. Production would use APAAR/DigiLocker authentication.
-    The same None is returned for an unknown APAAR and a wrong DOB; repeated failures lock the APAAR out.
-    ponytail: in-process throttle; use a shared store (Redis / table) if the API runs as several processes."""
+    """MOCK student sign-in: APAAR ID + date of birth. NOT real authentication (a DOB is not a secret):
+    production must use APAAR/DigiLocker authentication. The same None is returned for an unknown APAAR and
+    a wrong DOB (same work on both paths); 5 attempts per APAAR per 15 min, then LoginThrottled.
+    ponytail: in-process throttle; use a shared store (Redis / table) if the API runs as several processes;
+    add a per-IP throttle and backoff (instead of a hard lock) before anything real."""
+    global _DUMMY_DOB
     if not (apaar_id.isdigit() and len(apaar_id) == 12):
         return None
-    key, now = crypto.apaar_bi(apaar_id), time.monotonic()
-    with _failures_lock:
-        if _throttled(key, now):
-            raise LoginThrottled()
+    key = crypto.apaar_bi(apaar_id)
+    _reserve_attempt(key, time.monotonic())
     row = conn.execute("SELECT * FROM student_login_lookup(%s)", (key,)).fetchone()
-    stored = crypto.decrypt("students", "dob", row["id"], row["dob_enc"]) if row else "0000-00-00"
+    if row is None:
+        _DUMMY_DOB = _DUMMY_DOB or crypto.encrypt("students", "dob", 0, "0000-00-00")
+        stored = crypto.decrypt("students", "dob", 0, _DUMMY_DOB)
+    else:
+        stored = crypto.decrypt("students", "dob", row["id"], row["dob_enc"])
     if row is None or not hmac.compare_digest(stored.encode(), dob.strip().encode()):
-        with _failures_lock:
-            _failures[key].append(now)
         return None
-    with _failures_lock:
+    with _failures_lock:  # success clears the APAAR's attempts
         _failures.pop(key, None)
     return issue_token(f"student:{row['id']}", "student", f"Student ({crypto.mask_apaar(apaar_id)})", student_id=row["id"])
 
