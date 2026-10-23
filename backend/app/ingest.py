@@ -106,15 +106,18 @@ def _student_id(conn, d: dict, o: dict) -> int:
         s = conn.execute("SELECT id FROM students WHERE apaar_bi=%s", (o["bi"],)).fetchone()
         if s:
             return s["id"]
-    return conn.execute(
-        "INSERT INTO students (apaar_enc, apaar_bi, apaar_masked, apaar_status, provisional_id, name_enc, dob_enc, "
-        "guardian_name_enc, bi_dob_bucket, bi_name_phon) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
-        (crypto.encrypt("apaar", d["apaar_id"]) if o["bi"] else None, o["bi"],
+    sid = conn.execute("SELECT nextval('students_id_seq') id").fetchone()["id"]  # id first: it is part of the AAD
+    enc = lambda col, v: crypto.encrypt("students", col, sid, v)  # noqa: E731
+    conn.execute(
+        "INSERT INTO students (id, apaar_enc, apaar_bi, apaar_masked, apaar_status, provisional_id, name_enc, dob_enc, "
+        "guardian_name_enc, bi_dob_bucket, bi_name_phon) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (sid, enc("apaar", d["apaar_id"]) if o["bi"] else None, o["bi"],
          crypto.mask_apaar(d["apaar_id"]) if o["bi"] else None, o["apaar_status"],
          None if o["bi"] else f"PROV-{secrets.token_hex(6).upper()}",
-         crypto.encrypt("name", d["student_name"]), crypto.encrypt("dob", d["dob"].isoformat()),
-         crypto.encrypt("guardian_name", d["guardian_name"]) if d["guardian_name"] else None,
-         crypto.dob_bucket(d["dob"].isoformat()), crypto.name_phonetic(d["student_name"]))).fetchone()["id"]
+         enc("name", d["student_name"]), enc("dob", d["dob"].isoformat()),
+         enc("guardian_name", d["guardian_name"]) if d["guardian_name"] else None,
+         crypto.dob_bucket(d["dob"].isoformat()), crypto.name_phonetic(d["student_name"])))
+    return sid
 
 
 def _open_case(conn, student_id: int, year: str) -> int:

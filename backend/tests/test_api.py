@@ -43,7 +43,10 @@ def test_upload_clean_file_stores_encrypted(client, dbconn):
     c = r.json()["counts"]
     n = sum(1 for _ in csv.DictReader(open(SYN / "A1.csv", encoding="utf-8")))
     assert c["rows"] == n and c["accepted"] == n and c["rejected"] == 0 and c["warnings"] == 2
-    raw = dbconn.execute("SELECT apaar_enc, name_enc, apaar_bi, apaar_masked FROM students").fetchall()
+    raw = dbconn.execute("SELECT id, apaar_enc, name_enc, apaar_bi, apaar_masked FROM students").fetchall()
+    from app import crypto
+    s = raw[0]
+    assert len(crypto.decrypt("students", "name", s["id"], s["name_enc"])) > 0  # decrypts only with its own row id
     first = next(csv.DictReader(open(SYN / "A1.csv", encoding="utf-8")))
     blob = b"".join(bytes(x["apaar_enc"] or b"") + bytes(x["name_enc"]) for x in raw)
     assert first["apaar_id"].encode() not in blob and first["student_name"].encode() not in blob

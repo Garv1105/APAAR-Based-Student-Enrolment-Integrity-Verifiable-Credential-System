@@ -66,15 +66,20 @@ def normalise_name(name: str) -> str:
 
 
 # ---------- encryption ----------
-def encrypt(field: str, plaintext: str) -> bytes:
-    """AES-256-GCM; the column name is bound as associated data so ciphertexts can't be swapped across columns."""
+def _aad(table: str, column: str, row_id) -> bytes:
+    return f"{table}|{column}|{row_id}".encode()
+
+
+def encrypt(table: str, column: str, row_id, plaintext: str) -> bytes:
+    """AES-256-GCM, random 96-bit nonce. AAD = table|column|row_id, so a ciphertext can't be
+    moved to another row or column without failing authentication."""
     nonce = os.urandom(12)
-    return nonce + AESGCM(_key("k_enc")).encrypt(nonce, plaintext.encode(), field.encode())
+    return nonce + AESGCM(_key("k_enc")).encrypt(nonce, plaintext.encode(), _aad(table, column, row_id))
 
 
-def decrypt(field: str, blob: bytes) -> str:
+def decrypt(table: str, column: str, row_id, blob: bytes) -> str:
     blob = bytes(blob)
-    return AESGCM(_key("k_enc")).decrypt(blob[:12], blob[12:], field.encode()).decode()
+    return AESGCM(_key("k_enc")).decrypt(blob[:12], blob[12:], _aad(table, column, row_id)).decode()
 
 
 # ---------- blind indexes ----------
