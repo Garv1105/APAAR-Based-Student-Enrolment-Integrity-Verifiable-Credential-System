@@ -2,7 +2,7 @@
 Institutions see neutral notices and only their own enrolment ids (F4). Only AICTE officers resolve or unmask."""
 from datetime import datetime, timezone
 
-from . import auth, crypto
+from . import auth, crypto, webhooks
 from .ingest import NOTICE, ApiError
 
 OPEN = ("flagged", "under_investigation")
@@ -45,6 +45,15 @@ def resolve(conn, user: dict, case_id: int, body: dict, request=None) -> dict:
     conn.execute("UPDATE duplicate_cases SET status=%s, resolution_note=%s, resolved_by=%s, resolved_at=%s WHERE id=%s",
                  (body["status"], body["note"], user["id"] if final else None, datetime.now(timezone.utc) if final else None, case_id))
     n = conn.execute("SELECT apply_case_resolution(%s, %s) n", (case_id, body.get("keep_enrolment_id"))).fetchone()["n"]
+    if final:
+        webhooks.emit_case(conn, "case.resolved", case_id, status=body["status"])
+    if body["status"] == "confirmed_duplicate":
+        for c in conn.execute(
+                "SELECT c.id, c.enrolment_id, p.institution_id FROM credentials c JOIN enrolments e ON e.id = c.enrolment_id "
+                "JOIN programmes p ON p.id = e.programme_id WHERE c.enrolment_id = ANY(%s) AND c.enrolment_id <> %s "
+                "AND c.type <> 'VerificationCredential'", (case["enrolment_ids"], body["keep_enrolment_id"])).fetchall():
+            webhooks.emit(conn, "credential.revoked", c["institution_id"], credential_id=c["id"], enrolment_id=c["enrolment_id"],
+                          reason="confirmed_duplicate")
     auth.audit(conn, user, f"case.{body['status']}", "duplicate_case", case_id, student_id=case["student_id"],
                reason=f"{body['note'][:200]} ({n} credential(s) updated)", request=request)
     conn.commit()

@@ -11,10 +11,13 @@ import json
 import sys
 from pathlib import Path
 
+import os
+
 from fastapi.testclient import TestClient
 
 from . import db, seed
 
+os.environ.setdefault("WEBHOOK_DISPATCH", "off")  # the seed registers no webhooks; no poller thread needed
 SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
 LIVE_E501 = "277145114059"  # A/CSE/2026/0013, withdrawn after the deadline in --live mode
 STUDENT = {"apaar": "328865551724", "dob": "2006-11-05", "name": "Asha Joshi"}  # A/ECE/2026/0081 in A1.csv

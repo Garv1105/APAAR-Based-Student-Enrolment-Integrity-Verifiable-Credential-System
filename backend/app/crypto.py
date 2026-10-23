@@ -196,3 +196,25 @@ def sha256_hex(data: bytes) -> str:
 
 def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+# ---------- webhooks (Standard Webhooks v1: HMAC-SHA256 over "id.timestamp.body") ----------
+def webhook_secret() -> str:
+    return "whsec_" + base64.b64encode(os.urandom(32)).decode()
+
+
+def _webhook_key(secret: str) -> bytes:
+    return base64.b64decode(secret.removeprefix("whsec_"))
+
+
+def webhook_sign(secrets_: list[str], msg_id: str, ts: int, body: bytes) -> str:
+    """Value of the webhook-signature header: one 'v1,<base64>' per active secret (several during a rotation)."""
+    msg = f"{msg_id}.{ts}.".encode() + body
+    return " ".join("v1," + base64.b64encode(hmac.new(_webhook_key(s), msg, hashlib.sha256).digest()).decode() for s in secrets_)
+
+
+def webhook_verify(secret: str, msg_id: str, ts: int, body: bytes, signature_header: str, now: int, tolerance: int = 300) -> bool:
+    if abs(now - ts) > tolerance:
+        return False
+    expected = webhook_sign([secret], msg_id, ts, body).split(",", 1)[1]
+    return any(sig.startswith("v1,") and hmac.compare_digest(sig[3:], expected) for sig in signature_header.split())

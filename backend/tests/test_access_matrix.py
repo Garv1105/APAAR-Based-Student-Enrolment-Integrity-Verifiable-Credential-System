@@ -45,6 +45,14 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/cases", {}, expect({"inst-a": 200, "inst-b": 200} | REG)),
         ("POST", "/v1/cases/999999/resolve", {"json": {"status": "false_positive", "note": "test"}}, expect({"aicte": 404})),
         ("POST", "/v1/cases/999999/unmask", {"json": {"reason": "access matrix test"}}, expect({"aicte": 404})),
+        # webhooks (Req 7): institutions manage their own; 404 for anything that isn't theirs (public IP literal: no DNS)
+        ("POST", "/v1/webhooks", {"json": {"url": "https://93.184.216.34/hook", "events": ["batch.validated"]}},
+         expect({"inst-a": 201, "inst-b": 201})),
+        ("GET", "/v1/webhooks", {}, expect({"inst-a": 200, "inst-b": 200})),
+        ("POST", "/v1/webhooks/999999/rotate", {}, expect({"inst-a": 404, "inst-b": 404})),
+        ("GET", "/v1/webhooks/999999/deliveries", {}, expect({"inst-a": 404, "inst-b": 404})),
+        ("POST", "/v1/webhooks/deliveries/999999/redeliver", {}, expect({"inst-a": 404, "inst-b": 404})),
+        ("DELETE", "/v1/webhooks/999999", {}, expect({"inst-a": 404, "inst-b": 404})),
         # credentials (Req 5, 6, 10)
         ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "EnrolmentCredential"}}, expect({"inst-a": 201}, 404)),
         ("POST", f"/v1/credentials/{eid}/issue", {"json": {"type": "DegreeCredential"}},

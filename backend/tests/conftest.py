@@ -8,6 +8,7 @@ import pytest
 # Tests use a throwaway key file and a separate database so they never touch demo data.
 os.environ.setdefault("APAAR_KEY_FILE", str(Path(tempfile.mkdtemp()) / "keys.json"))
 os.environ.setdefault("APAAR_DB", "apaar_test")
+os.environ.setdefault("WEBHOOK_DISPATCH", "off")  # tests call webhooks.dispatch_due() themselves
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 

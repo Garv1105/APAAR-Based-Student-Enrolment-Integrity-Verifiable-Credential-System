@@ -251,3 +251,38 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   ts         timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS audit_logs_student_idx ON audit_logs (student_id);
+
+-- Outbound webhooks (Req 7). Secrets are AES-GCM encrypted (HMAC signing needs them); shown once at creation.
+CREATE TABLE IF NOT EXISTS webhook_endpoints (
+  id              bigserial PRIMARY KEY,
+  institution_id  text NOT NULL REFERENCES institutions(id),
+  url             text NOT NULL,
+  events          text[] NOT NULL,
+  secret_enc      bytea NOT NULL,
+  secret_fp       text NOT NULL,                -- first 8 hex of SHA-256, for display only
+  prev_secret_enc bytea,                        -- after a rotation the old secret also signs until prev_expires_at
+  prev_expires_at timestamptz,
+  active          boolean NOT NULL DEFAULT true,
+  idempotency_key text,
+  request_hash    text,
+  created_by      text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (institution_id, idempotency_key)
+);
+
+-- Outbox and delivery log in one. Response bodies are never stored.
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id               bigserial PRIMARY KEY,
+  endpoint_id      bigint NOT NULL REFERENCES webhook_endpoints(id),
+  event_id         uuid NOT NULL,
+  event_type       text NOT NULL,
+  payload          jsonb NOT NULL,              -- ids, counts, codes and statuses only (no PII)
+  status           text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','delivered','failed','cancelled')),
+  attempts         int NOT NULL DEFAULT 0,
+  next_attempt_at  timestamptz NOT NULL DEFAULT now(),
+  last_status_code int,
+  last_error       text,                        -- truncated
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  delivered_at     timestamptz
+);
+CREATE INDEX IF NOT EXISTS webhook_deliveries_due_idx ON webhook_deliveries (next_attempt_at) WHERE status = 'pending';

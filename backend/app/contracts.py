@@ -4,6 +4,7 @@ Change this file first, then backend and frontend.
 """
 from datetime import date, datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -412,3 +413,46 @@ class Problem(BaseModel):
     title: str
     status: int
     detail: str | None = None
+
+
+# ---------- webhooks (Req 7) ----------
+WebhookEvent = Literal["batch.validated", "case.opened", "case.resolved", "credential.issued", "credential.revoked"]
+
+
+class WebhookIn(BaseModel):
+    url: str = Field(max_length=500, description="https only (http://localhost only in dev); must resolve to public IPs")
+    events: list[WebhookEvent] = Field(min_length=1)
+
+
+class WebhookOut(BaseModel):
+    id: int
+    url: str
+    events: list[str]
+    active: bool
+    secret_fp: str = Field(description="first 8 hex of SHA-256(secret), for matching only")
+    created_at: datetime
+    previous_secret_valid_until: datetime | None = Field(None, description="after a rotation the old secret also signs until then")
+
+
+class WebhookCreated(WebhookOut):
+    secret: str = Field(description="Shown once. Standard Webhooks signing secret (whsec_...)")
+
+
+class WebhookDelivery(BaseModel):
+    id: int
+    endpoint_id: int
+    event_id: UUID
+    event_type: str
+    payload: dict = Field(description="ids, counts, codes and statuses only (no personal data)")
+    status: Literal["pending", "delivered", "failed", "cancelled"]
+    attempts: int
+    next_attempt_at: datetime
+    last_status_code: int | None
+    last_error: str | None = Field(None, description="truncated; response bodies are never stored")
+    created_at: datetime
+    delivered_at: datetime | None
+
+
+class WebhookDeliveriesPage(BaseModel):
+    items: list[WebhookDelivery]
+    next_cursor: int | None
