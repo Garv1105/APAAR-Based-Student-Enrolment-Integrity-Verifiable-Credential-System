@@ -36,13 +36,13 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#050a24] font-inter text-white selection:bg-[#3b6bff]/60 selection:text-white">
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#040816] font-inter text-white selection:bg-[#3b6bff]/60 selection:text-white">
       {/* living background: base light, drifting aurora bands, faint grid, particles */}
       <div aria-hidden className="ambient-blue pointer-events-none fixed inset-0 z-0" />
       <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="aurora-1 absolute -left-[10%] top-[-20%] h-[70vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(29,78,216,0.32),transparent)] blur-3xl" />
-        <div className="aurora-2 absolute -right-[15%] bottom-[-25%] h-[75vh] w-[65vw] rounded-full bg-[radial-gradient(closest-side,rgba(67,56,202,0.26),transparent)] blur-3xl" />
-        <div className="aurora-1 absolute left-[35%] top-[30%] h-[45vh] w-[40vw] rounded-full bg-[radial-gradient(closest-side,rgba(96,130,255,0.10),transparent)] blur-3xl" style={{ animationDelay: "-9s" }} />
+        <div className="aurora-1 absolute -left-[10%] top-[-20%] h-[70vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(30,58,138,0.26),transparent)] blur-3xl" />
+        <div className="aurora-2 absolute -right-[15%] bottom-[-25%] h-[75vh] w-[65vw] rounded-full bg-[radial-gradient(closest-side,rgba(49,46,129,0.28),transparent)] blur-3xl" />
+        <div className="aurora-1 absolute left-[35%] top-[30%] h-[45vh] w-[40vw] rounded-full bg-[radial-gradient(closest-side,rgba(37,99,235,0.05),transparent)] blur-3xl" style={{ animationDelay: "-9s" }} />
       </div>
       <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-60" />
       <Starfield />

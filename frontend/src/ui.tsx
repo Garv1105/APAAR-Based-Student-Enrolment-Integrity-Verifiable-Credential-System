@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, ArrowDownToLine, FileSpreadsheet, Inbox, ShieldAlert } from "lucide-react";
 import { ApiError, download, loadSession } from "./api/client";
 import { useMounted } from "./components/motion";
@@ -149,17 +149,19 @@ export function Stat({ label, value, tone = "neutral", hint, icon, visual, delay
 }
 
 /** Radial progress (0..1). Gold by default; pass a status colour for semantic use. */
-export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)", children, label }: {
-  value: number; size?: number; stroke?: number; color?: string; children?: ReactNode; label: string;
+export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)", gradient, children, label }: {
+  value: number; size?: number; stroke?: number; color?: string; gradient?: [string, string]; children?: ReactNode; label: string;
 }) {
+  const gid = useId().replace(/:/g, "");
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const v = useMounted() ? Math.max(0, Math.min(1, value)) : 0; // fill in from zero on first paint
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={label}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-line)" strokeWidth={stroke} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+        {gradient && <defs><linearGradient id={`ring-${gid}`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={gradient[0]} /><stop offset="100%" stopColor={gradient[1]} /></linearGradient></defs>}
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgb(255 255 255 / 0.07)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={gradient ? `url(#ring-${gid})` : color} strokeWidth={stroke} strokeLinecap="round"
           strokeDasharray={c} strokeDashoffset={c * (1 - v)} style={{ transition: "stroke-dashoffset 1100ms cubic-bezier(.2,.8,.2,1)" }} />
       </svg>
       {children && <div className="absolute inset-0 grid place-items-center text-center">{children}</div>}

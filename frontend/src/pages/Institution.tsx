@@ -212,12 +212,19 @@ function QuickActions() {
 
 /* ---------- seats ---------- */
 
-// Category colours (validated with the dataviz palette checker: colour-blind safe on the dark surface).
-// Shared by the seat bars and the donut so a colour means the same category everywhere on the page.
-const CAT = { regular: "#9085e9", sn: "#d55181", ciwg: "#c98500" } as const;
+// Category colours. The base hues are validated with the dataviz palette checker (colour-blind safe on the dark
+// surface, all pairs); each is drawn as a two-tone gradient around its base. Shared by the seat bars and the donut,
+// so a colour means the same category everywhere on the page.
+const CAT = { regular: "#7c6cff", sn: "#ec4899", ciwg: "#cf7a00" } as const;
+const GRAD = {
+  regular: ["#5b48ff", "#a99cff"],
+  sn: ["#db2777", "#f472b6"],
+  ciwg: ["#c2650a", "#f6b23c"],
+} as const;
+const lin = ([a, b]: readonly [string, string]) => `linear-gradient(90deg, ${a}, ${b})`;
 
 function Legend() {
-  const items = [["Regular", CAT.regular], ["Supernumerary FN / OCI", CAT.sn], ["CIWG", CAT.ciwg], ["Over limit", "var(--color-critical)"]] as const;
+  const items = [["Regular", lin(GRAD.regular)], ["Supernumerary FN / OCI", lin(GRAD.sn)], ["CIWG", lin(GRAD.ciwg)], ["Over limit", "var(--color-critical)"]] as const;
   return (
     <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-slate-600">
       {items.map(([k, c]) => <span key={k} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: c }} aria-hidden />{k}</span>)}
@@ -246,7 +253,7 @@ function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
                     <span className="ml-3 inline-block w-11 text-right font-semibold" style={{ color: CAT.regular }}>{pct(filled, cap)}%</span>
                   </span>
                 </div>
-                <SeatBar line={reg ?? { category_code: "REGULAR", filled, cap, excess: 0 }} color={`linear-gradient(90deg, #6f63d9, ${CAT.regular})`} thick />
+                <SeatBar line={reg ?? { category_code: "REGULAR", filled, cap, excess: 0 }} color={lin(GRAD.regular)} thick />
                 {sn && <SnBar sn={sn} ciwg={ciwg} />}
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-mute">
                   {sn && <span>Supernumerary <span className="font-semibold tabular-nums text-slate-700">{sn.filled} / {sn.cap}</span></span>}
@@ -283,7 +290,7 @@ export function SeatBar({ line, color = "var(--color-gold)", thick = false }: { 
   return (
     <div className={`mt-2.5 flex overflow-hidden rounded-full bg-white/[0.07] ${thick ? "h-2.5" : "h-1.5"}`} role="meter" aria-valuemin={0} aria-valuemax={line.cap} aria-valuenow={line.filled}
       aria-label={`${line.category_code}: ${line.filled} of ${line.cap} seats${line.excess > 0 ? `, ${line.excess} over` : ""}`}>
-      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: `${(within / max) * 100}%`, background: color, boxShadow: `0 0 12px -2px ${CAT.regular}66` }} />
+      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: `${(within / max) * 100}%`, background: color, boxShadow: `0 0 14px -1px ${CAT.regular}aa` }} />
       {line.excess > 0 && <div className="h-full bg-critical transition-[width] duration-1000 ease-out" style={{ width: `${((on ? line.excess : 0) / max) * 100}%` }} />}
     </div>
   );
@@ -299,8 +306,8 @@ function SnBar({ sn, ciwg }: { sn: S["SeatLine"]; ciwg?: S["SeatLine"] }) {
   return (
     <div className="mt-1.5 flex h-1.5 gap-[2px] overflow-hidden rounded-full bg-white/[0.07]" role="meter" aria-valuemin={0} aria-valuemax={sn.cap} aria-valuenow={sn.filled}
       aria-label={`Supernumerary: ${sn.filled} of ${sn.cap}${ciwg ? `, of which CIWG ${ciwg.filled}` : ""}${sn.excess > 0 ? `, ${sn.excess} over` : ""}`}>
-      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: w(fn), background: CAT.sn }} />
-      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: w(c), background: CAT.ciwg }} />
+      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: w(fn), background: lin(GRAD.sn), boxShadow: `0 0 12px -1px ${CAT.sn}aa` }} />
+      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: w(c), background: lin(GRAD.ciwg), boxShadow: `0 0 12px -1px ${CAT.ciwg}aa` }} />
       {sn.excess > 0 && <div className="h-full bg-critical" style={{ width: w(on ? sn.excess : 0) }} />}
     </div>
   );
@@ -311,9 +318,9 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   const regular = sum("REGULAR"), sn = sum("SN_FN_OCI_CIWG"), ciwg = sum("SN_FN_OCI_CIWG:CIWG");
   const total = regular + sn;
   const parts = [
-    { name: "Regular", value: regular, color: CAT.regular },
-    { name: "Supernumerary FN / OCI", value: Math.max(sn - ciwg, 0), color: CAT.sn },
-    { name: "CIWG", value: ciwg, color: CAT.ciwg },
+    { name: "Regular", key: "regular", value: regular, color: CAT.regular },
+    { name: "Supernumerary FN / OCI", key: "sn", value: Math.max(sn - ciwg, 0), color: CAT.sn },
+    { name: "CIWG", key: "ciwg", value: ciwg, color: CAT.ciwg },
   ];
   return (
     <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-3">
@@ -322,11 +329,18 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
           aria-label={`Filled seats by category: ${parts.map((p) => `${p.name} ${p.value}`).join(", ")}`}>
           <div aria-hidden className="absolute inset-6 rounded-full blur-2xl" style={{ background: `radial-gradient(${CAT.regular}33, transparent 70%)` }} />
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
+            <PieChart style={{ filter: `drop-shadow(0 0 10px ${CAT.regular}55)` }}>
+              <defs>
+                {(Object.keys(GRAD) as (keyof typeof GRAD)[]).map((k) => (
+                  <linearGradient key={k} id={`cat-${k}`} x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stopColor={GRAD[k][1]} /><stop offset="100%" stopColor={GRAD[k][0]} />
+                  </linearGradient>
+                ))}
+              </defs>
               {/* no animation: the dashboard polls every 3s and would replay it */}
               <Pie data={parts.filter((p) => p.value > 0)} dataKey="value" innerRadius="76%" outerRadius="100%" paddingAngle={3} cornerRadius={4}
                 stroke="none" startAngle={90} endAngle={-270} isAnimationActive={false}>
-                {parts.filter((p) => p.value > 0).map((p) => <Cell key={p.name} fill={p.color} />)}
+                {parts.filter((p) => p.value > 0).map((p) => <Cell key={p.name} fill={`url(#cat-${p.key})`} />)}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
@@ -337,7 +351,7 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
         <ul className="mt-6 space-y-3 text-[14.5px]">
           {parts.map((p) => (
             <li key={p.name} className="flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2.5 text-slate-700"><span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: p.color }} aria-hidden />
+              <span className="flex min-w-0 items-center gap-2.5 text-slate-700"><span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: lin(GRAD[p.key as keyof typeof GRAD]), boxShadow: `0 0 8px ${p.color}88` }} aria-hidden />
                 <span className="truncate">{p.name}</span></span>
               <span className="shrink-0 tabular-nums text-ink"><span className="font-semibold">{p.value}</span> <span className="text-mute">({pct(p.value, total)}%)</span></span>
             </li>
@@ -350,10 +364,11 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
 
 /* ---------- data quality + anomalies ---------- */
 
-const EMERALD = "#2ee59d";
+const EMERALD = "#1fe39a";
+const EMERALD_GRAD: [string, string] = ["#059669", "#5cf5b8"];
 const scoreTone = (s: number) => (s >= 85 ? { c: EMERALD, t: "text-success-text", w: "Good" } : s >= 65
   ? { c: "var(--color-warning)", t: "text-warning-text", w: "Fair" } : { c: "var(--color-critical)", t: "text-critical-text", w: "Needs attention" });
-const barColor = (v: number) => (v >= 0.9 ? "bg-gradient-to-r from-[#10b981] to-[#4ef0a8]" : v >= 0.6 ? "bg-warning" : "bg-critical");
+const barColor = (v: number) => (v >= 0.9 ? "bg-gradient-to-r from-[#059669] to-[#5cf5b8] shadow-[0_0_10px_-1px_rgba(31,227,154,0.6)]" : v >= 0.6 ? "bg-gradient-to-r from-[#c2650a] to-[#f6b23c]" : "bg-gradient-to-r from-[#b91c1c] to-[#f87171]");
 
 function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error: string | null }) {
   const d = risk?.dqs;
@@ -364,7 +379,7 @@ function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error
         <div className="grid items-center gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex flex-col items-center">
             <div style={{ filter: `drop-shadow(0 0 14px ${tone.c}55)` }}>
-              <Ring value={d.score / 100} size={124} stroke={8} color={tone.c} label={`Data quality score ${Math.round(d.score)} of 100`}>
+              <Ring value={d.score / 100} size={124} stroke={9} color={tone.c} gradient={d.score >= 85 ? EMERALD_GRAD : undefined} label={`Data quality score ${Math.round(d.score)} of 100`}>
                 <div><div className="font-display text-[40px] font-bold leading-none tabular-nums text-ink">{Math.round(d.score)}</div><div className="mt-1 text-[13px] text-mute">/ 100</div></div>
               </Ring>
             </div>

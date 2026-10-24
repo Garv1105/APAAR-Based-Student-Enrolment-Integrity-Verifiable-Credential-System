@@ -99,9 +99,9 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
     const Icon = it.icon;
     return (
       <button key={it.label} type="button" onClick={() => open(it)} aria-current={on ? "page" : undefined}
-        className={`group relative flex items-center gap-3 rounded-lg text-[15px] font-medium transition-colors duration-200 ${compact ? "shrink-0 px-3 py-1.5" : "w-full px-3.5 py-2.5"} ${on ? "bg-gold/[0.08] text-champagne" : "text-mute hover:bg-white/[0.03] hover:text-ink"}`}>
-        {!compact && <span aria-hidden className={`absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-gold transition-opacity duration-200 ${on ? "opacity-100" : "opacity-0"}`} />}
-        <Icon className={`h-[18px] w-[18px] shrink-0 ${on ? "text-gold" : "text-slate-400 group-hover:text-slate-600"}`} aria-hidden />
+        className={`group relative flex items-center gap-3 rounded-xl font-display text-[16px] font-semibold tracking-[-0.01em] transition-colors duration-200 ${compact ? "shrink-0 px-3 py-1.5" : "w-full px-4 py-3"} ${on ? "bg-gold/[0.08] text-champagne" : "text-mute hover:bg-white/[0.03] hover:text-ink"}`}>
+        {!compact && <span aria-hidden className={`absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-gold transition-opacity duration-200 ${on ? "opacity-100" : "opacity-0"}`} />}
+        <Icon className={`h-5 w-5 shrink-0 ${on ? "text-gold" : "text-slate-400 group-hover:text-slate-600"}`} aria-hidden />
         <span className="whitespace-nowrap">{it.label}</span>
       </button>
     );
@@ -111,7 +111,7 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="theme-gold min-h-screen antialiased lg:grid lg:grid-cols-[280px_minmax(0,1fr)]">
+      <div className="theme-gold min-h-screen antialiased lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
         {/* ambient light behind the glass: a static base plus two slowly drifting lights */}
         <div aria-hidden className="ambient-gold no-print pointer-events-none fixed inset-0" />
         <div aria-hidden className="no-print pointer-events-none fixed inset-0 overflow-hidden">
@@ -121,21 +121,21 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
         <div aria-hidden className="ambient-grid no-print pointer-events-none fixed inset-0 opacity-60" />
         {/* Sidebar (desktop) */}
         <aside className="no-print sticky top-0 z-20 hidden h-screen flex-col border-r border-white/[0.06] bg-[#0b0f14]/55 backdrop-blur-xl lg:flex">
-          <div className="px-5 pb-6 pt-6"><a href={`#${home}`} onClick={() => setActive("top")} aria-label="Dashboard home"><Brand /></a></div>
-          <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3">
+          <div className="px-6 pb-7 pt-6"><a href={`#${home}`} onClick={() => setActive("top")} aria-label="Dashboard home"><Brand /></a></div>
+          <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-4">
             {groups.map((g, i) => (
               <div key={i}>
-                {g.title && <p className="mb-2 px-3.5 text-[11.5px] font-bold uppercase tracking-[0.14em] text-slate-500">{g.title}</p>}
+                {g.title && <p className="mb-2.5 px-4 font-display text-[12.5px] font-bold uppercase tracking-[0.14em] text-slate-500">{g.title}</p>}
                 <div className="space-y-0.5">{g.items.map((it) => navButton(it))}</div>
               </div>
             ))}
           </nav>
           <div className="space-y-3 border-t border-line p-4">
             <div className="flex items-center gap-3">
-              <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-raised text-xs font-semibold text-champagne ring-1 ring-gold/30">{initials}</span>
+              <span aria-hidden className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-raised font-display text-[13px] font-bold text-champagne ring-1 ring-gold/30">{initials}</span>
               <span className="min-w-0 flex-1 leading-tight">
-                <span className="block truncate text-[15px] font-semibold text-ink">{session.display_name}</span>
-                <span className="block truncate text-[12.5px] text-mute">{roleLabel}</span>
+                <span className="block truncate font-display text-[16px] font-bold text-ink">{session.display_name}</span>
+                <span className="block truncate text-[13.5px] text-mute">{roleLabel}</span>
               </span>
               {onLogout && (
                 <button type="button" onClick={onLogout} title="Sign out" aria-label="Sign out"
@@ -162,28 +162,28 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
               {groups.flatMap((g) => g.items).map((it) => navButton(it, true))}
             </nav>
             <p className="border-t border-line px-4 py-1.5 text-[11px] text-warning-text lg:hidden" role="note">Prototype · synthetic data · registries, OTP and logins are MOCK</p>
-            <div className="hidden items-center justify-between gap-4 px-8 py-3.5 lg:flex">
-              <div className="flex items-center gap-4 text-[14px] text-mute">
+            <div className="hidden items-center justify-between gap-4 px-8 py-4 lg:flex">
+              <div className="flex items-center gap-4 text-[15px] text-mute">
                 <span className="flex items-center gap-2">
                   <span>{roleLabel}</span>
                   <span className="text-slate-300" aria-hidden>/</span>
-                  <span className="text-slate-700">{PAGE_LABEL(currentHash, home)}</span>
+                  <span className="font-display font-semibold text-slate-800">{PAGE_LABEL(currentHash, home)}</span>
                 </span>
                 <span aria-hidden className="h-4 w-px bg-white/10" />
-                <span className="hidden text-[12.5px] text-slate-500 xl:inline">SIH26263 prototype · not an official Government of India or AICTE website</span>
+                <span className="hidden text-[13.5px] text-slate-500 xl:inline">SIH26263 prototype · not an official Government of India or AICTE website</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-[13.5px] text-mute">
+                <span className="text-[14.5px] text-mute">
                   {new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>
                 <span aria-hidden className="h-4 w-px bg-white/10" />
                 <span className="flex items-center gap-2.5">
-                  <span aria-hidden className="grid h-8 w-8 place-items-center rounded-full bg-white/[0.05] text-[12px] font-bold text-champagne ring-1 ring-gold/30">{initials}</span>
-                  <span className="max-w-[220px] truncate text-[14px] font-medium text-slate-700">{session.display_name}</span>
+                  <span aria-hidden className="grid h-9 w-9 place-items-center rounded-full bg-white/[0.05] font-display text-[13px] font-bold text-champagne ring-1 ring-gold/30">{initials}</span>
+                  <span className="max-w-[240px] truncate text-[15px] font-semibold text-slate-800">{session.display_name}</span>
                 </span>
                 {onLogout && (
                   <button type="button" onClick={onLogout}
-                    className="group inline-flex items-center gap-1.5 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3.5 py-1.5 text-[14px] font-semibold text-slate-700 transition-colors hover:border-critical-border hover:bg-critical-bg hover:text-critical-text">
+                    className="group inline-flex items-center gap-1.5 rounded-lg border border-white/[0.09] bg-white/[0.03] px-4 py-2 text-[15px] font-semibold text-slate-800 transition-colors hover:border-critical-border hover:bg-critical-bg hover:text-critical-text">
                     <LogOut className="h-4 w-4" aria-hidden /> Sign out
                   </button>
                 )}

@@ -9,7 +9,7 @@ export default function Navbar() {
     <header className="sticky top-0 z-40 w-full border-b border-white/[0.06] bg-[#050816]/55 backdrop-blur-xl">
       <div className="mx-auto flex h-[76px] w-full max-w-[1440px] items-center justify-between gap-6 px-5 sm:px-8">
         <div className="flex min-w-0 items-center gap-5">
-          <a href="#/" aria-label="VidyaPramaan home"><BrandLogo size="md" cut="#050816" /></a>
+          <a href="#/" aria-label="VidyaPramaan home"><BrandLogo size="md" /></a>
           <span aria-hidden className="hidden h-9 w-px bg-gradient-to-b from-transparent via-white/25 to-transparent lg:block" />
           <p className="hidden font-inter text-[11.5px] leading-snug text-[#98a6c6] lg:block">
             <span className="block font-medium text-[#d6def0]">SIH26263 prototype · problem statement for AICTE</span>

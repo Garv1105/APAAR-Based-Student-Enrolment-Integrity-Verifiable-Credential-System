@@ -64,7 +64,7 @@ export default function IndiaMap({ className = "" }: { className?: string }) {
         <defs>
           <clipPath id={`clip-${u}`}><path d={INDIA_PATH} /></clipPath>
           <radialGradient id={`land-${u}`} cx="32%" cy="22%" r="85%">
-            <stop offset="0%" stopColor="#2f56d9" stopOpacity="0.55" />
+            <stop offset="0%" stopColor="#2a48b8" stopOpacity="0.5" />
             <stop offset="45%" stopColor="#1a2c78" stopOpacity="0.45" />
             <stop offset="100%" stopColor="#0b1236" stopOpacity="0.55" />
           </radialGradient>
@@ -95,7 +95,7 @@ export default function IndiaMap({ className = "" }: { className?: string }) {
         </defs>
 
         {/* halo + lit land */}
-        <path d={INDIA_PATH} fill="#3b6bff" opacity="0.32" filter={`url(#halo-${u})`} />
+        <path d={INDIA_PATH} fill="#2c4fc9" opacity="0.26" filter={`url(#halo-${u})`} />
         <path d={INDIA_PATH} fill={`url(#land-${u})`} />
         <path d={INDIA_PATH} fill={`url(#dots-${u})`} />
 
