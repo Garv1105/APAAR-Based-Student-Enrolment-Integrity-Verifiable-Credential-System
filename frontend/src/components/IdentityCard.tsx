@@ -17,20 +17,25 @@ export default function IdentityCard({ id, title, subtitle, iconType, isSelected
   const Icon = ICON[iconType];
   return (
     <label className={`group relative flex cursor-pointer items-center gap-4 rounded-2xl border px-4 py-3.5 transition-all duration-300
-      has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#7aa2ff]/60
+      has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-[#d4af37]
       ${isSelected
-        ? "border-[#7aa2ff]/55 bg-gradient-to-r from-[#3b6bff]/[0.18] via-[#5b5bff]/[0.10] to-[#7c5cff]/[0.08] shadow-[0_12px_32px_-16px_rgba(59,107,255,0.75),inset_0_1px_0_rgba(255,255,255,0.08)]"
+        ? "border-[#d4af37]/60 bg-gradient-to-r from-[#d4af37]/15 via-[#f7e08a]/10 to-[#d4af37]/5 shadow-[0_12px_32px_-16px_rgba(212,175,55,0.35),inset_0_1px_0_rgba(255,255,255,0.08)]"
         : "border-white/[0.07] bg-white/[0.025] hover:-translate-y-0.5 hover:border-white/[0.14] hover:bg-white/[0.05]"}`}>
       <input type="radio" name="identity" value={id} checked={isSelected} onChange={() => onSelect(id)} className="sr-only" />
       <span aria-hidden className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl transition-all duration-300
-        ${isSelected ? "bg-gradient-to-br from-[#4f7bff] to-[#7c5cff] text-white shadow-[0_8px_20px_-8px_rgba(79,123,255,0.9)]" : "bg-white/[0.05] text-[#9fb0d0] ring-1 ring-white/[0.06] group-hover:text-white"}`}>
+        ${isSelected ? "bg-gradient-to-br from-[#c4a032] via-[#d4af37] to-[#f7e08a] text-[#0b0f14] shadow-[0_8px_20px_-8px_rgba(212,175,55,0.6)]" : "bg-white/[0.04] text-[#d4af37] ring-1 ring-white/[0.06] group-hover:text-[#f7e08a]"}`}>
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-manrope text-[15.5px] font-semibold tracking-[-0.01em] text-white">{title}</span>
-        <span className="mt-0.5 block truncate font-inter text-[13px] text-[#93a2c4]">{subtitle} <span className="text-[#5f6f93]">·</span> <span className="font-mono text-[12px] text-[#7d8db0]">{id}</span></span>
+        {/* Institution name: Manrope semibold, ~15.5px */}
+        <span className="block truncate font-manrope text-[15px] font-semibold tracking-[-0.01em] text-[#f5f5f5]">{title}</span>
+        {/* Subtitle: Inter 13px · ID in Geist Mono */}
+        <span className="mt-0.5 block truncate font-inter text-[12.5px] text-[#b3b9c2]">
+          {subtitle} <span className="text-[#64748b]">·</span>{" "}
+          <span className="tnum font-mono text-[11.5px] text-[#d4af37]/80">{id}</span>
+        </span>
       </span>
-      <span aria-hidden className={`grid h-6 w-6 shrink-0 place-items-center rounded-full transition-all duration-300 ${isSelected ? "scale-100 bg-[#4f7bff] text-white" : "scale-90 border border-white/20 text-transparent"}`}>
+      <span aria-hidden className={`grid h-6 w-6 shrink-0 place-items-center rounded-full transition-all duration-300 ${isSelected ? "scale-100 bg-[#d4af37] text-[#0b0f14]" : "scale-90 border border-white/20 text-transparent"}`}>
         <Check className="h-3.5 w-3.5" strokeWidth={3} />
       </span>
     </label>

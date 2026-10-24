@@ -6,6 +6,13 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans:    ["Inter", "ui-sans-serif", "-apple-system", "Segoe UI", "Roboto", "Noto Sans", "sans-serif"],
+        inter:   ["Inter", "ui-sans-serif", "-apple-system", "sans-serif"],
+        manrope: ["Manrope", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        mono:    ["Geist Mono", "ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
+        display: ["Manrope", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       colors: {
         // Deep Navy Primary Palette (GovTech Core)
         gov: {
