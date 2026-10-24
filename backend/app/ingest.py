@@ -30,12 +30,15 @@ def batch_out(b: dict, replayed=False) -> dict:
             "created_at": b["created_at"], "counts": b["row_counts_json"], "replayed": replayed}
 
 
-def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: str | None, request_hash: str, request=None) -> dict:
+def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: str | None, request_hash: str, request=None,
+                  upload_time: datetime | None = None) -> dict:
+    """upload_time: DEMO_MODE clock override (the route only passes it then); None = now."""
     inst_id = user["institution_id"]
     with conn.transaction():
-        b = conn.execute("INSERT INTO upload_batches (institution_id, channel, status, idempotency_key, request_hash, created_by) "
-                         "VALUES (%s,%s,'processing',%s,%s,%s) ON CONFLICT (institution_id, idempotency_key) DO NOTHING RETURNING *",
-                         (inst_id, channel, idem_key, request_hash, user["id"])).fetchone()
+        b = conn.execute("INSERT INTO upload_batches (institution_id, channel, status, idempotency_key, request_hash, created_by, created_at) "
+                         "VALUES (%s,%s,'processing',%s,%s,%s,coalesce(%s, now())) ON CONFLICT (institution_id, idempotency_key) "
+                         "DO NOTHING RETURNING *",
+                         (inst_id, channel, idem_key, request_hash, user["id"], upload_time)).fetchone()
         if b is None:  # Idempotency-Key replay: return the original batch, insert nothing
             prev = conn.execute("SELECT * FROM upload_batches WHERE institution_id=%s AND idempotency_key=%s", (inst_id, idem_key)).fetchone()
             if prev["request_hash"] != request_hash:
@@ -89,7 +92,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
             ledger.append(conn, inst_id, "enrolment.created", e)
             if any(i["code"] == "E203" for i in o["issues"]):
                 new_cases.append(_open_case(conn, sid, year["code"]))
-        _store_batch_features(conn, b["id"], outcomes, progs, year["deadline"])
+        _store_batch_features(conn, b["id"], outcomes, progs, year["deadline"], b["created_at"])
         if issues:
             with conn.cursor() as cur:
                 cur.executemany("INSERT INTO validation_issues (batch_id, row_no, code, severity, field, params) VALUES (%s,%s,%s,%s,%s,%s)", issues)
@@ -110,18 +113,19 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
         webhooks.emit(conn, "batch.validated", inst_id, batch_id=b["id"], counts=counts, codes=codes)
         for cid in sorted(set(new_cases)):  # fires whenever a batch adds an enrolment to a case (new or existing)
             webhooks.emit_case(conn, "case.opened", cid)
-        audit(conn, user, "batch.upload", "upload_batch", b["id"], request=request)
+        audit(conn, user, "batch.upload", "upload_batch", b["id"], request=request,
+              reason=f"DEMO_MODE upload time {upload_time.isoformat()}" if upload_time else None)
     return batch_out(b)
 
 
-def _store_batch_features(conn, batch_id: int, outcomes: list[dict], progs: dict, deadline) -> None:
+def _store_batch_features(conn, batch_id: int, outcomes: list[dict], progs: dict, deadline, uploaded_at: datetime) -> None:
     """F1 (PRD §9.1): anomaly features from the plaintext rows while they are still in memory. Every submitted,
     parseable row counts (a ghost batch is suspicious even if its rows get rejected); only aggregates persist."""
     groups: dict[str, list[dict]] = {}
     for o in outcomes:
         if o["data"] and o["data"]["programme_code"] in progs:
             groups.setdefault(progs[o["data"]["programme_code"]]["id"], []).append(o["data"])
-    minutes = (deadline - datetime.now(timezone.utc)).total_seconds() / 60
+    minutes = (deadline - uploaded_at).total_seconds() / 60
     for pid, rows in groups.items():
         conn.execute("INSERT INTO batch_features (batch_id, programme_id, rows, max_dob_cluster, longest_apaar_run, minutes_before_deadline) "
                      "VALUES (%s,%s,%s,%s,%s,%s)",

@@ -140,6 +140,24 @@
        ],
        "title": "Idempotency-Key"
       }
+     },
+     {
+      "name": "x-demo-upload-time",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "DEMO_MODE only: ISO 8601 time with offset, used as the batch's upload time (deadline features). Otherwise ignored.",
+       "title": "X-Demo-Upload-Time"
+      },
+      "description": "DEMO_MODE only: ISO 8601 time with offset, used as the batch's upload time (deadline features). Otherwise ignored."
      }
     ],
     "responses": {
