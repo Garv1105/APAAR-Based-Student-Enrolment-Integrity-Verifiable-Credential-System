@@ -5,6 +5,7 @@ import json
 import uuid
 import zlib
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -131,7 +132,21 @@ def student_login(body: StudentLoginIn, conn=Depends(get_conn)):
 @app.post("/v1/batches", response_model=BatchOut, status_code=201,
           description="CSV (multipart field 'file' or text/csv body) or JSON {rows:[...]}. Validation runs synchronously.")
 async def create_batch(request: Request, idempotency_key: str | None = Header(None),
+                       x_demo_upload_time: str | None = Header(None, description="DEMO_MODE only: ISO 8601 time with offset, used "
+                                                           "as the batch's upload time (deadline features). Otherwise ignored."),
                        user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    upload_time = None
+    if x_demo_upload_time is not None:
+        if not passkeys.demo_mode():
+            auth.audit(conn, user, "batch.demo_clock_ignored", "upload_batch", None, reason="DEMO_MODE off", request=request)
+            conn.commit()
+        else:
+            try:
+                upload_time = datetime.fromisoformat(x_demo_upload_time)
+            except ValueError:
+                upload_time = None
+            if upload_time is None or upload_time.tzinfo is None:
+                return problem(422, "Invalid X-Demo-Upload-Time", "ISO 8601 with a UTC offset, e.g. 2026-11-15T22:30:00+05:30")
     ctype = request.headers.get("content-type", "")
     if ctype.startswith("application/json"):
         raw = await request.body()
@@ -164,7 +179,7 @@ async def create_batch(request: Request, idempotency_key: str | None = Header(No
         return problem(422, "Batch has no rows")
     if len(rows) > MAX_ROWS:
         return problem(413, "Too many rows", f"Limit is {MAX_ROWS}")
-    out = ingest.process_batch(conn, user, rows, channel, idempotency_key, crypto.sha256_hex(raw), request)
+    out = ingest.process_batch(conn, user, rows, channel, idempotency_key, crypto.sha256_hex(raw), request, upload_time)
     return JSONResponse(BatchOut(**out).model_dump(mode="json"), status_code=200 if out["replayed"] else 201)
 
 

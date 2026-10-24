@@ -1,7 +1,9 @@
 """Load the MOCK AICTE registry + demo users into a fresh database.
 `py -m app.seed --reset` drops all rows and reseeds (demo/test only).
+WORLD_DIR=<dir> (environment only, never .env) adds a generated world's <dir>/seed/registry.json on top of the repo registry.
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -15,13 +17,33 @@ SEED = Path(__file__).resolve().parent.parent / "data/seed/registry.json"
 DEMO_PASSWORD = "demo"  # seeded identity provider is MOCK
 
 
+def world_seed_dir() -> Path | None:
+    """Generated national world (MOCK, synthetic). Read from the process environment only, so tests never pick it up."""
+    d = os.environ.get("WORLD_DIR")
+    return Path(d) / "seed" if d else None
+
+
+def load_registry() -> dict:
+    """Repo registry + optional world overlay: lists are concatenated (exact duplicates dropped), so the world adds colleges
+    and users while seat categories, academic years and the demo users (aicte, auditor, ...) come from the repo."""
+    s = json.loads(SEED.read_text())
+    if (d := world_seed_dir()) is None:
+        return s
+    w = json.loads((d / "registry.json").read_text())
+    for k, v in w.items():
+        if isinstance(v, list):
+            s[k] = s.get(k, []) + [x for x in v if x not in s.get(k, [])]
+    s["trust_registry"]["institutions"] += w.get("trust_registry", {}).get("institutions", [])
+    return s
+
+
 def reset(conn) -> None:
     tables = [r["tablename"] for r in conn.execute("select tablename from pg_tables where schemaname='public'")]
     conn.execute("TRUNCATE " + ", ".join(f'"{t}"' for t in tables) + " RESTART IDENTITY CASCADE")
 
 
-def seed(conn) -> None:
-    s = json.loads(SEED.read_text())
+def seed(conn, s: dict | None = None) -> None:
+    s = s or load_registry()
     for y in s["academic_years"]:
         conn.execute("INSERT INTO academic_years VALUES (%s,%s,%s,%s)", (y["code"], y["window_start"], y["window_end"], y["deadline"]))
     for i in s["institutions"]:
@@ -38,7 +60,8 @@ def seed(conn) -> None:
         for key, cap in caps_for(a["approved_intake"], cats).items():
             conn.execute("INSERT INTO programme_category_counters VALUES (%s,%s,%s,0,%s)", (a["programme"], a["academic_year"], key, cap))
     for h in s["intake_history"]:
-        conn.execute("INSERT INTO intake_history VALUES (%s,%s,%s,%s)", (h["programme"], h["academic_year"], h["approved"], h["filled"]))
+        conn.execute("INSERT INTO intake_history VALUES (%s,%s,%s,%s,%s)",
+                     (h["programme"], h["academic_year"], h["approved"], h["filled"], h.get("foreign_filled")))
     credentials.seed_trust_registry(conn, s["trust_registry"])
     pw = PasswordHasher().hash(DEMO_PASSWORD)
     for u in s["users"]:
