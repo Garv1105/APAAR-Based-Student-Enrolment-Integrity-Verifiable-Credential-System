@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ApiError, getJson, sendJson, type S } from "../api/client";
 import { downloadJson, VerifyResultView, VerifyTool } from "../credentials";
-import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, Updated, usePoll } from "../ui";
+import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, PageHeader, Updated, usePoll } from "../ui";
 
 const FIELDS = [
   ["name", "Name"], ["programme", "Programme"], ["institution", "Institution"], ["academic_year", "Academic year"],
@@ -13,22 +13,18 @@ export default function VerifierHome() {
   const consents = usePoll(() => getJson<S["ConsentOut"][]>("/v1/consents"), 3000);
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <h1 className="text-2xl font-semibold">Verify a candidate</h1>
-          <p className="text-sm text-slate-500">Ask the student for consent; you receive a signed credential with only the fields they approve.</p>
-        </div>
-        <Updated at={consents.updatedAt} />
-      </div>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <PageHeader eyebrow="Employer verification" title="Verify a candidate"
+        meta={<span>Ask the student for consent. You receive a signed credential with only the fields they approve.</span>}
+        actions={<Updated at={consents.updatedAt} />} />
+      <div className="grid gap-4 lg:grid-cols-2">
         <RequestForm onDone={consents.refresh} />
-        <Card title="My consent requests">
+        <Card id="requests" title="My consent requests">
           {!consents.data ? <Loading /> : consents.data.length === 0 ? <Empty>No requests yet.</Empty> : (
             <div className="space-y-3">{consents.data.map((c) => <RequestRow key={c.id} c={c} />)}</div>
           )}
         </Card>
       </div>
-      <VerifyTool allowForgedDemo />
+      <div id="verify-tool" className="scroll-mt-28"><VerifyTool allowForgedDemo /></div>
     </div>
   );
 }

@@ -1,178 +1,262 @@
 import { useEffect, useState } from "react";
+import { Fingerprint, UserCheck, X } from "lucide-react";
 import { activateAndRegister, ApiError, getJson, login, passkeyLogin, studentLogin, type S, type Session } from "../api/client";
 import { passkeyError, passkeysSupported } from "../webauthn";
-import { Button, ErrorNote } from "../ui";
+import Hero from "../components/Hero";
+import IdentityPanel from "../components/IdentityPanel";
+import IndiaMap from "../components/IndiaMap";
+import Navbar from "../components/Navbar";
 
-// Seeded MOCK identities (backend/data/seed/registry.json). Shown so judges can switch roles quickly.
-const DEMO_USERS = [
-  { id: "inst-a", label: "Demo Institute of Technology", sub: "Institution · clean data", group: "Institutions" },
-  { id: "inst-b", label: "Sample College of Engineering", sub: "Institution · messy data", group: "Institutions" },
-  { id: "inst-c", label: "Example School of Management", sub: "Institution · enrolment spike", group: "Institutions" },
-  { id: "inst-d", label: "Closed Polytechnic", sub: "Institution · not approved", group: "Institutions" },
-  { id: "aicte", label: "AICTE Monitoring Officer", sub: "National monitoring", group: "Regulators" },
-  { id: "auditor", label: "Regulator (auditor)", sub: "Read-only", group: "Regulators" },
-  { id: "employer", label: "Acme Hiring (verifier)", sub: "Employer · consent-based checks", group: "Verification" },
-  { id: "univ", label: "Demo Technological University", sub: "Registrar · awards degrees", group: "Verification" },
-];
+function LightStreaks() {
+  return (
+    <div
+      className="pointer-events-none absolute bottom-0 left-0 h-[460px] w-[560px] select-none overflow-hidden z-0"
+      aria-hidden="true"
+    >
+      <svg
+        className="h-full w-full"
+        viewBox="0 0 600 500"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <defs>
+          <linearGradient id="streakGrad1" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#2563ff" stopOpacity="0" />
+            <stop offset="25%" stopColor="#2563ff" stopOpacity="0.8" />
+            <stop offset="60%" stopColor="#38bdf8" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
+          </linearGradient>
+          <linearGradient id="streakGrad2" x1="0%" y1="100%" x2="80%" y2="20%">
+            <stop offset="0%" stopColor="#7c5cff" stopOpacity="0" />
+            <stop offset="35%" stopColor="#2563ff" stopOpacity="0.6" />
+            <stop offset="75%" stopColor="#38bdf8" stopOpacity="0.8" />
+            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0" />
+          </linearGradient>
+          <filter id="streakGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Ambient Corner Glow */}
+        <circle cx="50" cy="450" r="160" fill="#2563ff" fillOpacity="0.2" filter="blur(60px)" />
+        <circle cx="150" cy="400" r="110" fill="#38bdf8" fillOpacity="0.16" filter="blur(50px)" />
+
+        {/* Swooping Curved Light Streaks */}
+        <path
+          d="M -50 480 C 100 480, 220 400, 340 280 C 420 200, 480 120, 520 40"
+          stroke="url(#streakGrad1)"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          filter="url(#streakGlow)"
+          className="animate-streak"
+        />
+        <path
+          d="M -30 520 C 130 510, 240 430, 380 320 C 470 240, 530 160, 570 80"
+          stroke="url(#streakGrad2)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          opacity="0.6"
+        />
+        <path
+          d="M 10 500 C 120 470, 200 420, 290 350 C 370 290, 430 210, 470 150"
+          stroke="url(#streakGrad1)"
+          strokeWidth="1.2"
+          strokeDasharray="4 6"
+          opacity="0.4"
+        />
+      </svg>
+    </div>
+  );
+}
 
 export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
-  const [userId, setUserId] = useState("inst-a");
+  const [selectedId, setSelectedId] = useState("inst-a");
   const [password, setPassword] = useState("demo");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
+  const [showStudentModal, setShowStudentModal] = useState(false);
+
+  async function handlePortalLogin(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      onLogin(await login(userId, password));
+      onLogin(await login(selectedId, password));
     } catch (err) {
-      setError(err instanceof ApiError ? (err.status === 401 ? "Wrong user or password." : err.text) : "Cannot reach the API. Is the backend running on :8000?");
+      setError(
+        err instanceof ApiError
+          ? err.status === 401
+            ? "Authentication rejected: invalid credentials."
+            : err.text
+          : "Backend API unavailable on :8000. Start uvicorn backend service."
+      );
     } finally {
       setBusy(false);
     }
   }
 
-  const groups = [...new Set(DEMO_USERS.map((u) => u.group))];
   return (
-    <div className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-semibold text-slate-900">Sign in</h1>
-      <p className="mt-1 text-sm text-slate-600">Choose a demo identity. Every account uses the password <code className="rounded bg-slate-100 px-1">demo</code>.</p>
-      <form onSubmit={submit} className="mt-6 space-y-6">
-        {groups.map((g) => (
-          <fieldset key={g}>
-            <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{g}</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {DEMO_USERS.filter((u) => u.group === g).map((u) => (
-                <label key={u.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border bg-white p-3 shadow-sm transition-colors ${userId === u.id ? "border-brand-600 ring-2 ring-brand-100" : "border-slate-200 hover:border-slate-300"}`}>
-                  <input type="radio" name="user" value={u.id} checked={userId === u.id} onChange={() => setUserId(u.id)} className="mt-1 accent-brand-600" />
-                  <span>
-                    <span className="block text-sm font-medium text-slate-900">{u.label}</span>
-                    <span className="block text-xs text-slate-500">{u.sub} · <code>{u.id}</code></span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
-        ))}
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="block">
-            <span className="block text-sm font-medium text-slate-700">Password</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password"
-              className="mt-1 w-56 rounded-lg border border-slate-300 px-3 py-1.5 text-sm" />
-          </label>
-          <Button type="submit" disabled={busy}>{busy ? "Signing in…" : "Sign in"}</Button>
+    <div className="relative min-h-screen w-full bg-[#050816] text-white selection:bg-[#2563ff] selection:text-white overflow-x-hidden">
+      {/* Background Layer: Deep navy with layered electric blue & violet radial glows */}
+      <div
+        className="pointer-events-none fixed inset-0 z-0 select-none overflow-hidden"
+        aria-hidden="true"
+      >
+        <div className="absolute -left-48 -top-48 h-[650px] w-[650px] rounded-full bg-[#2563ff]/15 blur-[140px]" />
+        <div className="absolute right-0 top-1/4 h-[700px] w-[700px] rounded-full bg-[#7c5cff]/12 blur-[150px]" />
+        <div className="absolute bottom-0 right-1/4 h-[500px] w-[500px] rounded-full bg-[#2563ff]/10 blur-[120px]" />
+      </div>
+
+      {/* Swooping light streaks in the bottom-left corner */}
+      <LightStreaks />
+
+      {/* Top Navbar */}
+      <Navbar />
+
+      {/* Main Container */}
+      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col justify-center px-4 py-8 sm:px-6 lg:px-8 min-h-[calc(100vh-64px)]">
+        {/* Full-Page Hero & Identity Gateway Layout */}
+        <div className="relative grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-12 xl:gap-16">
+          {/* Glowing Digital India Map Mesh (placed behind/between hero and panel) */}
+          <div className="pointer-events-none absolute left-[45%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-0 hidden lg:block opacity-65 xl:opacity-85 max-w-[500px] xl:max-w-[580px]">
+            <IndiaMap />
+          </div>
+
+          {/* Left Column (~45%): Hero Section */}
+          <div className="relative z-10 w-full">
+            <Hero onOpenStudentModal={() => setShowStudentModal(true)} />
+          </div>
+
+          {/* Right Column (~50%): Choose Your Identity Panel */}
+          <div className="relative z-10 w-full">
+            <IdentityPanel
+              selectedId={selectedId}
+              onSelectId={(id) => setSelectedId(id)}
+              password={password}
+              onPasswordChange={(pwd) => setPassword(pwd)}
+              onSubmit={handlePortalLogin}
+              busy={busy}
+              error={error}
+            />
+          </div>
         </div>
-        {error && <ErrorNote>{error}</ErrorNote>}
-      </form>
-      <StudentSignIn onLogin={onLogin} />
+      </main>
+
+      {/* Student Login Modal */}
+      {showStudentModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+          onKeyDown={(e) => e.key === "Escape" && setShowStudentModal(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="student-signin-title"
+            className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[24px] border border-blue-500/30 bg-[#080f24] p-6 sm:p-7 shadow-2xl text-white ring-1 ring-white/10 animate-fade-in">
+            <button
+              autoFocus
+              onClick={() => setShowStudentModal(false)}
+              className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/40 shadow-sm">
+                <UserCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 id="student-signin-title" className="font-bold text-base text-white">Students and guardians</h3>
+                <p className="text-xs text-[#9fb0d0]">Passkey sign-in · no password</p>
+              </div>
+            </div>
+
+            <StudentSignIn onLogin={onLogin} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
+const field = "w-full rounded-xl border border-slate-700 bg-[#060a16] px-3.5 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+const label = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300";
+
+/** Students and guardians: passkey sign-in, first-time activation, and (DEMO_MODE only) the MOCK date-of-birth fallback. */
 function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
   const [demo, setDemo] = useState(false);
-  useEffect(() => { getJson<S["AuthConfig"]>("/v1/auth/config").then((c) => setDemo(c.demo_mode)).catch(() => {}); }, []);
-  return (
-    <div className="mt-8 space-y-4">
-      <PasskeySignIn onLogin={onLogin} />
-      {demo && <DobSignIn onLogin={onLogin} />}
-    </div>
-  );
-}
-
-function PasskeySignIn({ onLogin }: { onLogin: (s: Session) => void }) {
   const [apaar, setApaar] = useState("");
   const [code, setCode] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [dob, setDob] = useState("");
   const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const supported = passkeysSupported();
+  useEffect(() => { getJson<S["AuthConfig"]>("/v1/auth/config").then((c) => setDemo(c.demo_mode)).catch(() => {}); }, []);
 
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError(null);
     try { await fn(); } catch (err) {
-      setError(passkeyError(err) ?? (err instanceof ApiError ? err.text : "Cannot reach the API."));
+      setError(passkeyError(err) ?? (err instanceof ApiError ? (err.status === 401 ? "Sign-in failed. Check the details and try again." : err.text) : "Cannot reach the API. Is the backend running on :8000?"));
     } finally { setBusy(false); }
   }
-  const signIn = () => run(async () => onLogin(await passkeyLogin()));
   const activate = (e: React.FormEvent) => {
     e.preventDefault();
     run(async () => {
       const setup = await activateAndRegister(apaar.replace(/[\s-]/g, ""), code);
-      setNote(`Passkey registered for the ${setup.kind}.` + (setup.reissue ? " It can approve consent after 24 hours (reissued code)." : "")
-        + " Now sign in with it.");
+      setNote(`Passkey registered for the ${setup.kind}.` + (setup.reissue ? " It can approve consent after 24 hours (reissued code)." : "") + " Now sign in with it.");
       setCode("");
     });
   };
+  const dobSignIn = (e: React.FormEvent) => { e.preventDefault(); run(async () => onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), dob))); };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-semibold">Students and guardians</h2>
-      <p className="mt-1 text-xs text-slate-500">Sign in with your passkey (fingerprint, face or device PIN). No password, nothing to type.</p>
-      {passkeysSupported() ? (
-        <Button className="mt-3" disabled={busy} onClick={signIn}>{busy ? "Waiting for passkey…" : "Sign in with passkey"}</Button>
-      ) : <p className="mt-3 text-xs text-err">This browser doesn't support passkeys.</p>}
-      <form onSubmit={activate} className="mt-4 border-t border-slate-100 pt-3">
-        <p className="text-xs text-slate-600">First time? Use the one-time activation code from your institution to register a passkey.</p>
-        <div className="mt-2 flex flex-wrap items-end gap-3">
-          <label className="text-sm">
-            <span className="block text-slate-700">APAAR ID</span>
-            <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits"
-              className="mt-1 w-52 rounded-lg border border-slate-300 px-3 py-1.5 font-mono" />
-          </label>
-          <label className="text-sm">
-            <span className="block text-slate-700">Activation code</span>
-            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="XXXX-XXXX-XX" autoComplete="one-time-code"
-              className="mt-1 w-40 rounded-lg border border-slate-300 px-3 py-1.5 font-mono uppercase" />
-          </label>
-          <Button type="submit" variant="secondary" disabled={busy || !passkeysSupported()}>Activate and register passkey</Button>
+    <div className="mt-5 space-y-5">
+      {supported ? (
+        <button type="button" disabled={busy} onClick={() => run(async () => onLogin(await passkeyLogin()))}
+          className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r from-[#2563ff] via-[#4f46e5] to-[#7c5cff] py-3 text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50">
+          <Fingerprint className="h-4 w-4" aria-hidden /> {busy ? "Waiting for passkey…" : "Sign in with passkey"}
+        </button>
+      ) : <p className="text-xs text-rose-300">This browser doesn't support passkeys.</p>}
+      <p className="text-xs text-[#9fb0d0]">Fingerprint, face or device PIN. Nothing to type.</p>
+
+      <form onSubmit={activate} className="space-y-3 border-t border-slate-800 pt-4">
+        <p className="text-xs text-slate-300">First time? Use the one-time activation code from your institution to register a passkey.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block"><span className={label}>APAAR ID</span>
+            <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits" className={`${field} font-mono`} /></label>
+          <label className="block"><span className={label}>Activation code</span>
+            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="XXXX-XXXX-XX" autoComplete="one-time-code" className={`${field} font-mono uppercase`} /></label>
         </div>
+        <button type="submit" disabled={busy || !supported}
+          className="w-full rounded-[14px] border border-blue-500/40 py-2.5 text-sm font-semibold text-blue-200 transition-colors hover:bg-blue-500/10 disabled:opacity-50">
+          Activate and register passkey
+        </button>
       </form>
-      {note && <p className="mt-3 text-sm text-ok" role="status">{note}</p>}
-      {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
-    </div>
-  );
-}
 
-/** DEMO_MODE only: the old MOCK APAAR + date-of-birth sign-in. */
-function DobSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
-  const [apaar, setApaar] = useState("");
-  const [dob, setDob] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+      {demo && (
+        <details className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-amber-200">Demo fallback: date-of-birth sign-in <span className="ml-1 rounded bg-amber-500/20 px-1">MOCK · DEMO_MODE</span></summary>
+          <p className="mt-2 text-xs text-amber-100/80">Not authentication: a date of birth isn't a secret. Enabled only because the server runs in DEMO_MODE.</p>
+          <form onSubmit={dobSignIn} className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block"><span className={label}>APAAR ID</span>
+              <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits" className={`${field} font-mono`} /></label>
+            <label className="block"><span className={label}>Date of birth</span>
+              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required className={field} /></label>
+            <button type="submit" disabled={busy} className="rounded-[14px] border border-amber-500/40 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-500/10 disabled:opacity-50 sm:col-span-2">
+              {busy ? "Signing in…" : "Sign in (MOCK)"}
+            </button>
+          </form>
+        </details>
+      )}
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), dob));
-    } catch (err) {
-      setError(err instanceof ApiError ? (err.status === 401 ? "APAAR ID and date of birth don't match." : err.text) : "Cannot reach the API.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-      <h2 className="text-sm font-semibold">Demo fallback: date-of-birth sign-in <span className="rounded bg-amber-200 px-1 text-xs">MOCK · DEMO_MODE</span></h2>
-      <p className="mt-1 text-xs text-slate-600">Not authentication: a date of birth isn't a secret. Enabled only because the server runs in DEMO_MODE.</p>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="text-sm">
-          <span className="block text-slate-700">APAAR ID</span>
-          <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits"
-            className="mt-1 w-52 rounded-lg border border-slate-300 px-3 py-1.5 font-mono" />
-        </label>
-        <label className="text-sm">
-          <span className="block text-slate-700">Date of birth</span>
-          <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required className="mt-1 rounded-lg border border-slate-300 px-3 py-1.5" />
-        </label>
-        <Button type="submit" variant="secondary" disabled={busy}>{busy ? "Signing in…" : "Sign in (MOCK)"}</Button>
+      <div aria-live="polite">
+        {note && <p className="text-sm text-emerald-300" role="status">{note}</p>}
+        {error && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-3 text-xs font-semibold text-rose-300">{error}</div>}
       </div>
-      {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
-    </form>
+    </div>
   );
 }

@@ -3,12 +3,12 @@ import { Fragment, useState } from "react";
 import { getJson, type S } from "./api/client";
 import { Badge, Card, Empty, ErrorNote, Loading, Table, Td, usePoll } from "./ui";
 
-const COMPONENT_LABEL: Record<string, string> = {
+export const COMPONENT_LABEL: Record<string, string> = {
   validation_pass_rate: "Validation pass rate", seat_integrity: "Seat integrity", timeliness: "Timeliness",
   duplicate_exposure: "Duplicate exposure", anomaly_flags: "Anomaly flags", correction_churn: "Correction churn",
   declarations: "Declarations (E303 / E501)",
 };
-const FLAG_LABEL: Record<string, string> = {
+export const FLAG_LABEL: Record<string, string> = {
   ENROLMENT_SPIKE: "Enrolment spike", CATEGORY_MIX_SHIFT: "Category-mix shift", DOB_CLUSTER: "DOB cluster",
   SEQUENTIAL_APAAR: "Sequential APAAR IDs", DEADLINE_DUMP: "Deadline dump",
 };
@@ -59,8 +59,8 @@ export function InspectionQueueCard() {
   const flags = usePoll(() => getJson<S["AnomalyFlag"][]>("/v1/anomalies"), 5000);
   const [open, setOpen] = useState<string | null>(null);
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <Card title="Risk-based inspection queue (D3)" className="lg:col-span-2"
+    <div className="grid gap-4 2xl:grid-cols-3">
+      <Card title="Risk-based inspection queue" className="2xl:col-span-2"
         actions={<span className="text-xs text-slate-500">risk = (100 − DQS) × active enrolments · not-submitted first</span>}>
         {q.error ? <ErrorNote>{q.error}</ErrorNote> : !q.data ? <Loading /> : q.data.length === 0 ? <Empty>No institutions.</Empty> : (
           <Table head={["#", "Institution", "State", "DQS", "Risk", "Why"]}>
