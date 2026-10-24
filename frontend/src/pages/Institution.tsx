@@ -1,15 +1,16 @@
 import { useRef, useState } from "react";
+import IndiaMap from "../components/IndiaMap";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import {
   AlertTriangle, ArrowRight, BadgeCheck, BarChart3, CheckCircle2, ChevronRight, FileDown, FileSpreadsheet, History, Megaphone,
-  PieChart as PieIcon, ShieldCheck, Siren, UploadCloud, UserCheck, Users, XCircle,
+  PieChart as PieIcon, ShieldCheck, Siren, UploadCloud, Users,
 } from "lucide-react";
 import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
 import { EnrolmentLookup } from "./Registrar";
 import { useMounted } from "../components/motion";
 import { FLAG_LABEL, COMPONENT_LABEL } from "../risk";
 import {
-  Badge, Button, Card, Empty, ErrorNote, go, Loading, Meter, PageHeader, Ring, SparkBars, Stat, Table, Td, usePoll,
+  Badge, Button, Card, Empty, ErrorNote, go, Loading, Meter, Ring, SparkBars, Stat, Table, Td, usePoll,
 } from "../ui";
 
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
@@ -27,58 +28,69 @@ export default function InstitutionHome() {
   const withoutApaar = (cov.REFUSED ?? 0) + (cov.NOT_GENERATED ?? 0) + (cov.PENDING ?? 0);
   const chrono = [...data.batches].reverse(); // API returns newest first
   const year = data.programmes[0]?.academic_year;
+  const regFilled = data.programmes.reduce((a, p) => a + (p.lines.find((l) => l.category_code === "REGULAR")?.filled ?? 0), 0);
+  const intake = data.programmes.reduce((a, p) => a + p.approved_intake, 0);
+  const util = pct(regFilled, intake);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Institution dashboard"
-        title={data.name}
-        meta={<>
-          <span>AICTE ID <span className="font-mono text-slate-700">{data.institution_id}</span></span>
-          {year && <><span aria-hidden className="text-slate-300">·</span><span>Academic year {year}</span></>}
-          <span aria-hidden className="text-slate-300">·</span>
-          <span>Approved intake from AICTE registry <Badge tone="warning">MOCK</Badge></span>
-        </>}
-      />
+      {/* hero: institution identity, map, AICTE notices */}
+      <section className="relative grid items-center gap-6 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_220px_380px] 2xl:grid-cols-[minmax(0,1fr)_280px_420px]">
+        <div className="rise relative z-10 min-w-0 py-2">
+          <p className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.28em] text-mute">
+            <span aria-hidden className="h-px w-10 bg-gold" />Institution dashboard
+          </p>
+          <h1 className="mt-4 font-display text-[40px] font-bold leading-[1.06] tracking-[-0.035em] text-ink sm:text-[48px] 2xl:text-[54px]">
+            {data.name}
+          </h1>
+          <dl className="mt-7 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 lg:grid-cols-2 2xl:grid-cols-4">
+            {([
+              ["AICTE ID", <span className="font-mono text-[16px]">{data.institution_id}</span>, null],
+              ["Academic year", year ?? "Not set", null],
+              ["Approved intake", <span className="inline-flex items-center gap-2">{intake}<Badge tone="warning">MOCK</Badge></span>, "From AICTE registry"],
+              ["Without APAAR", withoutApaar, `${cov.REFUSED ?? 0} refused · ${cov.PENDING ?? 0} pending · ${cov.NOT_GENERATED ?? 0} not generated`],
+            ] as const).map(([k, v, sub]) => (
+              <div key={k} className="min-w-0 border-l border-gold/35 pl-4">
+                <dt className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-mute">{k}</dt>
+                <dd className="mt-1.5 whitespace-nowrap font-display text-[19px] font-bold tabular-nums text-ink">{v}</dd>
+                {sub && <dd className="mt-1 text-[12.5px] leading-snug text-slate-500">{sub}</dd>}
+              </div>
+            ))}
+          </dl>
+        </div>
+        <div aria-hidden className="pointer-events-none hidden xl:block">
+          <div className="relative">
+            <div className="absolute inset-0 -m-10 rounded-full bg-[radial-gradient(closest-side,rgba(212,175,55,0.14),transparent)]" />
+            <IndiaMap tone="gold" className="relative mx-auto w-[220px] 2xl:w-[270px]" />
+          </div>
+        </div>
+        <Notices notices={data.open_notices} />
+      </section>
       {error && <ErrorNote>{error}</ErrorNote>}
-
-      {data.open_notices.length > 0 && (
-        <section className="rounded-xl border border-flag-border bg-flag-bg px-5 py-4" aria-labelledby="notices-h">
-          <h2 id="notices-h" className="flex items-center gap-2 text-[14.5px] font-semibold text-flag-text">
-            <Megaphone className="h-4 w-4" aria-hidden /> Notices from AICTE <Badge tone="flag">{data.open_notices.length}</Badge>
-          </h2>
-          <ul className="mt-2 space-y-1.5 text-[15px] text-slate-800">
-            {data.open_notices.map((n, i) => <li key={i} className="flex gap-2"><span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-flag" />{n}</li>)}
-          </ul>
-          <p className="mt-2 text-[13px] text-mute">Notices never reveal another institution's data. AICTE reviews each case.</p>
-        </section>
-      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat delay={80} label="Active enrolments" value={active} icon={<Users />}
-          hint="All count toward intake, with or without APAAR"
+        <Stat delay={80} label="Enrolments" value={active} icon={<Users />}
+          hint={withoutApaar ? <><span className="text-warning-text">{withoutApaar} without APAAR</span> · all count toward intake</> : "All count toward intake"}
           visual={<SparkBars values={chrono.map((b) => b.counts.accepted)} label="Accepted rows per upload batch, oldest to newest" />} />
-        <Stat delay={140} label="APAAR verified" value={verified} icon={<UserCheck />}
-          hint={`${pct(verified, active)}% of active enrolments`}
-          visual={<Ring value={active ? verified / active : 0} size={60} label={`${pct(verified, active)}% verified`}>
-            <span className="text-[13px] font-semibold text-champagne">{pct(verified, active)}%</span></Ring>} />
-        <Stat delay={200} label="Without APAAR" value={withoutApaar} tone={withoutApaar ? "warning" : "neutral"} icon={<AlertTriangle />}
-          hint={`Refused ${cov.REFUSED ?? 0} · Not generated ${cov.NOT_GENERATED ?? 0} · Pending ${cov.PENDING ?? 0}`} />
-        <Stat delay={260} label="Rows rejected" value={data.rejected_rows_total} tone={data.rejected_rows_total ? "error" : "neutral"} icon={<XCircle />}
-          hint="All batches · not counted until corrected"
+        <Stat delay={140} label="APAAR verified" value={verified} icon={<ShieldCheck />}
+          hint={<><span className="font-semibold text-success-text">{pct(verified, active)}%</span> of active enrolments</>} />
+        <Stat delay={200} label="Rows rejected" value={data.rejected_rows_total} tone={data.rejected_rows_total ? "error" : "neutral"} icon={<AlertTriangle />}
+          hint="Not counted until corrected"
           visual={<SparkBars values={chrono.map((b) => b.counts.rejected)} color="var(--color-critical)" label="Rejected rows per upload batch, oldest to newest" />} />
+        <Stat delay={260} label="Seat utilisation" value={`${util}%`} icon={<BarChart3 />}
+          hint={<><span className="tabular-nums text-ink">{regFilled} / {intake}</span> regular seats filled</>}
+          visual={<Ring value={intake ? regFilled / intake : 0} size={56} stroke={6} gradient={["#B8892A", "#FBE7A1"]} label={`${util}% of approved intake filled`} />} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-12">
         <Upload onDone={refresh} />
-        <QuickActions />
+        <QualityCard risk={risk.data} error={risk.error} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
         <SeatsCard programmes={data.programmes} />
         <CategoryCard programmes={data.programmes} />
-        <QualityCard risk={risk.data} error={risk.error} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-12">
@@ -86,8 +98,42 @@ export default function InstitutionHome() {
         <AnomalyCard risk={risk.data} />
       </div>
 
-      <div id="students" className="scroll-mt-28"><EnrolmentLookup mode="institution" /></div>
+      <div className="grid gap-4 xl:grid-cols-12">
+        <div id="students" className="scroll-mt-28 xl:col-span-8 [&>*]:h-full"><EnrolmentLookup mode="institution" /></div>
+        <QuickActions />
+      </div>
     </div>
+  );
+}
+
+/* ---------- AICTE notices ---------- */
+
+function Notices({ notices }: { notices: string[] }) {
+  return (
+    <section aria-labelledby="notices-h" style={{ ["--d" as string]: "60ms" }} className="glass rise flex flex-col rounded-2xl p-6">
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="notices-h" className="flex items-center gap-3 font-display text-[17px] font-bold text-ink">
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-gold/[0.08] text-gold ring-1 ring-gold/25" aria-hidden><Megaphone className="h-5 w-5" /></span>
+          Notices from AICTE
+        </h2>
+        {notices.length > 0 && <Badge tone="flag" dot>{notices.length} open</Badge>}
+      </div>
+      {notices.length === 0 ? (
+        <div className="mt-5 flex items-start gap-3 rounded-xl border border-success-border bg-success-bg p-4">
+          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-success-text" aria-hidden />
+          <p className="text-[14.5px] text-success-text">No open notices. AICTE has not raised any case on your uploads.</p>
+        </div>
+      ) : (
+        <ul className="mt-5 max-h-[220px] space-y-2 overflow-y-auto pr-1">
+          {notices.map((n, i) => (
+            <li key={i} className="flex items-start gap-3 rounded-xl border border-white/[0.06] bg-white/[0.025] px-4 py-3 text-[14.5px] leading-snug text-slate-800">
+              <span aria-hidden className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-flag shadow-[0_0_8px_var(--color-flag)]" />{n}
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-4 border-t border-line pt-3 text-[12.5px] leading-snug text-mute">Notices never reveal another institution's data. AICTE reviews each case.</p>
+    </section>
   );
 }
 
@@ -125,30 +171,27 @@ function Upload({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Card id="upload" delay={320} title="Upload student records" icon={<UploadCloud />} className="xl:col-span-2"
-      actions={<span>CSV · validated row by row</span>}>
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
+    <Card id="upload" delay={320} title="Upload & validation" icon={<UploadCloud />} className="xl:col-span-7"
+      actions={<span>Validated row by row</span>}>
+      <div>
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); send(e.dataTransfer.files[0]); }}
-          className={`flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-8 text-center transition-colors duration-200 ${drag ? "border-gold/70 bg-gold/[0.06]" : "border-white/[0.18] bg-white/[0.015] hover:border-gold/40"}`}
+          className={`flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-9 text-center transition-colors duration-200 ${drag ? "border-gold/70 bg-gold/[0.06]" : "border-white/[0.18] bg-white/[0.015] hover:border-gold/40"}`}
         >
-          <span className={`grid h-11 w-11 place-items-center rounded-full border transition-colors duration-200 ${drag ? "border-gold text-gold" : "border-slate-300 text-slate-500"}`} aria-hidden>
+          <span className={`grid h-12 w-12 place-items-center rounded-full border bg-white/[0.03] transition-colors duration-200 ${drag ? "border-gold text-gold" : "border-white/20 text-ink"}`} aria-hidden>
             <UploadCloud className="h-5 w-5" />
           </span>
-          <p className="mt-3 text-[15px] font-medium text-ink">Drag and drop a CSV file here</p>
+          <p className="mt-4 text-[16px] font-medium text-ink">Drag and drop your CSV file here</p>
           <p className="mt-1 text-[13px] text-mute">or</p>
-          <Button className="mt-3" onClick={() => input.current?.click()} disabled={busy}>{busy ? "Validating…" : "Choose file"}</Button>
+          <Button className="mt-3 rounded-full bg-gradient-to-b from-[#F3D573] to-[#C9982A] px-6 shadow-[0_8px_24px_-8px_rgba(212,175,55,0.6)]" onClick={() => input.current?.click()} disabled={busy}>{busy ? "Validating…" : "Choose file"}</Button>
           <input ref={input} type="file" accept=".csv,text/csv" className="sr-only" aria-label="CSV file" onChange={(e) => send(e.target.files?.[0])} />
-          <p className="mt-4 max-w-md text-[12.5px] leading-relaxed text-slate-400">
-            Use the template's 18 columns (apaar_id, institution_student_id, student_name, dob, programme_code, seat_category…).
-            Re-uploading the same file is safe: it returns the original batch.
-          </p>
+          <p className="mt-4 text-[13px] text-mute">Supports CSV <span aria-hidden>·</span> 18-column template <span aria-hidden>·</span> re-uploading the same file is safe</p>
         </div>
-        <ul className="space-y-2.5 self-center text-[14.5px] text-slate-700" aria-label="Checks run on every row">
+        <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-[13.5px] text-slate-700" aria-label="Checks run on every row">
           {CHECKS.map((c) => (
-            <li key={c} className="flex items-start gap-2.5"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />{c}</li>
+            <li key={c} className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 shrink-0 text-gold" aria-hidden />{c}</li>
           ))}
         </ul>
       </div>
@@ -191,17 +234,19 @@ function QuickActions() {
     { icon: BadgeCheck, title: "Verify a credential", sub: "Paste JSON or QR text", on: () => go("/verify") },
   ];
   return (
-    <Card id="reports" delay={380} title="Quick actions" icon={<ChevronRight />} actions={<span>Exports are audited</span>}>
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+    <Card id="reports" title="Quick actions" delay={0} className="xl:col-span-4" actions={<span>Exports are audited</span>}>
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-1">
         {actions.map((a) => (
           <button key={a.title} type="button" onClick={a.on}
-            className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-left transition-colors duration-300 hover:border-gold/35 hover:bg-gold/[0.045]">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-gold ring-1 ring-white/[0.05]" aria-hidden><a.icon className="h-4 w-4" /></span>
+            className="group flex w-full min-w-0 items-center gap-2.5 text-left">
+            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-white/[0.07] bg-white/[0.03] text-gold transition-colors duration-300 group-hover:border-gold/40" aria-hidden><a.icon className="h-5 w-5" /></span>
+            <span className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.03] px-4 py-2 transition-colors duration-300 group-hover:border-gold/35 group-hover:bg-gold/[0.045]">
             <span className="min-w-0 flex-1">
               <span className="block text-[14.5px] font-medium text-ink">{a.title}</span>
               <span className="block truncate text-[12.5px] text-mute">{a.sub}</span>
             </span>
-            <ArrowRight className="h-4 w-4 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-gold" aria-hidden />
+            <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-gold" aria-hidden />
+            </span>
           </button>
         ))}
       </div>
@@ -234,7 +279,7 @@ function Legend() {
 
 function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   return (
-    <Card id="seats" delay={440} title="Seats: approved intake vs filled" icon={<BarChart3 />} className="lg:col-span-2 xl:col-span-5"
+    <Card id="seats" delay={440} title="Seats: approved intake vs filled" icon={<BarChart3 />} className="xl:col-span-7"
       actions={<span>Limits from AICTE registry (MOCK)</span>}>
       {programmes.length === 0 ? <Empty>No approved programmes for this year.</Empty> : (<>
         <Legend />
@@ -323,7 +368,7 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
     { name: "CIWG", key: "ciwg", value: ciwg, color: CAT.ciwg },
   ];
   return (
-    <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-3">
+    <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-5">
       {total === 0 ? <Empty>No enrolments yet.</Empty> : (<>
         <div className="relative mx-auto h-48 w-48" role="img"
           aria-label={`Filled seats by category: ${parts.map((p) => `${p.name} ${p.value}`).join(", ")}`}>
@@ -374,25 +419,27 @@ function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error
   const d = risk?.dqs;
   const tone = d ? scoreTone(d.score) : null;
   return (
-    <Card id="quality" delay={560} title="Data quality score" icon={<ShieldCheck />} className="xl:col-span-4" actions={<span>What AICTE's inspection queue sees</span>}>
+    <Card id="quality" delay={380} title="Data quality" icon={<ShieldCheck />} className="xl:col-span-5" actions={<span>Seen by AICTE's inspection queue</span>}>
       {error ? <ErrorNote>{error}</ErrorNote> : !risk ? <p className="py-8 text-center text-[15px] text-mute">Loading…</p> : !d || !tone ? <Empty>Upload student records to get a score.</Empty> : (
         <div className="grid items-center gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex flex-col items-center">
             <div style={{ filter: `drop-shadow(0 0 14px ${tone.c}55)` }}>
-              <Ring value={d.score / 100} size={124} stroke={9} color={tone.c} gradient={d.score >= 85 ? EMERALD_GRAD : undefined} label={`Data quality score ${Math.round(d.score)} of 100`}>
-                <div><div className="font-display text-[40px] font-bold leading-none tabular-nums text-ink">{Math.round(d.score)}</div><div className="mt-1 text-[13px] text-mute">/ 100</div></div>
+              <Ring value={d.score / 100} size={140} stroke={8} color={tone.c} gradient={d.score >= 85 ? EMERALD_GRAD : undefined} label={`Data quality score ${Math.round(d.score)} of 100, ${tone.w}`}>
+                <div><div className="font-display text-[38px] font-bold leading-none tabular-nums text-ink">{Math.round(d.score)}<span className="text-[14px] font-semibold text-mute">/100</span></div>
+                  <div className={`mt-1.5 text-[13.5px] font-semibold ${tone.t}`}>{tone.w}</div></div>
               </Ring>
             </div>
-            <span className={`mt-3 text-[14px] font-bold ${tone.t}`}>{tone.w}</span>
           </div>
           <ul className="space-y-3">
             {Object.entries(d.components).map(([k, v]) => (
-              <li key={k} className="text-[13.5px]">
-                <div className="flex justify-between gap-2">
-                  <span className="truncate text-slate-700">{COMPONENT_LABEL[k] ?? k} <span className="text-slate-500">· {Math.round(d.weights[k] * 100)}%</span></span>
+              <li key={k} className="text-[14px]" title={`Weight ${Math.round(d.weights[k] * 100)}% of the score`}>
+                <div className="flex items-center gap-2.5">
+                  {v >= 0.9 ? <CheckCircle2 className="h-[18px] w-[18px] shrink-0 text-success-text" aria-hidden />
+                    : <AlertTriangle className={`h-[18px] w-[18px] shrink-0 ${v >= 0.6 ? "text-warning-text" : "text-critical-text"}`} aria-hidden />}
+                  <span className="min-w-0 flex-1 leading-snug text-slate-700">{COMPONENT_LABEL[k] ?? k}</span>
                   <span className="font-semibold tabular-nums text-ink">{Math.round(v * 100)}%</span>
                 </div>
-                <Meter value={v} color={barColor(v)} className="mt-1.5" />
+                <Meter value={v} color={barColor(v)} className="ml-7 mt-1.5" />
               </li>
             ))}
           </ul>

@@ -163,23 +163,23 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
             </nav>
             <p className="border-t border-line px-4 py-1.5 text-[11px] text-warning-text lg:hidden" role="note">Prototype · synthetic data · registries, OTP and logins are MOCK</p>
             <div className="hidden items-center justify-between gap-4 px-8 py-4 lg:flex">
-              <div className="flex items-center gap-4 text-[15px] text-mute">
+              <div className="flex min-w-0 items-center gap-4 whitespace-nowrap text-[15px] text-mute">
                 <span className="flex items-center gap-2">
                   <span>{roleLabel}</span>
                   <span className="text-slate-300" aria-hidden>/</span>
                   <span className="font-display font-semibold text-slate-800">{PAGE_LABEL(currentHash, home)}</span>
                 </span>
                 <span aria-hidden className="h-4 w-px bg-white/10" />
-                <span className="hidden text-[13.5px] text-slate-500 xl:inline">SIH26263 prototype · not an official Government of India or AICTE website</span>
+                <span className="hidden truncate text-[13.5px] text-slate-500 xl:inline">SIH26263 prototype · not an official Government of India or AICTE website</span>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="text-[14.5px] text-mute">
+              <div className="flex shrink-0 items-center gap-4 whitespace-nowrap">
+                <span className="hidden text-[14.5px] text-mute 2xl:inline">
                   {new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
                 </span>
                 <span aria-hidden className="h-4 w-px bg-white/10" />
                 <span className="flex items-center gap-2.5">
                   <span aria-hidden className="grid h-9 w-9 place-items-center rounded-full bg-white/[0.05] font-display text-[13px] font-bold text-champagne ring-1 ring-gold/30">{initials}</span>
-                  <span className="max-w-[240px] truncate text-[15px] font-semibold text-slate-800">{session.display_name}</span>
+                  <span className="max-w-[200px] truncate text-[15px] font-semibold text-slate-800">{session.display_name}</span>
                 </span>
                 {onLogout && (
                   <button type="button" onClick={onLogout}

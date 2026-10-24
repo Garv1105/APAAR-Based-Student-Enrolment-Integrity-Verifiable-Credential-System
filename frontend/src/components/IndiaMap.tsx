@@ -51,7 +51,17 @@ function useTilt(disabled: boolean) {
   return ref;
 }
 
-export default function IndiaMap({ className = "" }: { className?: string }) {
+const PALETTE = {
+  blue: { land: ["#2a48b8", "#1a2c78", "#0b1236"], edge: ["#a9c1ff", "#7d93ff", "#a48bff"], route: ["#7aa2ff", "#d6e0ff"], scan: "#9db4ff",
+    dot: "#b9caff", glow: ["#cfdbff", "#7d9bff"], halo: "#2c4fc9", state: "#9fb4ff", base: "#8ea8ff", city: "#eef3ff", hub: "#b9caff",
+    core: ["#060a1c", "#e3eaff"], label: "#c9d6ff" },
+  gold: { land: ["#4a360a", "#241a06", "#0b0803"], edge: ["#FBE7A1", "#D4AF37", "#B8892A"], route: ["#a07a1e", "#FBE7A1"], scan: "#E2BC4A",
+    dot: "#E8C766", glow: ["#FFF1C2", "#D4AF37"], halo: "#8a6a14", state: "#D4AF37", base: "#C9A23A", city: "#FFF6DA", hub: "#E8C766",
+    core: ["#0B0F14", "#FBE7A1"], label: "#E8D9A8" },
+};
+
+export default function IndiaMap({ className = "", tone = "blue" }: { className?: string; tone?: keyof typeof PALETTE }) {
+  const p = PALETTE[tone];
   const u = useId().replace(/:/g, "");
   const reduce = useReducedMotion();
   const tilt = useTilt(reduce);
@@ -64,53 +74,53 @@ export default function IndiaMap({ className = "" }: { className?: string }) {
         <defs>
           <clipPath id={`clip-${u}`}><path d={INDIA_PATH} /></clipPath>
           <radialGradient id={`land-${u}`} cx="32%" cy="22%" r="85%">
-            <stop offset="0%" stopColor="#2a48b8" stopOpacity="0.5" />
-            <stop offset="45%" stopColor="#1a2c78" stopOpacity="0.45" />
-            <stop offset="100%" stopColor="#0b1236" stopOpacity="0.55" />
+            <stop offset="0%" stopColor={p.land[0]} stopOpacity="0.5" />
+            <stop offset="45%" stopColor={p.land[1]} stopOpacity="0.45" />
+            <stop offset="100%" stopColor={p.land[2]} stopOpacity="0.55" />
           </radialGradient>
           <linearGradient id={`edge-${u}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#a9c1ff" />
-            <stop offset="55%" stopColor="#7d93ff" />
-            <stop offset="100%" stopColor="#a48bff" />
+            <stop offset="0%" stopColor={p.edge[0]} />
+            <stop offset="55%" stopColor={p.edge[1]} />
+            <stop offset="100%" stopColor={p.edge[2]} />
           </linearGradient>
           <linearGradient id={`route-${u}`} gradientUnits="userSpaceOnUse" x1="0" y1={H} x2="0" y2="0">
-            <stop offset="0%" stopColor="#7aa2ff" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="#d6e0ff" stopOpacity="0.85" />
+            <stop offset="0%" stopColor={p.route[0]} stopOpacity="0.15" />
+            <stop offset="100%" stopColor={p.route[1]} stopOpacity="0.85" />
           </linearGradient>
           <linearGradient id={`scan-${u}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#9db4ff" stopOpacity="0" />
-            <stop offset="50%" stopColor="#9db4ff" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#9db4ff" stopOpacity="0" />
+            <stop offset="0%" stopColor={p.scan} stopOpacity="0" />
+            <stop offset="50%" stopColor={p.scan} stopOpacity="0.16" />
+            <stop offset="100%" stopColor={p.scan} stopOpacity="0" />
           </linearGradient>
           <pattern id={`dots-${u}`} width="5" height="5" patternUnits="userSpaceOnUse">
-            <circle cx="1" cy="1" r="0.6" fill="#b9caff" opacity="0.28" />
+            <circle cx="1" cy="1" r="0.6" fill={p.dot} opacity="0.28" />
           </pattern>
           <radialGradient id={`glow-${u}`}>
-            <stop offset="0%" stopColor="#cfdbff" stopOpacity="0.9" />
-            <stop offset="35%" stopColor="#7d9bff" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="#7d9bff" stopOpacity="0" />
+            <stop offset="0%" stopColor={p.glow[0]} stopOpacity="0.9" />
+            <stop offset="35%" stopColor={p.glow[1]} stopOpacity="0.35" />
+            <stop offset="100%" stopColor={p.glow[1]} stopOpacity="0" />
           </radialGradient>
           <filter id={`halo-${u}`} x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14" /></filter>
           <filter id={`soft-${u}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" /></filter>
         </defs>
 
         {/* halo + lit land */}
-        <path d={INDIA_PATH} fill="#2c4fc9" opacity="0.26" filter={`url(#halo-${u})`} />
+        <path d={INDIA_PATH} fill={p.halo} opacity="0.26" filter={`url(#halo-${u})`} />
         <path d={INDIA_PATH} fill={`url(#land-${u})`} />
         <path d={INDIA_PATH} fill={`url(#dots-${u})`} />
 
         {/* state borders, then a scanning light, clipped to the land */}
         <g clipPath={`url(#clip-${u})`}>
-          {STATE_PATHS.map((s) => <path key={s.name} d={s.d} fill="none" stroke="#9fb4ff" strokeOpacity="0.2" strokeWidth="0.6" strokeLinejoin="round" />)}
+          {STATE_PATHS.map((s) => <path key={s.name} d={s.d} fill="none" stroke={p.state} strokeOpacity="0.2" strokeWidth="0.6" strokeLinejoin="round" />)}
           {!reduce && <rect className="scan" x="0" y="0" width={W} height={H * 0.35} fill={`url(#scan-${u})`} />}
         </g>
         <path d={INDIA_PATH} fill="none" stroke={`url(#edge-${u})`} strokeWidth="1.1" strokeLinejoin="round" />
-        <path d={INDIA_PATH} fill="none" stroke="#c9d6ff" strokeOpacity="0.35" strokeWidth="3" strokeLinejoin="round" filter={`url(#soft-${u})`} />
+        <path d={INDIA_PATH} fill="none" stroke={p.label} strokeOpacity="0.35" strokeWidth="3" strokeLinejoin="round" filter={`url(#soft-${u})`} />
 
         {/* routes to New Delhi: a faint base line plus a flowing dash, and travelling signals */}
         {ROUTES.map((ci, i) => (
           <g key={ci}>
-            <path id={`r-${u}-${i}`} d={arc(pts[ci])} fill="none" stroke="#8ea8ff" strokeOpacity="0.22" strokeWidth="0.8" />
+            <path id={`r-${u}-${i}`} d={arc(pts[ci])} fill="none" stroke={p.base} strokeOpacity="0.22" strokeWidth="0.8" />
             <path d={arc(pts[ci])} fill="none" stroke={`url(#route-${u})`} strokeWidth="1" strokeLinecap="round"
               className={reduce ? "" : "arc-flow"} style={{ animationDuration: `${2.6 + (i % 4) * 0.5}s` }} />
           </g>
@@ -130,7 +140,7 @@ export default function IndiaMap({ className = "" }: { className?: string }) {
           return (
             <g key={i} className={reduce ? "" : "city"} style={{ ["--t" as string]: `${3 + (i % 5) * 0.7}s`, ["--dl" as string]: `-${(i * 0.37) % 4}s`, ["--lo" as string]: tier === 1 ? ".7" : ".4" }}>
               <circle cx={x} cy={y} r={r * 5} fill={`url(#glow-${u})`} opacity={tier === 1 ? 0.9 : 0.6} />
-              <circle cx={x} cy={y} r={r} fill="#eef3ff" />
+              <circle cx={x} cy={y} r={r} fill={p.city} />
             </g>
           );
         })}
@@ -138,13 +148,13 @@ export default function IndiaMap({ className = "" }: { className?: string }) {
         {/* hub: New Delhi */}
         <circle cx={HUB[0]} cy={HUB[1]} r="34" fill={`url(#glow-${u})`} opacity="0.7" />
         {!reduce && <>
-          <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke="#b9caff" strokeWidth="1" className="hub-pulse" />
-          <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke="#b9caff" strokeWidth="1" className="hub-pulse" style={{ animationDelay: "1.6s" }} />
+          <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke={p.dot} strokeWidth="1" className="hub-pulse" />
+          <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke={p.dot} strokeWidth="1" className="hub-pulse" style={{ animationDelay: "1.6s" }} />
         </>}
-        <circle cx={HUB[0]} cy={HUB[1]} r="15" fill="none" stroke="#b9caff" strokeOpacity="0.45" strokeWidth="0.8" strokeDasharray="2 4" className={reduce ? "" : "orbit"} />
-        <circle cx={HUB[0]} cy={HUB[1]} r="4.6" fill="#060a1c" stroke="#e3eaff" strokeWidth="1.5" />
+        <circle cx={HUB[0]} cy={HUB[1]} r="15" fill="none" stroke={p.dot} strokeOpacity="0.45" strokeWidth="0.8" strokeDasharray="2 4" className={reduce ? "" : "orbit"} />
+        <circle cx={HUB[0]} cy={HUB[1]} r="4.6" fill={p.core[0]} stroke={p.core[1]} strokeWidth="1.5" />
         <circle cx={HUB[0]} cy={HUB[1]} r="1.8" fill="#ffffff" />
-        <text x={HUB[0] + 20} y={HUB[1] - 14} className="fill-[#c9d6ff] font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>
+        <text x={HUB[0] + 20} y={HUB[1] - 14} fill={p.label} className="font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>
       </svg>
     </div>
   );
