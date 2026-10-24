@@ -9,13 +9,13 @@ import { EnrolmentLookup } from "./Registrar";
 import { useMounted } from "../components/motion";
 import { FLAG_LABEL, COMPONENT_LABEL } from "../risk";
 import {
-  Badge, Button, Card, Empty, ErrorNote, go, Loading, Meter, PageHeader, Ring, SparkBars, Stat, Table, Td, Updated, usePoll,
+  Badge, Button, Card, Empty, ErrorNote, go, Loading, Meter, PageHeader, Ring, SparkBars, Stat, Table, Td, usePoll,
 } from "../ui";
 
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 
 export default function InstitutionHome() {
-  const { data, error, updatedAt, refresh } = usePoll(() => getJson<S["InstitutionDashboard"]>("/v1/dashboard/institution"));
+  const { data, error, refresh } = usePoll(() => getJson<S["InstitutionDashboard"]>("/v1/dashboard/institution"));
   const risk = usePoll(() => getJson<S["InstitutionRisk"]>("/v1/dqs"), 10000);
 
   if (error && !data) return <ErrorNote>{error}</ErrorNote>;
@@ -39,19 +39,18 @@ export default function InstitutionHome() {
           <span aria-hidden className="text-slate-300">·</span>
           <span>Approved intake from AICTE registry <Badge tone="warning">MOCK</Badge></span>
         </>}
-        actions={<Updated at={updatedAt} />}
       />
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {data.open_notices.length > 0 && (
         <section className="rounded-xl border border-flag-border bg-flag-bg px-5 py-4" aria-labelledby="notices-h">
-          <h2 id="notices-h" className="flex items-center gap-2 text-[13px] font-semibold text-flag-text">
+          <h2 id="notices-h" className="flex items-center gap-2 text-[14.5px] font-semibold text-flag-text">
             <Megaphone className="h-4 w-4" aria-hidden /> Notices from AICTE <Badge tone="flag">{data.open_notices.length}</Badge>
           </h2>
-          <ul className="mt-2 space-y-1.5 text-sm text-slate-800">
+          <ul className="mt-2 space-y-1.5 text-[15px] text-slate-800">
             {data.open_notices.map((n, i) => <li key={i} className="flex gap-2"><span aria-hidden className="mt-2 h-1 w-1 shrink-0 rounded-full bg-flag" />{n}</li>)}
           </ul>
-          <p className="mt-2 text-xs text-mute">Notices never reveal another institution's data. AICTE reviews each case.</p>
+          <p className="mt-2 text-[13px] text-mute">Notices never reveal another institution's data. AICTE reviews each case.</p>
         </section>
       )}
 
@@ -63,7 +62,7 @@ export default function InstitutionHome() {
         <Stat delay={140} label="APAAR verified" value={verified} icon={<UserCheck />}
           hint={`${pct(verified, active)}% of active enrolments`}
           visual={<Ring value={active ? verified / active : 0} size={60} label={`${pct(verified, active)}% verified`}>
-            <span className="text-xs font-semibold text-champagne">{pct(verified, active)}%</span></Ring>} />
+            <span className="text-[13px] font-semibold text-champagne">{pct(verified, active)}%</span></Ring>} />
         <Stat delay={200} label="Without APAAR" value={withoutApaar} tone={withoutApaar ? "warning" : "neutral"} icon={<AlertTriangle />}
           hint={`Refused ${cov.REFUSED ?? 0} · Not generated ${cov.NOT_GENERATED ?? 0} · Pending ${cov.PENDING ?? 0}`} />
         <Stat delay={260} label="Rows rejected" value={data.rejected_rows_total} tone={data.rejected_rows_total ? "error" : "neutral"} icon={<XCircle />}
@@ -138,16 +137,16 @@ function Upload({ onDone }: { onDone: () => void }) {
           <span className={`grid h-11 w-11 place-items-center rounded-full border transition-colors duration-200 ${drag ? "border-gold text-gold" : "border-slate-300 text-slate-500"}`} aria-hidden>
             <UploadCloud className="h-5 w-5" />
           </span>
-          <p className="mt-3 text-sm font-medium text-ink">Drag and drop a CSV file here</p>
-          <p className="mt-1 text-xs text-mute">or</p>
+          <p className="mt-3 text-[15px] font-medium text-ink">Drag and drop a CSV file here</p>
+          <p className="mt-1 text-[13px] text-mute">or</p>
           <Button className="mt-3" onClick={() => input.current?.click()} disabled={busy}>{busy ? "Validating…" : "Choose file"}</Button>
           <input ref={input} type="file" accept=".csv,text/csv" className="sr-only" aria-label="CSV file" onChange={(e) => send(e.target.files?.[0])} />
-          <p className="mt-4 max-w-md text-[11px] leading-relaxed text-slate-400">
+          <p className="mt-4 max-w-md text-[12.5px] leading-relaxed text-slate-400">
             Use the template's 18 columns (apaar_id, institution_student_id, student_name, dob, programme_code, seat_category…).
             Re-uploading the same file is safe: it returns the original batch.
           </p>
         </div>
-        <ul className="space-y-2.5 self-center text-[13px] text-slate-700" aria-label="Checks run on every row">
+        <ul className="space-y-2.5 self-center text-[14.5px] text-slate-700" aria-label="Checks run on every row">
           {CHECKS.map((c) => (
             <li key={c} className="flex items-start gap-2.5"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />{c}</li>
           ))}
@@ -159,7 +158,7 @@ function Upload({ onDone }: { onDone: () => void }) {
         {result && (
           <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+              <p className="flex flex-wrap items-center gap-2 text-[15px] font-medium text-ink">
                 Batch #{result.batch_id}
                 {result.replayed ? <Badge tone="brand">Already uploaded · original batch returned</Badge> : <Badge tone="ok" dot>Validated</Badge>}
               </p>
@@ -169,7 +168,7 @@ function Upload({ onDone }: { onDone: () => void }) {
               {([["Rows", result.counts.rows, "text-ink"], ["Accepted", result.counts.accepted, "text-success-text"],
                 ["Rejected", result.counts.rejected, "text-critical-text"], ["Warnings", result.counts.warnings, "text-warning-text"],
                 ["Flagged for AICTE", result.counts.flags, "text-flag-text"]] as const).map(([k, v, c]) => (
-                <div key={k}><dt className="text-[11px] text-mute">{k}</dt><dd className={`mt-0.5 text-xl font-semibold tabular-nums ${c}`}>{v.toLocaleString()}</dd></div>
+                <div key={k}><dt className="text-[12.5px] text-mute">{k}</dt><dd className={`mt-0.5 text-xl font-semibold tabular-nums ${c}`}>{v.toLocaleString()}</dd></div>
               ))}
             </dl>
           </div>
@@ -199,8 +198,8 @@ function QuickActions() {
             className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-left transition-colors duration-300 hover:border-gold/35 hover:bg-gold/[0.045]">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-gold ring-1 ring-white/[0.05]" aria-hidden><a.icon className="h-4 w-4" /></span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[13px] font-medium text-ink">{a.title}</span>
-              <span className="block truncate text-[11px] text-mute">{a.sub}</span>
+              <span className="block text-[14.5px] font-medium text-ink">{a.title}</span>
+              <span className="block truncate text-[12.5px] text-mute">{a.sub}</span>
             </span>
             <ArrowRight className="h-4 w-4 text-slate-400 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-gold" aria-hidden />
           </button>
@@ -213,32 +212,46 @@ function QuickActions() {
 
 /* ---------- seats ---------- */
 
+// Category colours (validated with the dataviz palette checker: colour-blind safe on the dark surface).
+// Shared by the seat bars and the donut so a colour means the same category everywhere on the page.
+const CAT = { regular: "#9085e9", sn: "#d55181", ciwg: "#c98500" } as const;
+
+function Legend() {
+  const items = [["Regular", CAT.regular], ["Supernumerary FN / OCI", CAT.sn], ["CIWG", CAT.ciwg], ["Over limit", "var(--color-critical)"]] as const;
+  return (
+    <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] text-slate-600">
+      {items.map(([k, c]) => <span key={k} className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: c }} aria-hidden />{k}</span>)}
+    </div>
+  );
+}
+
 function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   return (
     <Card id="seats" delay={440} title="Seats: approved intake vs filled" icon={<BarChart3 />} className="lg:col-span-2 xl:col-span-5"
-      actions={<span>Limits from AICTE registry (MOCK), never from uploads</span>}>
-      {programmes.length === 0 ? <Empty>No approved programmes for this year.</Empty> : (
-        <ul className="space-y-5">
+      actions={<span>Limits from AICTE registry (MOCK)</span>}>
+      {programmes.length === 0 ? <Empty>No approved programmes for this year.</Empty> : (<>
+        <Legend />
+        <ul className="mt-5 space-y-6">
           {programmes.map((p) => {
             const reg = p.lines.find((l) => l.category_code === "REGULAR");
             const sn = p.lines.find((l) => l.category_code === "SN_FN_OCI_CIWG");
             const ciwg = p.lines.find((l) => l.category_code === "SN_FN_OCI_CIWG:CIWG");
             const filled = reg?.filled ?? 0, cap = reg?.cap ?? p.approved_intake;
-            const over = p.lines.some((l) => l.excess > 0);
             return (
               <li key={p.programme_id}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 truncate text-[13px] font-medium text-ink" title={p.name}>{p.name}</span>
-                  <span className="shrink-0 text-[13px] tabular-nums text-slate-700">
-                    <strong className="font-semibold text-ink">{filled}</strong><span className="text-slate-400"> / {cap}</span>
-                    <span className="ml-3 inline-block w-10 text-right text-mute">{pct(filled, cap)}%</span>
+                  <span className="min-w-0 truncate text-[15px] font-semibold text-ink" title={p.name}>{p.name}</span>
+                  <span className="shrink-0 text-[15px] tabular-nums text-slate-700">
+                    <strong className="font-bold text-ink">{filled}</strong><span className="text-slate-500"> / {cap}</span>
+                    <span className="ml-3 inline-block w-11 text-right font-semibold" style={{ color: CAT.regular }}>{pct(filled, cap)}%</span>
                   </span>
                 </div>
-                <SeatBar line={reg ?? { category_code: "REGULAR", filled, cap, excess: 0 }} />
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-mute">
-                  {sn && <span>Supernumerary <span className="tabular-nums text-slate-700">{sn.filled} / {sn.cap}</span></span>}
-                  {ciwg && <span>of which CIWG <span className="tabular-nums text-slate-700">{ciwg.filled} / {ciwg.cap}</span></span>}
-                  {over && p.lines.filter((l) => l.excess > 0).map((l) => (
+                <SeatBar line={reg ?? { category_code: "REGULAR", filled, cap, excess: 0 }} color={`linear-gradient(90deg, #6f63d9, ${CAT.regular})`} thick />
+                {sn && <SnBar sn={sn} ciwg={ciwg} />}
+                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-mute">
+                  {sn && <span>Supernumerary <span className="font-semibold tabular-nums text-slate-700">{sn.filled} / {sn.cap}</span></span>}
+                  {ciwg && <span>of which CIWG <span className="font-semibold tabular-nums text-slate-700">{ciwg.filled} / {ciwg.cap}</span></span>}
+                  {p.lines.filter((l) => l.excess > 0).map((l) => (
                     <Badge key={l.category_code} tone="error">+{l.excess} over {l.category_code === "REGULAR" ? "intake" : "quota"}</Badge>
                   ))}
                 </div>
@@ -246,15 +259,15 @@ function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
             );
           })}
         </ul>
-      )}
+      </>)}
       {programmes.length > 1 && (() => {
         const f = programmes.reduce((a, p) => a + (p.lines.find((l) => l.category_code === "REGULAR")?.filled ?? 0), 0);
         const c = programmes.reduce((a, p) => a + p.approved_intake, 0);
         return (
-          <div className="mt-6 flex items-center justify-between border-t border-line pt-4 text-[13px]">
-            <span className="text-mute">All programmes · regular seats</span>
-            <span className="tabular-nums text-ink"><strong className="font-semibold">{f}</strong><span className="text-slate-400"> / {c}</span>
-              <span className="ml-3 inline-block w-10 text-right text-gold">{pct(f, c)}%</span></span>
+          <div className="mt-6 flex items-center justify-between border-t border-line pt-4 text-[15px]">
+            <span className="text-slate-600">All programmes · regular seats</span>
+            <span className="tabular-nums text-ink"><strong className="font-bold">{f}</strong><span className="text-slate-500"> / {c}</span>
+              <span className="ml-3 inline-block w-11 text-right font-bold" style={{ color: CAT.regular }}>{pct(f, c)}%</span></span>
           </div>
         );
       })()}
@@ -262,16 +275,33 @@ function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   );
 }
 
-/** One category line: gold fill within the cap, red for seats beyond it. */
-export function SeatBar({ line }: { line: S["SeatLine"] }) {
+/** One category line: coloured fill within the cap, red for seats beyond it. */
+export function SeatBar({ line, color = "var(--color-gold)", thick = false }: { line: S["SeatLine"]; color?: string; thick?: boolean }) {
   const on = useMounted(); // bars grow in from zero on first paint
   const max = Math.max(line.cap, line.filled, 1);
   const within = on ? Math.min(line.filled, line.cap) : 0;
   return (
-    <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-white/[0.06]" role="meter" aria-valuemin={0} aria-valuemax={line.cap} aria-valuenow={line.filled}
+    <div className={`mt-2.5 flex overflow-hidden rounded-full bg-white/[0.07] ${thick ? "h-2.5" : "h-1.5"}`} role="meter" aria-valuemin={0} aria-valuemax={line.cap} aria-valuenow={line.filled}
       aria-label={`${line.category_code}: ${line.filled} of ${line.cap} seats${line.excess > 0 ? `, ${line.excess} over` : ""}`}>
-      <div className="h-full bg-gradient-to-r from-accent-500 to-accent-700 transition-[width] duration-1000 ease-out" style={{ width: `${(within / max) * 100}%` }} />
+      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: `${(within / max) * 100}%`, background: color, boxShadow: `0 0 12px -2px ${CAT.regular}66` }} />
       {line.excess > 0 && <div className="h-full bg-critical transition-[width] duration-1000 ease-out" style={{ width: `${((on ? line.excess : 0) / max) * 100}%` }} />}
+    </div>
+  );
+}
+
+/** Supernumerary quota: FN/OCI part in magenta, CIWG part in amber, over-quota in red. */
+function SnBar({ sn, ciwg }: { sn: S["SeatLine"]; ciwg?: S["SeatLine"] }) {
+  const on = useMounted();
+  const max = Math.max(sn.cap, sn.filled, 1);
+  const c = on ? Math.min(ciwg?.filled ?? 0, sn.cap) : 0;
+  const fn = on ? Math.max(Math.min(sn.filled, sn.cap) - c, 0) : 0;
+  const w = (n: number) => `${(n / max) * 100}%`;
+  return (
+    <div className="mt-1.5 flex h-1.5 gap-[2px] overflow-hidden rounded-full bg-white/[0.07]" role="meter" aria-valuemin={0} aria-valuemax={sn.cap} aria-valuenow={sn.filled}
+      aria-label={`Supernumerary: ${sn.filled} of ${sn.cap}${ciwg ? `, of which CIWG ${ciwg.filled}` : ""}${sn.excess > 0 ? `, ${sn.excess} over` : ""}`}>
+      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: w(fn), background: CAT.sn }} />
+      <div className="h-full rounded-full transition-[width] duration-1000 ease-out" style={{ width: w(c), background: CAT.ciwg }} />
+      {sn.excess > 0 && <div className="h-full bg-critical" style={{ width: w(on ? sn.excess : 0) }} />}
     </div>
   );
 }
@@ -281,34 +311,35 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   const regular = sum("REGULAR"), sn = sum("SN_FN_OCI_CIWG"), ciwg = sum("SN_FN_OCI_CIWG:CIWG");
   const total = regular + sn;
   const parts = [
-    { name: "Regular", value: regular, color: "#d4af37" },
-    { name: "Supernumerary FN / OCI", value: Math.max(sn - ciwg, 0), color: "#f7e08a" },
-    { name: "CIWG", value: ciwg, color: "#6b7480" },
+    { name: "Regular", value: regular, color: CAT.regular },
+    { name: "Supernumerary FN / OCI", value: Math.max(sn - ciwg, 0), color: CAT.sn },
+    { name: "CIWG", value: ciwg, color: CAT.ciwg },
   ];
   return (
     <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-3">
       {total === 0 ? <Empty>No enrolments yet.</Empty> : (<>
-        <div className="relative mx-auto h-44 w-44" role="img"
+        <div className="relative mx-auto h-48 w-48" role="img"
           aria-label={`Filled seats by category: ${parts.map((p) => `${p.name} ${p.value}`).join(", ")}`}>
+          <div aria-hidden className="absolute inset-6 rounded-full blur-2xl" style={{ background: `radial-gradient(${CAT.regular}33, transparent 70%)` }} />
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               {/* no animation: the dashboard polls every 3s and would replay it */}
-              <Pie data={parts.filter((p) => p.value > 0)} dataKey="value" innerRadius="74%" outerRadius="100%" paddingAngle={2}
+              <Pie data={parts.filter((p) => p.value > 0)} dataKey="value" innerRadius="76%" outerRadius="100%" paddingAngle={3} cornerRadius={4}
                 stroke="none" startAngle={90} endAngle={-270} isAnimationActive={false}>
                 {parts.filter((p) => p.value > 0).map((p) => <Cell key={p.name} fill={p.color} />)}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
-            <div><div className="text-3xl font-semibold tabular-nums text-ink">{total}</div><div className="text-[11px] text-mute">seats filled</div></div>
+            <div><div className="font-display text-[38px] font-bold leading-none tabular-nums text-ink">{total}</div><div className="mt-1 text-[13px] text-mute">seats filled</div></div>
           </div>
         </div>
-        <ul className="mt-5 space-y-2.5 text-[13px]">
+        <ul className="mt-6 space-y-3 text-[14.5px]">
           {parts.map((p) => (
             <li key={p.name} className="flex items-center justify-between gap-3">
-              <span className="flex min-w-0 items-center gap-2 text-slate-700"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: p.color }} aria-hidden />
+              <span className="flex min-w-0 items-center gap-2.5 text-slate-700"><span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: p.color }} aria-hidden />
                 <span className="truncate">{p.name}</span></span>
-              <span className="shrink-0 tabular-nums text-ink">{p.value} <span className="text-mute">({pct(p.value, total)}%)</span></span>
+              <span className="shrink-0 tabular-nums text-ink"><span className="font-semibold">{p.value}</span> <span className="text-mute">({pct(p.value, total)}%)</span></span>
             </li>
           ))}
         </ul>
@@ -319,30 +350,34 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
 
 /* ---------- data quality + anomalies ---------- */
 
-const scoreTone = (s: number) => (s >= 85 ? { c: "var(--color-success)", t: "text-success-text", w: "Good" } : s >= 65
+const EMERALD = "#2ee59d";
+const scoreTone = (s: number) => (s >= 85 ? { c: EMERALD, t: "text-success-text", w: "Good" } : s >= 65
   ? { c: "var(--color-warning)", t: "text-warning-text", w: "Fair" } : { c: "var(--color-critical)", t: "text-critical-text", w: "Needs attention" });
-const barColor = (v: number) => (v >= 0.9 ? "bg-success" : v >= 0.6 ? "bg-warning" : "bg-critical");
+const barColor = (v: number) => (v >= 0.9 ? "bg-gradient-to-r from-[#10b981] to-[#4ef0a8]" : v >= 0.6 ? "bg-warning" : "bg-critical");
 
 function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error: string | null }) {
   const d = risk?.dqs;
+  const tone = d ? scoreTone(d.score) : null;
   return (
     <Card id="quality" delay={560} title="Data quality score" icon={<ShieldCheck />} className="xl:col-span-4" actions={<span>What AICTE's inspection queue sees</span>}>
-      {error ? <ErrorNote>{error}</ErrorNote> : !risk ? <p className="py-8 text-center text-sm text-mute">Loading…</p> : !d ? <Empty>Upload student records to get a score.</Empty> : (
-        <div className="grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
+      {error ? <ErrorNote>{error}</ErrorNote> : !risk ? <p className="py-8 text-center text-[15px] text-mute">Loading…</p> : !d || !tone ? <Empty>Upload student records to get a score.</Empty> : (
+        <div className="grid items-center gap-6 sm:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex flex-col items-center">
-            <Ring value={d.score / 100} size={112} stroke={7} color={scoreTone(d.score).c} label={`Data quality score ${Math.round(d.score)} of 100`}>
-              <div><div className="text-3xl font-semibold tabular-nums text-ink">{Math.round(d.score)}</div><div className="text-[11px] text-mute">/ 100</div></div>
-            </Ring>
-            <span className={`mt-2 text-xs font-medium ${scoreTone(d.score).t}`}>{scoreTone(d.score).w}</span>
+            <div style={{ filter: `drop-shadow(0 0 14px ${tone.c}55)` }}>
+              <Ring value={d.score / 100} size={124} stroke={8} color={tone.c} label={`Data quality score ${Math.round(d.score)} of 100`}>
+                <div><div className="font-display text-[40px] font-bold leading-none tabular-nums text-ink">{Math.round(d.score)}</div><div className="mt-1 text-[13px] text-mute">/ 100</div></div>
+              </Ring>
+            </div>
+            <span className={`mt-3 text-[14px] font-bold ${tone.t}`}>{tone.w}</span>
           </div>
-          <ul className="space-y-2.5">
+          <ul className="space-y-3">
             {Object.entries(d.components).map(([k, v]) => (
-              <li key={k} className="text-[11.5px]">
+              <li key={k} className="text-[13.5px]">
                 <div className="flex justify-between gap-2">
-                  <span className="truncate text-slate-700">{COMPONENT_LABEL[k] ?? k} <span className="text-slate-400">· {Math.round(d.weights[k] * 100)}%</span></span>
-                  <span className="tabular-nums text-ink">{Math.round(v * 100)}%</span>
+                  <span className="truncate text-slate-700">{COMPONENT_LABEL[k] ?? k} <span className="text-slate-500">· {Math.round(d.weights[k] * 100)}%</span></span>
+                  <span className="font-semibold tabular-nums text-ink">{Math.round(v * 100)}%</span>
                 </div>
-                <Meter value={v} color={barColor(v)} className="mt-1" />
+                <Meter value={v} color={barColor(v)} className="mt-1.5" />
               </li>
             ))}
           </ul>
@@ -356,12 +391,12 @@ function AnomalyCard({ risk }: { risk: S["InstitutionRisk"] | null }) {
   const flags = risk?.flags ?? [];
   return (
     <Card delay={680} title="Anomaly flags" icon={<Siren />} className="xl:col-span-3" actions={risk && <Badge tone={flags.length ? "warning" : "ok"} dot>{flags.length} active</Badge>}>
-      {!risk ? <p className="py-8 text-center text-sm text-mute">Loading…</p> : flags.length === 0 ? (
+      {!risk ? <p className="py-8 text-center text-[15px] text-mute">Loading…</p> : flags.length === 0 ? (
         <div className="flex items-start gap-3 rounded-lg border border-success-border bg-success-bg p-4">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success-text" aria-hidden />
           <div>
-            <p className="text-[13px] font-medium text-success-text">No anomaly flags</p>
-            <p className="mt-0.5 text-xs text-mute">Nothing from your uploads is in AICTE's risk-based inspection queue for anomalies.</p>
+            <p className="text-[14.5px] font-medium text-success-text">No anomaly flags</p>
+            <p className="mt-0.5 text-[13px] text-mute">Nothing from your uploads is in AICTE's risk-based inspection queue for anomalies.</p>
           </div>
         </div>
       ) : (
@@ -370,14 +405,14 @@ function AnomalyCard({ risk }: { risk: S["InstitutionRisk"] | null }) {
             <li key={i} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="warning">{FLAG_LABEL[f.type] ?? f.type}</Badge>
-                {f.programme && <span className="text-xs text-mute">{f.programme}</span>}
+                {f.programme && <span className="text-[13px] text-mute">{f.programme}</span>}
               </div>
-              <p className="mt-1.5 text-[13px] text-slate-700">{f.explanation}</p>
+              <p className="mt-1.5 text-[14.5px] text-slate-700">{f.explanation}</p>
             </li>
           ))}
         </ul>
       )}
-      <p className="mt-3 text-[11px] text-slate-400">Risk indicators for review, not proof of misconduct.</p>
+      <p className="mt-3 text-[12.5px] text-slate-400">Risk indicators for review, not proof of misconduct.</p>
     </Card>
   );
 }

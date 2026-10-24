@@ -68,9 +68,9 @@ export function PageHeader({ eyebrow, title, meta, actions }: { eyebrow?: ReactN
   return (
     <header className="rise flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        {eyebrow && <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold">{eyebrow}</p>}
-        <h1 className="mt-2.5 font-display text-[40px] font-normal leading-[1.02] tracking-[-0.01em] text-ink sm:text-[52px]">{title}</h1>
-        {meta && <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-mute">{meta}</div>}
+        {eyebrow && <p className="text-[12.5px] font-bold uppercase tracking-[0.16em] text-gold">{eyebrow}</p>}
+        <h1 className="mt-2.5 font-display text-[42px] font-extrabold leading-[1.04] tracking-[-0.025em] text-ink sm:text-[50px]">{title}</h1>
+        {meta && <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-slate-600">{meta}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </header>
@@ -93,11 +93,11 @@ export function Card({ title, actions, children, className = "", id, icon, bodyC
       className={`glass spotlight rise min-w-0 scroll-mt-28 rounded-2xl ${className}`}>
       {(title || actions) && (
         <header className="relative flex flex-wrap items-center justify-between gap-3 px-5 pt-[18px] pb-3">
-          <h2 className="flex items-center gap-2 text-[13.5px] font-medium tracking-[-0.005em] text-ink">
-            {icon && <span className="text-gold [&>svg]:h-4 [&>svg]:w-4" aria-hidden>{icon}</span>}
+          <h2 className="flex items-center gap-2.5 font-display text-[17px] font-bold tracking-[-0.01em] text-ink">
+            {icon && <span className="text-gold [&>svg]:h-[18px] [&>svg]:w-[18px]" aria-hidden>{icon}</span>}
             {title}
           </h2>
-          {actions && <div className="flex flex-wrap items-center gap-2 text-xs text-mute">{actions}</div>}
+          {actions && <div className="flex flex-wrap items-center gap-2 text-[13px] text-mute">{actions}</div>}
         </header>
       )}
       <div className={`relative ${bodyClassName}`}>{children}</div>
@@ -119,7 +119,7 @@ export const TONE_TEXT = { neutral: "text-ink", error: "text-critical-text", war
 
 export function Badge({ tone = "neutral", children, dot = false }: { tone?: Tone; children: ReactNode; dot?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium ${TONES[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[12px] font-semibold ${TONES[tone]}`}>
       {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOT[tone]}`} aria-hidden="true" />}
       {children}
     </span>
@@ -134,14 +134,14 @@ export function Stat({ label, value, tone = "neutral", hint, icon, visual, delay
     <div onMouseMove={spot} style={{ ["--d" as string]: `${delay}ms` }}
       className="glass spotlight rise flex min-w-0 items-center justify-between gap-4 rounded-2xl p-5 transition-[transform,border-color] duration-300 hover:-translate-y-0.5 hover:border-white/[0.11]">
       <div className="relative min-w-0">
-        <div className="flex items-center gap-2 text-[12px] font-medium text-mute">
+        <div className="flex items-center gap-2.5 text-[14px] font-medium text-slate-600">
           {icon && <span className={`grid h-7 w-7 place-items-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.05] [&>svg]:h-3.5 [&>svg]:w-3.5 ${tone === "neutral" ? "text-gold" : TONE_TEXT[tone]}`} aria-hidden>{icon}</span>}
           {label}
         </div>
-        <div className={`mt-3.5 text-[34px] font-medium leading-none tracking-[-0.03em] tabular-nums ${TONE_TEXT[tone]}`}>
+        <div className={`mt-4 font-display text-[40px] font-bold leading-none tracking-[-0.03em] tabular-nums ${TONE_TEXT[tone]}`}>
           {typeof value === "number" ? <AnimatedCounter value={value} /> : value}
         </div>
-        {hint && <div className="mt-2 text-xs text-mute">{hint}</div>}
+        {hint && <div className="mt-2.5 text-[13.5px] leading-snug text-mute">{hint}</div>}
       </div>
       {visual && <div className="relative shrink-0">{visual}</div>}
     </div>
@@ -206,7 +206,7 @@ export function Empty({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
       <Inbox className="h-5 w-5 text-slate-400" aria-hidden />
-      <p className="max-w-sm text-sm text-mute">{children}</p>
+      <p className="max-w-sm text-[15px] text-mute">{children}</p>
     </div>
   );
 }
@@ -233,7 +233,7 @@ export function Button({ variant = "primary", className = "", ...p }: React.Butt
   }[variant];
   return (
     <button {...p}
-      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed ${v} ${className}`} />
+      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-[14px] font-semibold transition-colors duration-150 disabled:cursor-not-allowed ${v} ${className}`} />
   );
 }
 
@@ -295,9 +295,9 @@ export function ReportsCard({ institutions, id }: { institutions?: { id: string;
 export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
     <div className="-mx-5 overflow-x-auto">
-      <table className="min-w-full text-[13px]">
+      <table className="min-w-full text-[14.5px]">
         <thead>
-          <tr className="border-y border-line text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+          <tr className="border-y border-line text-left text-[11.5px] font-bold uppercase tracking-[0.08em] text-slate-500">
             {head.map((h, i) => <th key={i} scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold first:pl-5 last:pr-5">{h}</th>)}
           </tr>
         </thead>

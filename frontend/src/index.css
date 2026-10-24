@@ -156,7 +156,8 @@ body {
    accent becomes gold, status colours become muted dark-mode tints.
    =================================================================== */
 @theme {
-  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-display: "Cabinet Grotesk", "Satoshi", ui-sans-serif, system-ui, sans-serif;
+  --font-app: "Satoshi", "Inter", ui-sans-serif, system-ui, sans-serif;
   --color-canvas: #0b0f14;
   --color-surface: #111820;
   --color-raised: #161f29;
@@ -164,11 +165,16 @@ body {
   --color-gold: #d4af37;
   --color-champagne: #f7e08a;
   --color-ink: #f5f5f5;
+  --color-cat-regular: #9085e9;
+  --color-cat-sn: #d55181;
+  --color-cat-ciwg: #c98500;
   --color-mute: #9ca3af;
 }
 
 .theme-gold {
   color-scheme: dark;
+  font-family: var(--font-app);
+  font-size: 15px;
 
   --color-slate-50: #0f151c;  --color-slate-100: #161e28; --color-slate-200: #222c37;
   --color-slate-300: #2f3a46; --color-slate-400: #6b7480; --color-slate-500: #9ca3af;
@@ -187,15 +193,15 @@ body {
   --color-brand-50: #19160d; --color-brand-100: #221d10; --color-brand-600: #d4af37;
   --color-brand-700: #e3c45c; --color-brand-900: #f5f5f5;
 
-  --color-success: #3fb68b; --color-success-hover: #2f9c74; --color-success-text: #86dcb9;
-  --color-success-bg: rgb(63 182 139 / 0.1); --color-success-border: rgb(63 182 139 / 0.3);
+  --color-success: #22c983; --color-success-hover: #1aa86d; --color-success-text: #5ee6a8;
+  --color-success-bg: rgb(34 201 131 / 0.11); --color-success-border: rgb(34 201 131 / 0.32);
   --color-critical: #e5534b; --color-critical-hover: #cc423b; --color-critical-text: #f39a94;
   --color-critical-bg: rgb(229 83 75 / 0.1); --color-critical-border: rgb(229 83 75 / 0.32);
   --color-warning: #e8913a; --color-warning-hover: #cf7c2a; --color-warning-text: #f4bb80;
   --color-warning-bg: rgb(232 145 58 / 0.1); --color-warning-border: rgb(232 145 58 / 0.32);
   --color-flag: #8f9cf3; --color-flag-hover: #7884e0; --color-flag-text: #bcc4fa;
   --color-flag-bg: rgb(143 156 243 / 0.1); --color-flag-border: rgb(143 156 243 / 0.3);
-  --color-ok: #3fb68b; --color-ok-bg: rgb(63 182 139 / 0.1);
+  --color-ok: #22c983; --color-ok-bg: rgb(34 201 131 / 0.11);
   --color-err: #e5534b; --color-err-bg: rgb(229 83 75 / 0.1);
   --color-warn: #e8913a; --color-warn-bg: rgb(232 145 58 / 0.1);
   --color-amber-500: #e8913a;
@@ -297,11 +303,14 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
 .hub-pulse { transform-box: fill-box; transform-origin: center; animation: hubPulse 3.2s cubic-bezier(.2,.6,.3,1) infinite; }
 
 /* Landing backdrop (blue/violet, static) */
+/* royal blue: deep sapphire base, a royal-blue crown light, indigo depth and a faint gold warmth */
 .ambient-blue {
   background:
-    radial-gradient(1000px 640px at 12% -8%, rgb(59 107 255 / 0.16), transparent 62%),
-    radial-gradient(900px 640px at 100% 100%, rgb(124 92 255 / 0.12), transparent 60%),
-    #050816;
+    radial-gradient(1100px 700px at 18% -12%, rgb(30 64 175 / 0.42), transparent 62%),
+    radial-gradient(900px 620px at 92% 8%, rgb(37 50 150 / 0.30), transparent 60%),
+    radial-gradient(1000px 700px at 75% 110%, rgb(55 48 163 / 0.30), transparent 60%),
+    radial-gradient(700px 500px at 0% 100%, rgb(212 175 55 / 0.05), transparent 65%),
+    linear-gradient(180deg, #070d2e 0%, #050a24 55%, #04081d 100%);
 }
 @keyframes arcFade { from { opacity: 0; } to { opacity: 1; } }
 .arc-fade { animation: arcFade 1.2s ease-out both; }
