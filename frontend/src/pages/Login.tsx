@@ -1,78 +1,11 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, UserCheck, X } from "lucide-react";
+import { Fingerprint, X } from "lucide-react";
 import { activateAndRegister, ApiError, getJson, login, passkeyLogin, studentLogin, type S, type Session } from "../api/client";
 import { passkeyError, passkeysSupported } from "../webauthn";
 import Hero from "../components/Hero";
 import IdentityPanel from "../components/IdentityPanel";
 import IndiaMap from "../components/IndiaMap";
 import Navbar from "../components/Navbar";
-
-function LightStreaks() {
-  return (
-    <div
-      className="pointer-events-none absolute bottom-0 left-0 h-[460px] w-[560px] select-none overflow-hidden z-0"
-      aria-hidden="true"
-    >
-      <svg
-        className="h-full w-full"
-        viewBox="0 0 600 500"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id="streakGrad1" x1="0%" y1="100%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#2563ff" stopOpacity="0" />
-            <stop offset="25%" stopColor="#2563ff" stopOpacity="0.8" />
-            <stop offset="60%" stopColor="#38bdf8" stopOpacity="0.9" />
-            <stop offset="100%" stopColor="#38bdf8" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id="streakGrad2" x1="0%" y1="100%" x2="80%" y2="20%">
-            <stop offset="0%" stopColor="#7c5cff" stopOpacity="0" />
-            <stop offset="35%" stopColor="#2563ff" stopOpacity="0.6" />
-            <stop offset="75%" stopColor="#38bdf8" stopOpacity="0.8" />
-            <stop offset="100%" stopColor="#60a5fa" stopOpacity="0" />
-          </linearGradient>
-          <filter id="streakGlow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="8" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-
-        {/* Ambient Corner Glow */}
-        <circle cx="50" cy="450" r="160" fill="#2563ff" fillOpacity="0.2" filter="blur(60px)" />
-        <circle cx="150" cy="400" r="110" fill="#38bdf8" fillOpacity="0.16" filter="blur(50px)" />
-
-        {/* Swooping Curved Light Streaks */}
-        <path
-          d="M -50 480 C 100 480, 220 400, 340 280 C 420 200, 480 120, 520 40"
-          stroke="url(#streakGrad1)"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-          filter="url(#streakGlow)"
-          className="animate-streak"
-        />
-        <path
-          d="M -30 520 C 130 510, 240 430, 380 320 C 470 240, 530 160, 570 80"
-          stroke="url(#streakGrad2)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          opacity="0.6"
-        />
-        <path
-          d="M 10 500 C 120 470, 200 420, 290 350 C 370 290, 430 210, 470 150"
-          stroke="url(#streakGrad1)"
-          strokeWidth="1.2"
-          strokeDasharray="4 6"
-          opacity="0.4"
-        />
-      </svg>
-    </div>
-  );
-}
 
 export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   const [selectedId, setSelectedId] = useState("inst-a");
@@ -102,76 +35,47 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   }
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050816] text-white selection:bg-[#2563ff] selection:text-white overflow-x-hidden">
-      {/* Background Layer: Deep navy with layered electric blue & violet radial glows */}
-      <div
-        className="pointer-events-none fixed inset-0 z-0 select-none overflow-hidden"
-        aria-hidden="true"
-      >
-        <div className="absolute -left-48 -top-48 h-[650px] w-[650px] rounded-full bg-[#2563ff]/15 blur-[140px]" />
-        <div className="absolute right-0 top-1/4 h-[700px] w-[700px] rounded-full bg-[#7c5cff]/12 blur-[150px]" />
-        <div className="absolute bottom-0 right-1/4 h-[500px] w-[500px] rounded-full bg-[#2563ff]/10 blur-[120px]" />
-      </div>
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#050816] text-white selection:bg-[#3b6bff]/60 selection:text-white">
+      <div aria-hidden className="ambient-blue pointer-events-none fixed inset-0 z-0" />
+      <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-70" />
 
-      {/* Swooping light streaks in the bottom-left corner */}
-      <LightStreaks />
-
-      {/* Top Navbar */}
       <Navbar />
 
-      {/* Main Container */}
-      <main className="relative z-10 mx-auto flex w-full max-w-7xl flex-col justify-center px-4 py-8 sm:px-6 lg:px-8 min-h-[calc(100vh-64px)]">
-        {/* Full-Page Hero & Identity Gateway Layout */}
-        <div className="relative grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-12 xl:gap-16">
-          {/* Glowing Digital India Map Mesh (placed behind/between hero and panel) */}
-          <div className="pointer-events-none absolute left-[45%] top-[50%] -translate-x-1/2 -translate-y-1/2 z-0 hidden lg:block opacity-65 xl:opacity-85 max-w-[500px] xl:max-w-[580px]">
-            <IndiaMap />
-          </div>
-
-          {/* Left Column (~45%): Hero Section */}
-          <div className="relative z-10 w-full">
-            <Hero onOpenStudentModal={() => setShowStudentModal(true)} />
-          </div>
-
-          {/* Right Column (~50%): Choose Your Identity Panel */}
-          <div className="relative z-10 w-full">
-            <IdentityPanel
-              selectedId={selectedId}
-              onSelectId={(id) => setSelectedId(id)}
-              password={password}
-              onPasswordChange={(pwd) => setPassword(pwd)}
-              onSubmit={handlePortalLogin}
-              busy={busy}
-              error={error}
-            />
-          </div>
+      <main className="relative z-10 mx-auto grid w-full max-w-[1320px] grid-cols-1 items-center gap-12 px-5 pb-14 pt-4 sm:px-8 lg:min-h-[calc(100vh-80px)] lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-10 xl:gap-16">
+        {/* map: between the text and the panel; its eastern half sits under the frosted panel */}
+        <div className="pointer-events-none absolute left-[530px] top-1/2 hidden w-[620px] -translate-y-1/2 xl:block 2xl:left-[560px] 2xl:w-[660px]">
+          <IndiaMap />
+        </div>
+        <div className="relative min-w-0 max-w-[540px]">
+          <Hero onOpenStudentModal={() => setShowStudentModal(true)} />
+        </div>
+        <div className="relative">
+          <IdentityPanel selectedId={selectedId} onSelectId={setSelectedId} password={password} onPasswordChange={setPassword}
+            onSubmit={handlePortalLogin} busy={busy} error={error} />
         </div>
       </main>
+      <p className="relative z-10 mx-auto max-w-[1320px] px-5 pb-6 text-[10.5px] text-[#55607e] sm:px-8">
+        Map: India boundaries by <a className="underline decoration-white/20 underline-offset-2 hover:text-[#8b9bbd]" href="https://github.com/datameet/maps" target="_blank" rel="noreferrer">DataMeet</a> (CC BY 4.0), simplified. Illustration only.
+      </p>
 
       {/* Student Login Modal */}
       {showStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#02040b]/75 p-4 backdrop-blur-md"
           onKeyDown={(e) => e.key === "Escape" && setShowStudentModal(false)}>
           <div role="dialog" aria-modal="true" aria-labelledby="student-signin-title"
-            className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[24px] border border-blue-500/30 bg-[#080f24] p-6 sm:p-7 shadow-2xl text-white ring-1 ring-white/10 animate-fade-in">
+            className="rise relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[22px] border border-white/[0.09] bg-[#0a1024]/85 p-6 text-white shadow-[0_40px_80px_-30px_rgba(0,0,0,0.9)] backdrop-blur-2xl sm:p-7">
             <button
               autoFocus
               onClick={() => setShowStudentModal(false)}
-              className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+              className="absolute right-4 top-4 rounded-full p-1.5 text-[#8b9bbd] transition-colors hover:bg-white/[0.06] hover:text-white"
               aria-label="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600/30 text-blue-400 border border-blue-500/40 shadow-sm">
-                <UserCheck className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 id="student-signin-title" className="font-bold text-base text-white">Students and guardians</h3>
-                <p className="text-xs text-[#9fb0d0]">Passkey sign-in · no password</p>
-              </div>
-            </div>
+            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#8ea8ff]">Passkey sign-in</p>
+            <h3 id="student-signin-title" className="mt-2 font-display text-[32px] leading-none text-white">Students and guardians</h3>
+            <p className="mt-2 text-[13px] text-[#8b9bbd]">Fingerprint, face or device PIN. No password.</p>
 
             <StudentSignIn onLogin={onLogin} />
           </div>
@@ -181,8 +85,8 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   );
 }
 
-const field = "w-full rounded-xl border border-slate-700 bg-[#060a16] px-3.5 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
-const label = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300";
+const field = "w-full rounded-xl border border-white/[0.09] bg-[#060b1c]/70 px-3.5 py-2.5 text-sm text-white focus:border-[#7aa2ff]/60 focus:outline-none focus:ring-2 focus:ring-[#7aa2ff]/20";
+const label = "mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.18em] text-[#6f7fa3]";
 
 /** Students and guardians: passkey sign-in, first-time activation, and (DEMO_MODE only) the MOCK date-of-birth fallback. */
 function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
@@ -217,7 +121,7 @@ function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
     <div className="mt-5 space-y-5">
       {supported ? (
         <button type="button" disabled={busy} onClick={() => run(async () => onLogin(await passkeyLogin()))}
-          className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r from-[#2563ff] via-[#4f46e5] to-[#7c5cff] py-3 text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50">
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#3b6bff] py-3 text-[14px] font-medium text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] transition-colors hover:bg-[#4a78ff] disabled:opacity-50">
           <Fingerprint className="h-4 w-4" aria-hidden /> {busy ? "Waiting for passkey…" : "Sign in with passkey"}
         </button>
       ) : <p className="text-xs text-rose-300">This browser doesn't support passkeys.</p>}

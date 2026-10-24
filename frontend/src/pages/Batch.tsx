@@ -130,7 +130,7 @@ export default function BatchDetail({ id }: { id: number }) {
               <select
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-gov-900 shadow-xs focus:border-accent-600"
+                className="rounded-xl border border-slate-300 bg-surface px-2.5 py-1 text-xs font-medium text-gov-900 shadow-xs focus:border-accent-600"
               >
                 <option value="all">All validation codes</option>
                 {codes.map((c) => (

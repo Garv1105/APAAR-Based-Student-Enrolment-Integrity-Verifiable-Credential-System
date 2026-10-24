@@ -46,23 +46,14 @@ export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" })
   }
 
   return (
-    <Card
-      title={
-        <div className="flex items-center gap-2">
-          <Search className="h-4 w-4 text-accent-600" />
-          <span>{mode === "registrar" ? "Locate Affiliated Candidate" : "Student Registry & Credential Management"}</span>
-        </div>
-      }
-      actions={
-        <span className="text-xs text-slate-500 font-medium">
-          Query by 12-digit APAAR ID or institutional roll number
-        </span>
-      }
+    <Card icon={<Search />} delay={740}
+      title={mode === "registrar" ? "Find a student" : "Students & credentials"}
+      actions={<span>Search by 12-digit APAAR ID or student ID</span>}
     >
       <form onSubmit={search} className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[280px]">
-          <label htmlFor="search-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">
-            Candidate Identifier
+          <label htmlFor="search-input" className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+            APAAR ID or student ID
           </label>
           <div className="relative">
             <input
@@ -71,13 +62,13 @@ export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" })
               onChange={(e) => setQ(e.target.value)}
               required
               placeholder="e.g. 123456789012 or CS-2024-001"
-              className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 font-mono text-sm text-gov-900 shadow-xs focus:border-accent-600 focus:ring-1 focus:ring-accent-600"
+              className="w-full rounded-xl border border-white/[0.09] bg-white/[0.025] px-3.5 py-2.5 pr-10 font-mono text-sm text-ink transition-colors placeholder:text-slate-400 focus:border-gold/50 focus:outline-none focus:ring-2 focus:ring-gold/15"
             />
-            <Search className="pointer-events-none absolute right-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="pointer-events-none absolute right-3.5 top-3 h-4 w-4 text-slate-400" aria-hidden />
           </div>
         </div>
         <Button type="submit" disabled={busy || !q.trim()}>
-          {busy ? "Searching…" : "Search Registry"}
+          {busy ? "Searching…" : "Search"}
         </Button>
       </form>
 
@@ -90,7 +81,7 @@ export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" })
       {rows && (
         <div className="mt-6">
           {rows.length === 0 ? (
-            <Empty>No matching enrolment records found in your jurisdiction.</Empty>
+            <Empty>No matching enrolment you can see.</Empty>
           ) : (
             <div className="space-y-4">
               {rows.map((e) => (
@@ -156,7 +147,7 @@ function EnrolmentPanel({
     );
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-slate-300">
+    <div className="rounded-2xl border border-slate-200/90 bg-surface p-5 shadow-xs transition-all hover:border-slate-300">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent-50 text-accent-700">

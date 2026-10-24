@@ -73,7 +73,7 @@ function Brand() {
     <span className="flex items-center gap-3">
       <span aria-hidden className="grid h-10 w-10 place-items-center rounded-full border border-gold/60 font-display text-xl leading-none text-gold">A</span>
       <span className="leading-tight">
-        <span className="block text-[15px] font-semibold tracking-tight text-ink">APAAR Integrity</span>
+        <span className="block text-[15px] font-semibold tracking-[-0.01em] text-ink">APAAR Integrity</span>
         <span className="block text-[11px] text-mute">Seat integrity &amp; credentials</span>
       </span>
     </span>
@@ -119,8 +119,11 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
   return (
     <MotionConfig reducedMotion="user">
       <div className="theme-gold min-h-screen antialiased lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
+        {/* ambient light behind the glass surfaces (static) */}
+        <div aria-hidden className="ambient-gold no-print pointer-events-none fixed inset-0" />
+        <div aria-hidden className="ambient-grid no-print pointer-events-none fixed inset-0 opacity-60" />
         {/* Sidebar (desktop) */}
-        <aside className="no-print sticky top-0 hidden h-screen flex-col border-r border-line bg-[#0d1218] lg:flex">
+        <aside className="no-print sticky top-0 z-20 hidden h-screen flex-col border-r border-white/[0.06] bg-[#0b0f14]/55 backdrop-blur-xl lg:flex">
           <div className="px-5 pb-6 pt-6"><a href={`#${home}`} onClick={() => setActive("top")} aria-label="Dashboard home"><Brand /></a></div>
           <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3">
             {groups.map((g, i) => (
@@ -150,9 +153,9 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-col">
+        <div className="relative flex min-w-0 flex-col">
           {/* Top bar: mobile shows brand + nav strip + MOCK note; desktop shows a thin context bar */}
-          <header className="no-print sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md">
+          <header className="no-print sticky top-0 z-30 border-b border-white/[0.06] bg-[#0b0f14]/60 backdrop-blur-xl">
             <div className="flex items-center justify-between gap-3 px-4 py-3 lg:hidden">
               <a href={`#${home}`} aria-label="Dashboard home"><Brand /></a>
               {onLogout && (

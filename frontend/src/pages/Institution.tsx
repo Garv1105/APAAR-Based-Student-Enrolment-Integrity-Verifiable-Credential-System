@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
 import { EnrolmentLookup } from "./Registrar";
+import { useMounted } from "../components/motion";
 import { FLAG_LABEL, COMPONENT_LABEL } from "../risk";
 import {
   Badge, Button, Card, Empty, ErrorNote, go, Loading, Meter, PageHeader, Ring, SparkBars, Stat, Table, Td, Updated, usePoll,
@@ -56,16 +57,16 @@ export default function InstitutionHome() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Active enrolments" value={active} icon={<Users />}
+        <Stat delay={80} label="Active enrolments" value={active} icon={<Users />}
           hint="All count toward intake, with or without APAAR"
           visual={<SparkBars values={chrono.map((b) => b.counts.accepted)} label="Accepted rows per upload batch, oldest to newest" />} />
-        <Stat label="APAAR verified" value={verified} icon={<UserCheck />}
+        <Stat delay={140} label="APAAR verified" value={verified} icon={<UserCheck />}
           hint={`${pct(verified, active)}% of active enrolments`}
           visual={<Ring value={active ? verified / active : 0} size={60} label={`${pct(verified, active)}% verified`}>
             <span className="text-xs font-semibold text-champagne">{pct(verified, active)}%</span></Ring>} />
-        <Stat label="Without APAAR" value={withoutApaar} tone={withoutApaar ? "warning" : "neutral"} icon={<AlertTriangle />}
+        <Stat delay={200} label="Without APAAR" value={withoutApaar} tone={withoutApaar ? "warning" : "neutral"} icon={<AlertTriangle />}
           hint={`Refused ${cov.REFUSED ?? 0} · Not generated ${cov.NOT_GENERATED ?? 0} · Pending ${cov.PENDING ?? 0}`} />
-        <Stat label="Rows rejected" value={data.rejected_rows_total} tone={data.rejected_rows_total ? "error" : "neutral"} icon={<XCircle />}
+        <Stat delay={260} label="Rows rejected" value={data.rejected_rows_total} tone={data.rejected_rows_total ? "error" : "neutral"} icon={<XCircle />}
           hint="All batches · not counted until corrected"
           visual={<SparkBars values={chrono.map((b) => b.counts.rejected)} color="var(--color-critical)" label="Rejected rows per upload batch, oldest to newest" />} />
       </div>
@@ -125,14 +126,14 @@ function Upload({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Card id="upload" title="Upload student records" icon={<UploadCloud />} className="xl:col-span-2"
+    <Card id="upload" delay={320} title="Upload student records" icon={<UploadCloud />} className="xl:col-span-2"
       actions={<span>CSV · validated row by row</span>}>
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
         <div
           onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
           onDragLeave={() => setDrag(false)}
           onDrop={(e) => { e.preventDefault(); setDrag(false); send(e.dataTransfer.files[0]); }}
-          className={`flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-8 text-center transition-colors duration-200 ${drag ? "border-gold bg-gold/[0.06]" : "border-slate-300 bg-canvas/40"}`}
+          className={`flex flex-col items-center justify-center rounded-lg border border-dashed px-6 py-8 text-center transition-colors duration-200 ${drag ? "border-gold/70 bg-gold/[0.06]" : "border-white/[0.18] bg-white/[0.015] hover:border-gold/40"}`}
         >
           <span className={`grid h-11 w-11 place-items-center rounded-full border transition-colors duration-200 ${drag ? "border-gold text-gold" : "border-slate-300 text-slate-500"}`} aria-hidden>
             <UploadCloud className="h-5 w-5" />
@@ -156,7 +157,7 @@ function Upload({ onDone }: { onDone: () => void }) {
       <div aria-live="polite" className="space-y-3">
         {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
         {result && (
-          <div className="mt-4 rounded-lg border border-line bg-raised p-4">
+          <div className="mt-4 rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
                 Batch #{result.batch_id}
@@ -191,12 +192,12 @@ function QuickActions() {
     { icon: BadgeCheck, title: "Verify a credential", sub: "Paste JSON or QR text", on: () => go("/verify") },
   ];
   return (
-    <Card id="reports" title="Quick actions" icon={<ChevronRight />} actions={<span>Exports are audited</span>}>
+    <Card id="reports" delay={380} title="Quick actions" icon={<ChevronRight />} actions={<span>Exports are audited</span>}>
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
         {actions.map((a) => (
           <button key={a.title} type="button" onClick={a.on}
-            className="group flex items-center gap-3 rounded-lg border border-line bg-canvas/40 px-3.5 py-3 text-left transition-colors duration-200 hover:border-accent-400 hover:bg-gold/[0.04]">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-raised text-gold" aria-hidden><a.icon className="h-4 w-4" /></span>
+            className="group flex items-center gap-3 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3.5 py-3 text-left transition-colors duration-300 hover:border-gold/35 hover:bg-gold/[0.045]">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white/[0.04] text-gold ring-1 ring-white/[0.05]" aria-hidden><a.icon className="h-4 w-4" /></span>
             <span className="min-w-0 flex-1">
               <span className="block text-[13px] font-medium text-ink">{a.title}</span>
               <span className="block truncate text-[11px] text-mute">{a.sub}</span>
@@ -214,7 +215,7 @@ function QuickActions() {
 
 function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   return (
-    <Card id="seats" title="Seats: approved intake vs filled" icon={<BarChart3 />} className="lg:col-span-2 xl:col-span-5"
+    <Card id="seats" delay={440} title="Seats: approved intake vs filled" icon={<BarChart3 />} className="lg:col-span-2 xl:col-span-5"
       actions={<span>Limits from AICTE registry (MOCK), never from uploads</span>}>
       {programmes.length === 0 ? <Empty>No approved programmes for this year.</Empty> : (
         <ul className="space-y-5">
@@ -263,13 +264,14 @@ function SeatsCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
 
 /** One category line: gold fill within the cap, red for seats beyond it. */
 export function SeatBar({ line }: { line: S["SeatLine"] }) {
+  const on = useMounted(); // bars grow in from zero on first paint
   const max = Math.max(line.cap, line.filled, 1);
-  const within = Math.min(line.filled, line.cap);
+  const within = on ? Math.min(line.filled, line.cap) : 0;
   return (
-    <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-slate-100" role="meter" aria-valuemin={0} aria-valuemax={line.cap} aria-valuenow={line.filled}
+    <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-white/[0.06]" role="meter" aria-valuemin={0} aria-valuemax={line.cap} aria-valuenow={line.filled}
       aria-label={`${line.category_code}: ${line.filled} of ${line.cap} seats${line.excess > 0 ? `, ${line.excess} over` : ""}`}>
-      <div className="h-full bg-gradient-to-r from-accent-500 to-accent-700 transition-[width] duration-700 ease-out" style={{ width: `${(within / max) * 100}%` }} />
-      {line.excess > 0 && <div className="h-full bg-critical" style={{ width: `${(line.excess / max) * 100}%` }} />}
+      <div className="h-full bg-gradient-to-r from-accent-500 to-accent-700 transition-[width] duration-1000 ease-out" style={{ width: `${(within / max) * 100}%` }} />
+      {line.excess > 0 && <div className="h-full bg-critical transition-[width] duration-1000 ease-out" style={{ width: `${((on ? line.excess : 0) / max) * 100}%` }} />}
     </div>
   );
 }
@@ -284,7 +286,7 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
     { name: "CIWG", value: ciwg, color: "#6b7480" },
   ];
   return (
-    <Card title="Category utilisation" icon={<PieIcon />} className="xl:col-span-3">
+    <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-3">
       {total === 0 ? <Empty>No enrolments yet.</Empty> : (<>
         <div className="relative mx-auto h-44 w-44" role="img"
           aria-label={`Filled seats by category: ${parts.map((p) => `${p.name} ${p.value}`).join(", ")}`}>
@@ -324,7 +326,7 @@ const barColor = (v: number) => (v >= 0.9 ? "bg-success" : v >= 0.6 ? "bg-warnin
 function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error: string | null }) {
   const d = risk?.dqs;
   return (
-    <Card id="quality" title="Data quality score" icon={<ShieldCheck />} className="xl:col-span-4" actions={<span>What AICTE's inspection queue sees</span>}>
+    <Card id="quality" delay={560} title="Data quality score" icon={<ShieldCheck />} className="xl:col-span-4" actions={<span>What AICTE's inspection queue sees</span>}>
       {error ? <ErrorNote>{error}</ErrorNote> : !risk ? <p className="py-8 text-center text-sm text-mute">Loading…</p> : !d ? <Empty>Upload student records to get a score.</Empty> : (
         <div className="grid items-center gap-5 sm:grid-cols-[auto_minmax(0,1fr)]">
           <div className="flex flex-col items-center">
@@ -353,7 +355,7 @@ function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error
 function AnomalyCard({ risk }: { risk: S["InstitutionRisk"] | null }) {
   const flags = risk?.flags ?? [];
   return (
-    <Card title="Anomaly flags" icon={<Siren />} className="xl:col-span-4" actions={risk && <Badge tone={flags.length ? "warning" : "ok"} dot>{flags.length} active</Badge>}>
+    <Card delay={680} title="Anomaly flags" icon={<Siren />} className="xl:col-span-3" actions={risk && <Badge tone={flags.length ? "warning" : "ok"} dot>{flags.length} active</Badge>}>
       {!risk ? <p className="py-8 text-center text-sm text-mute">Loading…</p> : flags.length === 0 ? (
         <div className="flex items-start gap-3 rounded-lg border border-success-border bg-success-bg p-4">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success-text" aria-hidden />
@@ -365,7 +367,7 @@ function AnomalyCard({ risk }: { risk: S["InstitutionRisk"] | null }) {
       ) : (
         <ul className="space-y-2.5">
           {flags.map((f, i) => (
-            <li key={i} className="rounded-lg border border-line bg-canvas/40 p-3">
+            <li key={i} className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="warning">{FLAG_LABEL[f.type] ?? f.type}</Badge>
                 {f.programme && <span className="text-xs text-mute">{f.programme}</span>}
@@ -386,7 +388,7 @@ const STATUS_TONE = { completed: "ok", processing: "warning", failed: "error" } 
 
 function BatchesCard({ batches }: { batches: S["BatchOut"][] }) {
   return (
-    <Card id="batches" title="Recent upload batches" icon={<History />} className="xl:col-span-8" actions={<span>Last {Math.min(batches.length, 20)} · newest first · open a batch for row-level issues</span>}>
+    <Card id="batches" delay={620} title="Recent upload batches" icon={<History />} className="xl:col-span-9" actions={<span>Last {Math.min(batches.length, 20)} · newest first · open a batch for row-level issues</span>}>
       {batches.length === 0 ? <Empty>No uploads yet.</Empty> : (
         <Table head={["Batch", "Uploaded", "Rows", "Accepted", "Rejected", "Warnings", "Flags", "Status"]}>
           {batches.map((b) => (

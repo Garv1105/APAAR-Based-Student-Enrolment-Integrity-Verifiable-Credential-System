@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertCircle, ArrowDownToLine, FileSpreadsheet, Inbox, ShieldAlert } from "lucide-react";
 import { ApiError, download, loadSession } from "./api/client";
+import { useMounted } from "./components/motion";
 
 export const go = (path: string) => { window.location.hash = path; };
 
@@ -65,10 +66,10 @@ export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
 /** Page heading: small gold eyebrow, serif title, muted meta line, actions on the right. */
 export function PageHeader({ eyebrow, title, meta, actions }: { eyebrow?: ReactNode; title: ReactNode; meta?: ReactNode; actions?: ReactNode }) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4">
+    <header className="rise flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         {eyebrow && <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold">{eyebrow}</p>}
-        <h1 className="mt-2 font-display text-[36px] font-normal leading-[1.1] text-ink sm:text-[44px]">{title}</h1>
+        <h1 className="mt-2.5 font-display text-[40px] font-normal leading-[1.02] tracking-[-0.01em] text-ink sm:text-[52px]">{title}</h1>
         {meta && <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-mute">{meta}</div>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -76,21 +77,30 @@ export function PageHeader({ eyebrow, title, meta, actions }: { eyebrow?: ReactN
   );
 }
 
-export function Card({ title, actions, children, className = "", id, icon, bodyClassName = "p-5" }: {
-  title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; id?: string; icon?: ReactNode; bodyClassName?: string;
+/** Moves the card's spotlight to the pointer (CSS reads --mx/--my). */
+const spot = (e: React.MouseEvent<HTMLElement>) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+  e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+};
+
+/** Glass card. `delay` (ms) staggers its entrance on first render. */
+export function Card({ title, actions, children, className = "", id, icon, bodyClassName = "p-5", delay = 0 }: {
+  title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; id?: string; icon?: ReactNode; bodyClassName?: string; delay?: number;
 }) {
   return (
-    <section id={id} className={`min-w-0 scroll-mt-28 rounded-xl border border-line bg-surface shadow-premium ${className}`}>
+    <section id={id} onMouseMove={spot} style={{ ["--d" as string]: `${delay}ms` }}
+      className={`glass spotlight rise min-w-0 scroll-mt-28 rounded-2xl ${className}`}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-3">
-          <h2 className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-ink">
+        <header className="relative flex flex-wrap items-center justify-between gap-3 px-5 pt-[18px] pb-3">
+          <h2 className="flex items-center gap-2 text-[13.5px] font-medium tracking-[-0.005em] text-ink">
             {icon && <span className="text-gold [&>svg]:h-4 [&>svg]:w-4" aria-hidden>{icon}</span>}
             {title}
           </h2>
           {actions && <div className="flex flex-wrap items-center gap-2 text-xs text-mute">{actions}</div>}
         </header>
       )}
-      <div className={bodyClassName}>{children}</div>
+      <div className={`relative ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
@@ -117,22 +127,23 @@ export function Badge({ tone = "neutral", children, dot = false }: { tone?: Tone
 }
 
 /** KPI tile: label, large number, optional visual (ring, spark bars) on the right and a quiet footnote. */
-export function Stat({ label, value, tone = "neutral", hint, icon, visual }: {
-  label: string; value: ReactNode; tone?: Tone; hint?: ReactNode; icon?: ReactNode; visual?: ReactNode;
+export function Stat({ label, value, tone = "neutral", hint, icon, visual, delay = 0 }: {
+  label: string; value: ReactNode; tone?: Tone; hint?: ReactNode; icon?: ReactNode; visual?: ReactNode; delay?: number;
 }) {
   return (
-    <div className="flex min-w-0 items-center justify-between gap-4 rounded-xl border border-line bg-surface p-5 shadow-premium">
-      <div className="min-w-0">
+    <div onMouseMove={spot} style={{ ["--d" as string]: `${delay}ms` }}
+      className="glass spotlight rise flex min-w-0 items-center justify-between gap-4 rounded-2xl p-5 transition-[transform,border-color] duration-300 hover:-translate-y-0.5 hover:border-white/[0.11]">
+      <div className="relative min-w-0">
         <div className="flex items-center gap-2 text-[12px] font-medium text-mute">
-          {icon && <span className={`grid h-7 w-7 place-items-center rounded-lg bg-raised [&>svg]:h-3.5 [&>svg]:w-3.5 ${tone === "neutral" ? "text-gold" : TONE_TEXT[tone]}`} aria-hidden>{icon}</span>}
+          {icon && <span className={`grid h-7 w-7 place-items-center rounded-lg bg-white/[0.04] ring-1 ring-white/[0.05] [&>svg]:h-3.5 [&>svg]:w-3.5 ${tone === "neutral" ? "text-gold" : TONE_TEXT[tone]}`} aria-hidden>{icon}</span>}
           {label}
         </div>
-        <div className={`mt-3 text-[30px] font-semibold leading-none tracking-tight tabular-nums ${TONE_TEXT[tone]}`}>
+        <div className={`mt-3.5 text-[34px] font-medium leading-none tracking-[-0.03em] tabular-nums ${TONE_TEXT[tone]}`}>
           {typeof value === "number" ? <AnimatedCounter value={value} /> : value}
         </div>
         {hint && <div className="mt-2 text-xs text-mute">{hint}</div>}
       </div>
-      {visual && <div className="shrink-0">{visual}</div>}
+      {visual && <div className="relative shrink-0">{visual}</div>}
     </div>
   );
 }
@@ -143,13 +154,13 @@ export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)"
 }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const v = Math.max(0, Math.min(1, value));
+  const v = useMounted() ? Math.max(0, Math.min(1, value)) : 0; // fill in from zero on first paint
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={label}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-line)" strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
-          strokeDasharray={c} strokeDashoffset={c * (1 - v)} style={{ transition: "stroke-dashoffset 700ms cubic-bezier(.2,.8,.2,1)" }} />
+          strokeDasharray={c} strokeDashoffset={c * (1 - v)} style={{ transition: "stroke-dashoffset 1100ms cubic-bezier(.2,.8,.2,1)" }} />
       </svg>
       {children && <div className="absolute inset-0 grid place-items-center text-center">{children}</div>}
     </div>
@@ -158,10 +169,11 @@ export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)"
 
 /** Thin horizontal meter (0..1). */
 export function Meter({ value, color = "bg-gold", className = "", label }: { value: number; color?: string; className?: string; label?: string }) {
+  const shown = useMounted() ? value : 0;
   return (
-    <div className={`h-1.5 overflow-hidden rounded-full bg-slate-100 ${className}`} role={label ? "meter" : undefined}
+    <div className={`h-1.5 overflow-hidden rounded-full bg-white/[0.06] ${className}`} role={label ? "meter" : undefined}
       aria-label={label} aria-valuemin={label ? 0 : undefined} aria-valuemax={label ? 100 : undefined} aria-valuenow={label ? Math.round(value * 100) : undefined}>
-      <div className={`h-full rounded-full ${color} transition-[width] duration-700 ease-out`} style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} />
+      <div className={`h-full rounded-full ${color} transition-[width] duration-1000 ease-out`} style={{ width: `${Math.max(0, Math.min(1, shown)) * 100}%` }} />
     </div>
   );
 }
@@ -235,8 +247,8 @@ export function fmtTime(iso: string | null | undefined) {
 /** Live polling indicator. Shows the time of the last successful refresh. */
 export function Updated({ at }: { at: Date | null }) {
   return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-line bg-raised px-3 py-1 text-[11px] text-mute" aria-live="polite">
-      <span className={`h-1.5 w-1.5 rounded-full ${at ? "bg-success" : "bg-slate-400"}`} aria-hidden />
+    <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[11px] text-mute backdrop-blur" aria-live="polite">
+      <span className={`h-1.5 w-1.5 rounded-full ${at ? "live-dot bg-success" : "bg-slate-400"}`} aria-hidden />
       {at ? <>Live · <span className="tabular-nums">{at.toLocaleTimeString()}</span></> : "Connecting…"}
     </span>
   );
