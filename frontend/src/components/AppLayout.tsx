@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
-  AlertOctagon, BadgeCheck, BarChart3, ClipboardList, FileSpreadsheet, FileText, Fingerprint, GraduationCap, History,
-  Inbox, LayoutDashboard, LogOut, Map, ScrollText, Send, ShieldCheck, UploadCloud, Users, Wallet,
+  BadgeCheck, BarChart3, Building2, ClipboardList, FileSpreadsheet, Fingerprint, GraduationCap, History,
+  Inbox, LayoutDashboard, LogOut, ScrollText, Send, Share2, ShieldCheck, UploadCloud, UserPlus, Users, Wallet,
 } from "lucide-react";
 import type { Role, Session } from "../api/client";
 import { go } from "../ui";
@@ -37,13 +37,14 @@ function navFor(role: Role, canVerify: boolean): Group[] {
     case "aicte_officer":
     case "auditor":
       return [{ items: [
-        { label: "National overview", icon: LayoutDashboard, section: "top" },
-        { label: "State map", icon: Map, section: "map" },
-        { label: "Excess admissions", icon: AlertOctagon, section: "excess" },
-        { label: "Duplicate cases", icon: Users, section: "cases" },
-        { label: "Inspection queue", icon: ClipboardList, section: "inspection" },
-        { label: "Upload compliance", icon: FileText, section: "compliance" },
-        { label: "Reports", icon: FileSpreadsheet, section: "reports" },
+        { label: "Overview", icon: LayoutDashboard, route: "/aicte" },
+        { label: "Seats & intake", icon: BarChart3, route: "/aicte/seats" },
+        { label: "Duplicate cases", icon: Users, route: "/aicte/cases" },
+        { label: "Inspection priorities", icon: ClipboardList, route: "/aicte/inspection" },
+        { label: "Shared students", icon: Share2, route: "/aicte/network" },
+        { label: "Institutions", icon: Building2, route: "/aicte/institutions" },
+        { label: "Accounts & access", icon: UserPlus, route: "/aicte/accounts" },
+        { label: "Reports & integrity", icon: FileSpreadsheet, route: "/aicte/reports" },
       ] }, ...verify];
     case "verifier":
       return [{ items: [
@@ -73,9 +74,9 @@ function Brand() {
   return <BrandLogo size="md" />;
 }
 
-const PAGE_LABEL = (hash: string, home: string) =>
-  hash === home ? "Dashboard" : hash.startsWith("/inst/batch") ? "Batch detail" : hash === "/verify" ? "Verify a credential"
-    : hash.startsWith("/certificate") ? "Certificate" : "Dashboard";
+const PAGE_LABEL = (hash: string, home: string, items: Item[] = []) =>
+  items.find((it) => it.route && it.route === hash.split("?")[0])?.label ?? (hash === home ? "Dashboard" : hash.startsWith("/inst/batch") ? "Upload details" : hash === "/verify" ? "Verify a credential"
+    : hash.startsWith("/certificate") ? "Certificate" : "Dashboard");
 
 export default function AppLayout({ session, roleLabel, onLogout, canVerify = false, currentHash = "/", home = "/", children }: AppLayoutProps) {
   const [active, setActive] = useState("top");
@@ -86,7 +87,7 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
 
   const groups = navFor(session.role, canVerify);
   const onHome = currentHash === home;
-  const isActive = (it: Item) => (it.route ? currentHash === it.route : onHome && active === it.section);
+  const isActive = (it: Item) => (it.route ? currentHash.split("?")[0] === it.route : onHome && active === it.section);
   const open = (it: Item) => {
     if (it.route) { go(it.route); return; }
     setActive(it.section!);
@@ -167,7 +168,7 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
                 <span className="flex items-center gap-2">
                   <span>{roleLabel}</span>
                   <span className="text-slate-300" aria-hidden>/</span>
-                  <span className="font-display font-semibold text-slate-800">{PAGE_LABEL(currentHash, home)}</span>
+                  <span className="font-display font-semibold text-slate-800">{PAGE_LABEL(currentHash, home, groups.flatMap((g) => g.items))}</span>
                 </span>
                 <span aria-hidden className="h-4 w-px bg-white/10" />
                 <span className="hidden truncate text-[13.5px] text-slate-500 xl:inline">SIH26263 prototype · not an official Government of India or AICTE website</span>

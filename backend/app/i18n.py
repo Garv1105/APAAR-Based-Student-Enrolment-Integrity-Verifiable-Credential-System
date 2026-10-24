@@ -15,4 +15,5 @@ def catalogue(locale: str) -> dict:
 def render(code: str, params: dict | None, locale: str = "en") -> dict:
     entry = catalogue(locale).get(code) or catalogue("en")[code]
     p = {"field": "", "detail": "", **(params or {})}
-    return {"message": entry["template"].format(**p), "fix_hint": entry["fix_hint"]}
+    return {"title": entry.get("title") or catalogue("en")[code]["title"], "message": entry["template"].format(**p),
+            "fix_hint": entry["fix_hint"]}

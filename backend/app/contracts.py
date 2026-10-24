@@ -65,6 +65,7 @@ class Issue(BaseModel):
     code: str
     severity: Severity
     field: str | None = None
+    title: str = Field(description="short plain-language name of the problem (same for every row with this code)")
     message: str = Field(description="rendered from i18n/<locale>.json for the requested locale")
     fix_hint: str
 

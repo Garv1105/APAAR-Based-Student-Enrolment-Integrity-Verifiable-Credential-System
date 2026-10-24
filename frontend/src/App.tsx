@@ -93,7 +93,7 @@ export default function App() {
   } else if (r === "institution_admin") {
     page = <InstitutionHome />;
   } else if (r === "aicte_officer" || r === "auditor") {
-    page = <AicteHome role={r} />;
+    page = <AicteHome role={r} hash={hash} />;
   } else if (r === "verifier") {
     page = <VerifierHome />;
   } else if (r === "university_registrar") {

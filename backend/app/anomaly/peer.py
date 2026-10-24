@@ -11,6 +11,7 @@ Which metric is tested (so a programme that is simply full every year is never f
   institution-level, once per institution: rejection_rate, late_share
 """
 import statistics
+from collections import defaultdict
 
 from . import stats
 from .rules import LABEL
@@ -54,16 +55,25 @@ def programme_metrics(r: dict) -> tuple[dict, list[str]]:
     return vals, tested
 
 
-def peer_group(i: int, units: list[dict], metric: str, levels) -> tuple[str, list[float]] | None:
+def group_index(units: list[dict], levels) -> dict:
+    """(level, metric, key) -> [(unit index, value)], built once so each test is a lookup, not a scan of every unit."""
+    idx = defaultdict(list)
+    for j, u in enumerate(units):
+        for name, key in levels:
+            k = key(u)
+            for m, v in u["values"].items():
+                idx[(name, m, k)].append((j, v))
+    return idx
+
+
+def peer_group(i: int, units: list[dict], metric: str, levels, index: dict | None = None) -> tuple[str, list[float]] | None:
     """Most specific level with >= MIN_PEERS peers that have this metric (the unit itself excluded)."""
+    index = group_index(units, levels) if index is None else index
     for name, key in levels:
-        k = key(units[i])
-        peers = [u["values"][metric] for j, u in enumerate(units)
-                 if j != i and metric in u["values"] and key(u) == k]
+        peers = [v for j, v in index.get((name, metric, key(units[i])), ()) if j != i]
         if len(peers) >= MIN_PEERS:
             return name, peers
     return None
-
 
 def _pct(x: float, signed: bool) -> str:
     return f"{x * 100:+.0f}%" if signed else f"{x * 100:.0f}%"
@@ -90,9 +100,10 @@ def peer_flags(programmes: list[dict], institutions: list[dict]) -> dict:
 
     tests, insufficient = [], 0
     for units, levels in ((prog_units, PROGRAMME_LEVELS), (inst_units, INSTITUTION_LEVELS)):
+        index = group_index(units, levels)
         for i, u in enumerate(units):
             for m in u["tested"]:
-                g = peer_group(i, units, m, levels)
+                g = peer_group(i, units, m, levels, index)
                 if g is None:
                     insufficient += 1
                     continue

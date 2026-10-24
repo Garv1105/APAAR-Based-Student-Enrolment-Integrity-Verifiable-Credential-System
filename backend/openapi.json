@@ -4785,6 +4785,11 @@
       ],
       "title": "Field"
      },
+     "title": {
+      "type": "string",
+      "title": "Title",
+      "description": "short plain-language name of the problem (same for every row with this code)"
+     },
      "message": {
       "type": "string",
       "title": "Message",
@@ -4800,6 +4805,7 @@
      "row_no",
      "code",
      "severity",
+     "title",
      "message",
      "fix_hint"
     ],

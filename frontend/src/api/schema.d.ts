@@ -2152,6 +2152,11 @@ export interface components {
             /** Field */
             field?: string | null;
             /**
+             * Title
+             * @description short plain-language name of the problem (same for every row with this code)
+             */
+            title: string;
+            /**
              * Message
              * @description rendered from i18n/<locale>.json for the requested locale
              */

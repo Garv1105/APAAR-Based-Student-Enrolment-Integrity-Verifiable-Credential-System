@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS enrolments (
   batch_id           bigint NOT NULL REFERENCES upload_batches(id)
 );
 CREATE INDEX IF NOT EXISTS enrolments_dup_idx ON enrolments (student_id, academic_year, status);
+CREATE INDEX IF NOT EXISTS enrolments_programme_idx ON enrolments (programme_id, academic_year, status);
+CREATE INDEX IF NOT EXISTS upload_batches_inst_idx ON upload_batches (institution_id);
 
 CREATE TABLE IF NOT EXISTS validation_issues (
   id        bigserial PRIMARY KEY,
@@ -135,6 +137,7 @@ CREATE TABLE IF NOT EXISTS batch_features (      -- F1: computed in memory from 
   minutes_before_deadline double precision NOT NULL,
   PRIMARY KEY (batch_id, programme_id)
 );
+CREATE INDEX IF NOT EXISTS batch_features_programme_idx ON batch_features (programme_id);
 
 CREATE TABLE IF NOT EXISTS duplicate_cases (
   id            bigserial PRIMARY KEY,

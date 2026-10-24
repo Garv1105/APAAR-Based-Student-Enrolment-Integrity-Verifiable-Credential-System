@@ -624,8 +624,11 @@ BEGIN
   END IF;
   RETURN QUERY
   WITH win AS (SELECT y.code FROM academic_years y WHERE y.code <= p_year ORDER BY y.code DESC LIMIT 3),
+  multi AS (SELECT en.student_id FROM enrolments en WHERE en.academic_year IN (SELECT code FROM win)
+             GROUP BY en.student_id HAVING count(*) > 1),   -- only students seen more than once can link colleges
   e AS (SELECT en.id, en.student_id, p.institution_id AS inst, en.status, en.academic_year, en.admission_date
-          FROM enrolments en JOIN programmes p ON p.id = en.programme_id JOIN students s ON s.id = en.student_id
+          FROM enrolments en JOIN multi m ON m.student_id = en.student_id JOIN programmes p ON p.id = en.programme_id
+          JOIN students s ON s.id = en.student_id
          WHERE s.apaar_bi IS NOT NULL AND en.academic_year IN (SELECT code FROM win)),
   pairs AS (SELECT x.student_id, x.inst AS a, y.inst AS b,
                    bool_or(x.status = 'active' AND y.status = 'active' AND x.academic_year = p_year AND y.academic_year = p_year) AS both_active
