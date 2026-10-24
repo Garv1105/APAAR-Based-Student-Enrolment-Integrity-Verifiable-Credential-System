@@ -168,17 +168,18 @@ body {
   --color-cat-regular: #9085e9;
   --color-cat-sn: #d55181;
   --color-cat-ciwg: #c98500;
-  --color-mute: #9ca3af;
+  --color-mute: #b3b9c2;
 }
 
 .theme-gold {
   color-scheme: dark;
   font-family: var(--font-app);
-  font-size: 15px;
+  font-size: 16px;
+  line-height: 1.6;
 
   --color-slate-50: #0f151c;  --color-slate-100: #161e28; --color-slate-200: #222c37;
-  --color-slate-300: #2f3a46; --color-slate-400: #6b7480; --color-slate-500: #9ca3af;
-  --color-slate-600: #aeb4bd; --color-slate-700: #c9cdd3; --color-slate-800: #e2e4e7;
+  --color-slate-300: #2f3a46; --color-slate-400: #87909b; --color-slate-500: #a9b0ba;
+  --color-slate-600: #bfc5cd; --color-slate-700: #d5d9de; --color-slate-800: #e8eaed;
   --color-slate-900: #f5f5f5; --color-slate-950: #ffffff;
 
   --color-gov-50: #0f151c;  --color-gov-100: #161e28; --color-gov-200: #222c37;

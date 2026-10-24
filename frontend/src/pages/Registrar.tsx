@@ -24,7 +24,8 @@ export default function RegistrarHome() {
 }
 
 /** Shared by the registrar (degrees) and the institution (enrolment credentials, completion/withdrawal). */
-export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" }) {
+/** `bare` drops the card frame and adds a short guide before the first search (used on the institution dashboard). */
+export function EnrolmentLookup({ mode, bare = false }: { mode: "registrar" | "institution"; bare?: boolean }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<S["EnrolmentOut"][] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -45,14 +46,11 @@ export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" })
     }
   }
 
-  return (
-    <Card icon={<Search />} delay={740}
-      title={mode === "registrar" ? "Find a student" : "Students & credentials"}
-      actions={<span>Search by 12-digit APAAR ID or student ID</span>}
-    >
+  const body = (
+    <>
       <form onSubmit={search} className="flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[280px]">
-          <label htmlFor="search-input" className="mb-1.5 block text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
+          <label htmlFor="search-input" className="mb-2 block text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500">
             APAAR ID or student ID
           </label>
           <div className="relative">
@@ -62,15 +60,31 @@ export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" })
               onChange={(e) => setQ(e.target.value)}
               required
               placeholder="e.g. 123456789012 or CS-2024-001"
-              className="w-full rounded-xl border border-white/[0.09] bg-white/[0.025] px-3.5 py-2.5 pr-10 font-mono text-sm text-ink transition-colors placeholder:text-slate-400 focus:border-gold/50 focus:outline-none focus:ring-2 focus:ring-gold/15"
+              className="w-full rounded-xl border border-white/[0.09] bg-white/[0.025] px-4 py-3.5 pr-11 font-mono text-[15px] text-ink transition-colors placeholder:text-slate-400 focus:border-gold/50 focus:outline-none focus:ring-2 focus:ring-gold/15"
             />
-            <Search className="pointer-events-none absolute right-3.5 top-3 h-4 w-4 text-slate-400" aria-hidden />
+            <Search className="pointer-events-none absolute right-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" aria-hidden />
           </div>
         </div>
-        <Button type="submit" disabled={busy || !q.trim()}>
+        <Button type="submit" className="px-6 py-3.5 text-[15px]" disabled={busy || !q.trim()}>
           {busy ? "Searching…" : "Search"}
         </Button>
       </form>
+
+      {bare && !rows && !error && (
+        <ol className="mt-8 grid gap-6 sm:grid-cols-3" aria-label="What you can do with a student record">
+          {([
+            [Search, "Find the record", "Enrolment status, programme and academic year, with the APAAR ID masked."],
+            [FileCheck, "Issue a credential", "A signed W3C Verifiable Credential the student holds and shares with consent."],
+            [CheckCircle2, "Keep it current", "Mark the student completed or withdrawn; withdrawal revokes active credentials."],
+          ] as const).map(([Icon, t, d], i) => (
+            <li key={t} className="relative border-t border-gold/25 pt-5">
+              <span className="font-mono text-[12.5px] tracking-[0.18em] text-gold">{String(i + 1).padStart(2, "0")}</span>
+              <p className="mt-2 flex items-center gap-2.5 text-[16.5px] font-semibold text-ink"><Icon className="h-5 w-5 text-gold" strokeWidth={1.7} aria-hidden />{t}</p>
+              <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{d}</p>
+            </li>
+          ))}
+        </ol>
+      )}
 
       {error && (
         <div className="mt-4">
@@ -91,6 +105,15 @@ export function EnrolmentLookup({ mode }: { mode: "registrar" | "institution" })
           )}
         </div>
       )}
+    </>
+  );
+  if (bare) return <div className="min-w-0">{body}</div>;
+  return (
+    <Card icon={<Search />} delay={740}
+      title={mode === "registrar" ? "Find a student" : "Students & credentials"}
+      actions={<span>Search by 12-digit APAAR ID or student ID</span>}
+    >
+      {body}
     </Card>
   );
 }
