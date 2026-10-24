@@ -5,6 +5,7 @@ import {
 import { ApiError, getJson, sendJson, type Role, type S } from "../api/client";
 import { CaseQueueCard } from "../cases";
 import GoldIndiaMap from "../components/GoldIndiaMap";
+import { NetworkCard } from "../network";
 import { InspectionQueueCard } from "../risk";
 import {
   Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, Meter, PageHeader, ReportsCard, Ring, Stat, Table, Td, Updated, usePoll,
@@ -114,6 +115,8 @@ export default function AicteHome({ role }: { role: Role }) {
       <div id="cases" className="scroll-mt-28"><CaseQueueCard canResolve={role === "aicte_officer"} /></div>
 
       <div id="inspection" className="scroll-mt-28"><InspectionQueueCard /></div>
+
+      <div id="network" className="scroll-mt-28"><NetworkCard /></div>
 
       <div>
         <Card id="compliance" title="Upload compliance" icon={<FileText />}>

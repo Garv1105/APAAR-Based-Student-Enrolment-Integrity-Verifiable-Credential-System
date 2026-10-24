@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, PeerStatus, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, NetworkOut, PeerStatus, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
                         PasskeyOut, SetupOut, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
                         WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
@@ -299,7 +299,19 @@ def ledger_latest(conn=Depends(get_conn)):
 @app.get("/v1/anomalies", response_model=list[AnomalyFlag],
          description="Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).")
 def anomalies(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
-    return risk.flags(conn, regulator=True)
+    out = risk.flags(conn, regulator=True)
+    auth.audit(conn, user, "anomalies.read", "anomalies", None, request=request)
+    conn.commit()
+    return out
+
+
+@app.get("/v1/network", response_model=NetworkOut,
+         description="A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.")
+def shared_student_network(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    out = risk.network_view(conn)
+    auth.audit(conn, user, "network.read", "network", out["academic_year"], request=request)
+    conn.commit()
+    return out
 
 
 @app.get("/v1/anomalies/peer-status", response_model=PeerStatus,

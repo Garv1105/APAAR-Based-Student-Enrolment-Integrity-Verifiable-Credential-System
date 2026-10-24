@@ -678,6 +678,30 @@
     ]
    }
   },
+  "/v1/network": {
+   "get": {
+    "summary": "Shared Student Network",
+    "description": "A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.",
+    "operationId": "shared_student_network_v1_network_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NetworkOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/anomalies/peer-status": {
    "get": {
     "summary": "Anomalies Peer Status",
@@ -2667,7 +2691,9 @@
        "DOB_CLUSTER",
        "SEQUENTIAL_APAAR",
        "DEADLINE_DUMP",
-       "PEER_OUTLIER"
+       "PEER_OUTLIER",
+       "SHARED_STUDENT_RING",
+       "SEAT_BLOCKING"
       ],
       "title": "Type"
      },
@@ -4000,6 +4026,216 @@
      "display_name"
     ],
     "title": "LoginOut"
+   },
+   "NetworkComponent": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "members": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Members"
+     },
+     "colleges": {
+      "type": "integer",
+      "title": "Colleges"
+     },
+     "density": {
+      "type": "number",
+      "title": "Density"
+     },
+     "shared_students": {
+      "type": "integer",
+      "title": "Shared Students"
+     },
+     "carousel": {
+      "type": "integer",
+      "title": "Carousel"
+     },
+     "active_shared_inside": {
+      "type": "integer",
+      "title": "Active Shared Inside"
+     },
+     "shared_ratio": {
+      "type": "number",
+      "title": "Shared Ratio"
+     },
+     "has_cycle": {
+      "type": "boolean",
+      "title": "Has Cycle"
+     },
+     "flagged": {
+      "type": "boolean",
+      "title": "Flagged"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "members",
+     "colleges",
+     "density",
+     "shared_students",
+     "carousel",
+     "active_shared_inside",
+     "shared_ratio",
+     "has_cycle",
+     "flagged"
+    ],
+    "title": "NetworkComponent"
+   },
+   "NetworkEdge": {
+    "properties": {
+     "inst_a": {
+      "type": "string",
+      "title": "Inst A"
+     },
+     "inst_b": {
+      "type": "string",
+      "title": "Inst B"
+     },
+     "active_shared": {
+      "type": "integer",
+      "title": "Active Shared",
+      "description": "students active at both colleges this year"
+     },
+     "historical_shared": {
+      "type": "integer",
+      "title": "Historical Shared",
+      "description": "students enrolled at both in the last 3 years, not active at both now"
+     },
+     "carousel": {
+      "type": "integer",
+      "title": "Carousel",
+      "description": "students who moved A -> B -> A"
+     },
+     "weight": {
+      "type": "number",
+      "title": "Weight"
+     },
+     "kept": {
+      "type": "boolean",
+      "title": "Kept"
+     }
+    },
+    "type": "object",
+    "required": [
+     "inst_a",
+     "inst_b",
+     "active_shared",
+     "historical_shared",
+     "carousel",
+     "weight",
+     "kept"
+    ],
+    "title": "NetworkEdge"
+   },
+   "NetworkNode": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "active": {
+      "type": "integer",
+      "title": "Active",
+      "description": "active enrolments this year"
+     },
+     "ring": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ring",
+      "description": "id of the flagged ring this college belongs to"
+     },
+     "connected": {
+      "type": "boolean",
+      "title": "Connected",
+      "description": "has at least one kept edge"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "state",
+     "active",
+     "ring",
+     "connected"
+    ],
+    "title": "NetworkNode"
+   },
+   "NetworkOut": {
+    "properties": {
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "nodes": {
+      "items": {
+       "$ref": "#/components/schemas/NetworkNode"
+      },
+      "type": "array",
+      "title": "Nodes"
+     },
+     "edges": {
+      "items": {
+       "$ref": "#/components/schemas/NetworkEdge"
+      },
+      "type": "array",
+      "title": "Edges"
+     },
+     "components": {
+      "items": {
+       "$ref": "#/components/schemas/NetworkComponent"
+      },
+      "type": "array",
+      "title": "Components"
+     },
+     "flags": {
+      "items": {
+       "$ref": "#/components/schemas/AnomalyFlag"
+      },
+      "type": "array",
+      "title": "Flags"
+     },
+     "edge_min": {
+      "type": "number",
+      "title": "Edge Min"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "academic_year",
+     "nodes",
+     "edges",
+     "components",
+     "flags",
+     "edge_min",
+     "note"
+    ],
+    "title": "NetworkOut"
    },
    "PasskeyCredentialIn": {
     "properties": {

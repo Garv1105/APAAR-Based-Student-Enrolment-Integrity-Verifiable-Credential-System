@@ -311,6 +311,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shared Student Network
+         * @description A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.
+         */
+        get: operations["shared_student_network_v1_network_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/anomalies/peer-status": {
         parameters: {
             query?: never;
@@ -1244,7 +1264,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP" | "PEER_OUTLIER";
+            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP" | "PEER_OUTLIER" | "SHARED_STUDENT_RING" | "SEAT_BLOCKING";
             /** Institution Id */
             institution_id: string;
             /** Programme */
@@ -1820,6 +1840,96 @@ export interface components {
             institution_id: string | null;
             /** Display Name */
             display_name: string;
+        };
+        /** NetworkComponent */
+        NetworkComponent: {
+            /** Id */
+            id: string;
+            /** Members */
+            members: string[];
+            /** Colleges */
+            colleges: number;
+            /** Density */
+            density: number;
+            /** Shared Students */
+            shared_students: number;
+            /** Carousel */
+            carousel: number;
+            /** Active Shared Inside */
+            active_shared_inside: number;
+            /** Shared Ratio */
+            shared_ratio: number;
+            /** Has Cycle */
+            has_cycle: boolean;
+            /** Flagged */
+            flagged: boolean;
+        };
+        /** NetworkEdge */
+        NetworkEdge: {
+            /** Inst A */
+            inst_a: string;
+            /** Inst B */
+            inst_b: string;
+            /**
+             * Active Shared
+             * @description students active at both colleges this year
+             */
+            active_shared: number;
+            /**
+             * Historical Shared
+             * @description students enrolled at both in the last 3 years, not active at both now
+             */
+            historical_shared: number;
+            /**
+             * Carousel
+             * @description students who moved A -> B -> A
+             */
+            carousel: number;
+            /** Weight */
+            weight: number;
+            /** Kept */
+            kept: boolean;
+        };
+        /** NetworkNode */
+        NetworkNode: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** State */
+            state: string;
+            /**
+             * Active
+             * @description active enrolments this year
+             */
+            active: number;
+            /**
+             * Ring
+             * @description id of the flagged ring this college belongs to
+             */
+            ring: string | null;
+            /**
+             * Connected
+             * @description has at least one kept edge
+             */
+            connected: boolean;
+        };
+        /** NetworkOut */
+        NetworkOut: {
+            /** Academic Year */
+            academic_year: string;
+            /** Nodes */
+            nodes: components["schemas"]["NetworkNode"][];
+            /** Edges */
+            edges: components["schemas"]["NetworkEdge"][];
+            /** Components */
+            components: components["schemas"]["NetworkComponent"][];
+            /** Flags */
+            flags: components["schemas"]["AnomalyFlag"][];
+            /** Edge Min */
+            edge_min: number;
+            /** Note */
+            note: string;
         };
         /** PasskeyCredentialIn */
         PasskeyCredentialIn: {
@@ -2664,6 +2774,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnomalyFlag"][];
+                };
+            };
+        };
+    };
+    shared_student_network_v1_network_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"];
                 };
             };
         };

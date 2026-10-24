@@ -11,6 +11,7 @@ export const COMPONENT_LABEL: Record<string, string> = {
 export const FLAG_LABEL: Record<string, string> = {
   ENROLMENT_SPIKE: "Enrolment spike", CATEGORY_MIX_SHIFT: "Category-mix shift", DOB_CLUSTER: "DOB cluster",
   SEQUENTIAL_APAAR: "Sequential APAAR IDs", DEADLINE_DUMP: "Deadline dump", PEER_OUTLIER: "Peer outlier",
+  SHARED_STUDENT_RING: "Shared-student ring", SEAT_BLOCKING: "Seat blocking",
 };
 
 export function DqsBreakdown({ d }: { d: S["Dqs"] }) {

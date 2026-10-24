@@ -195,13 +195,56 @@ class AicteDashboard(BaseModel):
 
 
 class AnomalyFlag(BaseModel):
-    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP", "PEER_OUTLIER"]
+    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP", "PEER_OUTLIER",
+                  "SHARED_STUDENT_RING", "SEAT_BLOCKING"]
     institution_id: str
     programme: str | None
     score: float
     evidence: dict = Field(description="the numbers that triggered the rule")
     explanation: str
     label: str = Field(description="always: risk indicator for review, not proof of misconduct")
+
+
+class NetworkNode(BaseModel):
+    id: str
+    name: str
+    state: str
+    active: int = Field(description="active enrolments this year")
+    ring: str | None = Field(description="id of the flagged ring this college belongs to")
+    connected: bool = Field(description="has at least one kept edge")
+
+
+class NetworkEdge(BaseModel):
+    inst_a: str
+    inst_b: str
+    active_shared: int = Field(description="students active at both colleges this year")
+    historical_shared: int = Field(description="students enrolled at both in the last 3 years, not active at both now")
+    carousel: int = Field(description="students who moved A -> B -> A")
+    weight: float
+    kept: bool
+
+
+class NetworkComponent(BaseModel):
+    id: str
+    members: list[str]
+    colleges: int
+    density: float
+    shared_students: int
+    carousel: int
+    active_shared_inside: int
+    shared_ratio: float
+    has_cycle: bool
+    flagged: bool
+
+
+class NetworkOut(BaseModel):
+    academic_year: str
+    nodes: list[NetworkNode]
+    edges: list[NetworkEdge]
+    components: list[NetworkComponent]
+    flags: list[AnomalyFlag]
+    edge_min: float
+    note: str
 
 
 class PeerStatus(BaseModel):

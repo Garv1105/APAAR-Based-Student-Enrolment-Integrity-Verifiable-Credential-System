@@ -73,6 +73,33 @@ def peer_status(conn) -> dict:
             "fdr_q": anomaly.peer.FDR_Q, "note": note}
 
 
+CROSS_INSTITUTION = {"PEER_OUTLIER", "SHARED_STUDENT_RING", "SEAT_BLOCKING"}  # regulator-only; not part of the DQS
+NETWORK_NOTE = ("historical_shared and carousel need multi-year enrolment and migration data; on the current single-year "
+                "data they are close to 0, so edges mostly reflect students active at two colleges.")
+
+
+def network_analysis(conn, year: str) -> tuple[dict, dict]:
+    """A3 (regulator connection): edge counts from shared_student_edges(), analysed by anomaly.network."""
+    edges = [dict(e) for e in conn.execute("SELECT * FROM shared_student_edges(%s)", (year,))]
+    active = {r["institution_id"]: r["n"] for r in conn.execute(
+        "SELECT p.institution_id, count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id "
+        "WHERE e.academic_year = %s AND e.status = 'active' GROUP BY 1", (year,))}
+    return anomaly.network.analyse(edges, active), active
+
+
+def network_view(conn) -> dict:
+    """Regulators only. Small counts are not suppressed because regulators can already read the underlying rows (RLS);
+    if auditor access is ever narrowed to aggregates, suppress counts below 5 for auditors or drop them from /v1/network."""
+    year = current_year(conn)["code"]
+    res, active = network_analysis(conn, year)
+    connected = {n for e in res["edges"] if e["kept"] for n in (e["inst_a"], e["inst_b"])}
+    nodes = [{"id": i["id"], "name": i["name"], "state": i["state"], "active": active.get(i["id"], 0),
+              "ring": res["ring_of"].get(i["id"]), "connected": i["id"] in connected}
+             for i in conn.execute("SELECT id, name, state FROM institutions ORDER BY id")]
+    return {"academic_year": year, "nodes": nodes, "edges": res["edges"], "components": res["components"],
+            "flags": res["flags"], "edge_min": anomaly.network.EDGE_MIN, "note": NETWORK_NOTE}
+
+
 def flags(conn, regulator: bool = False) -> list[dict]:
     """Own-data rules for everyone; peer comparisons (A1) only on a regulator connection (they need every college's numbers)."""
     year = current_year(conn)["code"]
@@ -81,6 +108,7 @@ def flags(conn, regulator: bool = False) -> list[dict]:
            for f in anomaly.programme_flags(x)]
     if regulator:
         out += anomaly.peer.peer_flags(*peer_inputs(conn, year, feats))["flags"]
+        out += network_analysis(conn, year)[0]["flags"]
     minutes = defaultdict(list)
     for r in conn.execute("SELECT DISTINCT b.institution_id, f.batch_id, f.minutes_before_deadline "
                           "FROM batch_features f JOIN upload_batches b ON b.id = f.batch_id"):
@@ -120,7 +148,8 @@ def dqs_inputs(conn, institution_id: str, year: str, flag_count: int, updates: i
 def institution_view(conn, institution_id: str) -> dict:
     """An institution's own DQS (RLS connection of that institution)."""
     year = current_year(conn)["code"]
-    fl = [f for f in flags(conn) if f["institution_id"] == institution_id]
+    # second guard: cross-institution flags (their evidence can name other colleges) never reach an institution
+    fl = [f for f in flags(conn) if f["institution_id"] == institution_id and f["type"] not in CROSS_INSTITUTION]
     updates = conn.execute("SELECT own_correction_count() n").fetchone()["n"]
     m = dqs_inputs(conn, institution_id, year, len(fl), updates)
     return {"institution_id": institution_id, "dqs": anomaly.dqs(m) if m else None, "flags": fl}
@@ -135,7 +164,7 @@ def inspection_queue(conn) -> list[dict]:
     entries = []
     for i in conn.execute("SELECT * FROM institutions ORDER BY id"):
         fl = [f for f in all_flags if f["institution_id"] == i["id"]]
-        own = [f for f in fl if f["type"] != "PEER_OUTLIER"]  # DQS uses the institution's own data only (matches its own view)
+        own = [f for f in fl if f["type"] not in CROSS_INSTITUTION]  # DQS uses the institution's own data only (matches its own view)
         m = dqs_inputs(conn, i["id"], year, len(own), updates.get(i["id"], 0))
         entries.append({"institution_id": i["id"], "name": i["name"], "state": i["state"], "status": i["status"],
                         "active": m["active"] if m else 0, "dqs": anomaly.dqs(m) if m else None, "flags": fl})

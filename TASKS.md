@@ -20,6 +20,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **W1 webhooks + ERP connector (Req 7):** Standard Webhooks signing; outbox with retries and backoff; delivery log; redeliver; secret rotation (24 h overlap); max 5 endpoints; SSRF guard that pins the validated IP (Host + SNI); `tools/erp_connector/` (YAML mapping, file-hash Idempotency-Key, verifying receiver).
 - **A0 anomaly package:** `backend/app/anomaly/` (`rules.py` = the five D3 rules unchanged, `stats.py` shared helpers); same public interface. Spec: `docs/ANOMALY_V2_SPEC.md`.
 - **A1 peer baselines:** each programme (and each institution, for rejection rate and late uploads) is compared with similar units this year (programme+state+size, then programme+size, then programme; institutions: state+size, then size; at least 8 peers). Uses peer robust z, one-sided p (`math.erfc`), Benjamini–Hochberg at q=0.05 across all tests nationally, plus a minimum practical gap. Fill and foreign share are tested raw only for programmes with no history; with history, their change is tested. Regulator-only. Too few peers gives "insufficient peers" (`GET /v1/anomalies/peer-status`); today's 4-college DB has no peer groups.
+- **A3 shared-student network:** regulator-only `shared_student_edges(year)` (blind-index join, counts only: active, historical, A→B→A carousel). Rings are found on the 2-core of the kept-edge graph via union-find (`SHARED_STUDENT_RING`, with active sharing inside the ring counted in the ring flag); `SEAT_BLOCKING` for pairs outside rings. `GET /v1/network` feeds an AICTE SVG network view (kept edges by default, "show all" toggle, edge counts, drill-down to the duplicate cases).
 - **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
 **Decisions:**
@@ -71,6 +72,11 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - Rejection rate is institution-level only, because rejected rows carry no programme.
   - Peer flags aren't counted in the DQS (it stays own-data only, so it matches the institution's own view).
   - The peer rule needs at least 8 similar units per group, so it does nothing until the 300-college world is loaded.
+- A3 network:
+  - `historical_shared` and `carousel` need multi-year enrolment and migration data; on today's single-year data they are about 0, so edges mostly reflect students active at two colleges.
+  - The carousel detects return trips (A→B→A) only, not 3-college loops.
+  - A ring's shared-student total adds up edge counts, so a student shared by 3 colleges counts on each edge.
+  - Students without an APAAR are not in the network.
 - Credentials:
   - Student sign-in and consent use **passkeys** (P1). The old APAAR + DOB + fixed-OTP path exists only with `DEMO_MODE=true`, labelled MOCK.
   - Activation codes reach the student out of band. In the prototype the institution hands them over; production delivers them via DigiLocker or the registered mobile number. Whoever holds an unused code can register the passkey; a reissued code puts a 24 h consent cooldown on the new passkey and notifies the student.
