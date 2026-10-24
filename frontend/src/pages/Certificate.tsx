@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
+import { ArrowLeft, Copy, Printer } from "lucide-react";
 import { ApiError, getJson, type S } from "../api/client";
 import { Button, ErrorNote, Loading } from "../ui";
 
-/** Printable certificate (Req 10): APAAR ID and student ID in full, plus the offline-verifiable QR. */
+/** Printable certificate (Req 10): APAAR ID and student ID in full, plus the verification QR (checked online).
+ *  Paper colours are explicit (not theme tokens) so it reads the same on screen and in print. */
 export default function Certificate({ id }: { id: string }) {
   const [cert, setCert] = useState<S["CertificateOut"] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   useEffect(() => {
     getJson<S["CertificateOut"]>(`/v1/credentials/certificate?id=${encodeURIComponent(id)}`)
-      .then(setCert).catch((e) => setError(e instanceof ApiError ? e.text : "Cannot load certificate"));
+      .then(setCert)
+      .catch((e) => setError(e instanceof ApiError ? e.text : "Cannot load certificate"));
   }, [id]);
 
   if (error) return <ErrorNote>{error}</ErrorNote>;
@@ -19,40 +24,68 @@ export default function Certificate({ id }: { id: string }) {
   // the SVG comes from our backend's QR generator; rendered as an image, never injected as HTML
   const qrSrc = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(cert.qr_svg)))}`;
 
+  const copyPayload = async () => {
+    try { await navigator.clipboard.writeText(cert.qr_payload); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
+  };
+
+  const field = (label: string, value: React.ReactNode, mono = false) => (
+    <div>
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8a7a55]">{label}</dt>
+      <dd className={`mt-1 text-[#1c1a16] ${mono ? "font-mono text-[15px] font-semibold tracking-wide" : "text-sm font-medium"}`}>{value}</dd>
+    </div>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2 print:hidden">
-        <Button onClick={() => window.print()}>Print</Button>
-        <Button variant="secondary" onClick={() => navigator.clipboard?.writeText(cert.qr_payload)}>Copy QR text</Button>
-        <Button variant="ghost" onClick={() => history.back()}>Back</Button>
-      </div>
-      <article className="mx-auto max-w-3xl rounded-2xl border-4 border-double border-brand-900 bg-white p-8 shadow-sm print:border-2 print:shadow-none">
-        <header className="text-center">
-          <p className="text-xs uppercase tracking-[0.3em] text-slate-500">{degree ? "Degree certificate" : "Enrolment certificate"}</p>
-          <h1 className="mt-2 text-2xl font-semibold text-brand-900">{vc.issuer.name}</h1>
-        </header>
-        <p className="mt-8 text-center text-slate-700">This is to certify that</p>
-        <p className="mt-2 text-center text-3xl font-semibold">{s.name}</p>
-        <p className="mt-4 text-center text-slate-700">
-          {degree ? <>has been awarded the degree of <strong>{s.degree}</strong> through <strong>{s.institution}</strong></>
-            : <>is enrolled in <strong>{s.programme}</strong>, academic year <strong>{s.academicYear}</strong></>}
-        </p>
-        <div className="mt-8 grid grid-cols-1 items-end gap-6 sm:grid-cols-[1fr_auto]">
-          <dl className="grid grid-cols-2 gap-4 text-sm">
-            <div><dt className="text-xs text-slate-500">APAAR ID</dt><dd className="font-mono text-base font-semibold">{s.apaarId ?? `${s.provisionalId} (provisional)`}</dd></div>
-            <div><dt className="text-xs text-slate-500">Student ID</dt><dd className="font-mono text-base font-semibold">{s.studentId}</dd></div>
-            <div><dt className="text-xs text-slate-500">{degree ? "Awarded on" : "Issued"}</dt><dd>{degree ? s.awardedOn : new Date(vc.validFrom).toLocaleDateString()}</dd></div>
-            <div><dt className="text-xs text-slate-500">Issuer DID</dt><dd className="break-all font-mono text-xs">{vc.issuer.id}</dd></div>
-          </dl>
-          <figure className="text-center">
-            <img src={qrSrc} alt="Verification QR code containing the signed credential" className="mx-auto h-44 w-44" />
-            <figcaption className="mt-1 text-[10px] text-slate-500">Contains the signed credential · verify at /verify<br />{cert.qr_payload_chars} chars, EC level M</figcaption>
-          </figure>
+    <div className="mx-auto max-w-4xl space-y-5">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3">
+        <Button variant="ghost" onClick={() => history.back()}><ArrowLeft className="h-4 w-4" aria-hidden />Back</Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="secondary" onClick={copyPayload}><Copy className="h-4 w-4" aria-hidden /><span aria-live="polite">{copied ? "QR text copied" : "Copy QR text"}</span></Button>
+          <Button onClick={() => window.print()}><Printer className="h-4 w-4" aria-hidden />Print</Button>
         </div>
-        <footer className="mt-8 border-t border-slate-200 pt-3 text-center text-[10px] text-slate-500">
-          W3C Verifiable Credential (eddsa-jcs-2022) · issuer in the AICTE trust registry (MOCK) · verify the QR and check that the
-          signed details it shows match this printout: an altered QR fails verification, and altered print won't match
-        </footer>
+      </div>
+
+      <article className="relative rounded-sm bg-[#fbf8f0] p-3 text-[#1c1a16] shadow-premium-lg print:p-0 print:shadow-none">
+        <div className="border border-[#b8963a] p-1.5">
+          <div className="border-[3px] border-double border-[#b8963a]/70 px-6 py-10 sm:px-14 sm:py-14">
+            <header className="text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-[#8a7a55]">{degree ? "Degree certificate" : "Enrolment certificate"}</p>
+              <h1 className="mt-4 font-display text-[34px] leading-tight text-[#1c1a16] sm:text-[40px]">{vc.issuer.name}</h1>
+              <div className="mx-auto mt-5 flex w-48 items-center gap-3" aria-hidden>
+                <span className="h-px flex-1 bg-[#b8963a]/60" /><span className="h-1.5 w-1.5 rotate-45 bg-[#b8963a]" /><span className="h-px flex-1 bg-[#b8963a]/60" />
+              </div>
+            </header>
+
+            <div className="mt-8 text-center">
+              <p className="font-display text-lg italic text-[#5c5240]">This is to certify that</p>
+              <p className="mt-3 font-display text-[40px] leading-tight text-[#1c1a16] sm:text-[48px]">{s.name}</p>
+              <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-[#3d372b]">
+                {degree
+                  ? <>has been awarded the degree of <strong className="font-semibold">{s.degree}</strong> through <strong className="font-semibold">{s.institution}</strong>.</>
+                  : <>is enrolled in <strong className="font-semibold">{s.programme}</strong>, academic year <strong className="font-semibold">{s.academicYear}</strong>.</>}
+              </p>
+            </div>
+
+            <div className="mt-12 grid grid-cols-1 items-end gap-8 border-t border-[#b8963a]/40 pt-8 sm:grid-cols-[1fr_auto]">
+              <dl className="grid grid-cols-2 gap-x-8 gap-y-5">
+                {field("APAAR ID", s.apaarId ?? `${s.provisionalId} (provisional)`, true)}
+                {field("Student ID", s.studentId, true)}
+                {field(degree ? "Awarded on" : "Issued", degree ? s.awardedOn : new Date(vc.validFrom).toLocaleDateString())}
+                {field("Issuer DID", <span className="break-all font-mono text-[11px]">{vc.issuer.id}</span>)}
+              </dl>
+              <figure className="text-center">
+                <div className="inline-block border border-[#b8963a]/50 bg-white p-2"><img src={qrSrc} alt="Verification QR code containing the signed credential" className="h-40 w-40" /></div>
+                <figcaption className="mt-2 text-[10px] leading-snug text-[#6b6150]">Contains the signed credential · verify at /verify<br />{cert.qr_payload_chars} chars · EC level M</figcaption>
+              </figure>
+            </div>
+
+            <footer className="mt-10 space-y-1 text-center text-[10px] leading-relaxed text-[#6b6150]">
+              <p>W3C Verifiable Credential (eddsa-jcs-2022) · issuer listed in the AICTE trust registry (MOCK).</p>
+              <p>Verify the QR and check that the signed details it shows match this printout: an altered QR fails verification, and altered print won't match.</p>
+              <p className="pt-1 font-semibold uppercase tracking-[0.2em] text-[#8a7a55]">Prototype · synthetic data</p>
+            </footer>
+          </div>
+        </div>
       </article>
     </div>
   );
