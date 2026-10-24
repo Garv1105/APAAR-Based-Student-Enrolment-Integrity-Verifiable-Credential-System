@@ -660,3 +660,133 @@ GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], te
   store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
   activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint),
   shared_student_edges(text) TO app_user;
+
+-- ---------- T-LANDING: public portal numbers, account search, account activation, verifier access requests ----------
+-- account_codes: no grants, functions only. access_requests: regulators read (contact fields stay encrypted at rest).
+GRANT SELECT ON access_requests TO app_user;
+ALTER TABLE account_codes ENABLE ROW LEVEL SECURITY; ALTER TABLE account_codes FORCE ROW LEVEL SECURITY;
+ALTER TABLE access_requests ENABLE ROW LEVEL SECURITY; ALTER TABLE access_requests FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON access_requests;
+CREATE POLICY sel ON access_requests FOR SELECT USING (app_is_regulator());
+
+-- Public landing numbers: aggregates only (no institution or student rows). The app suppresses small per-state counts.
+CREATE OR REPLACE FUNCTION public_stats(p_year text) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  WITH rep AS (SELECT DISTINCT b.institution_id FROM upload_batches b JOIN institutions i ON i.id = b.institution_id
+               WHERE b.status = 'completed' AND i.status = 'approved'),  -- "x of N approved" stays consistent
+  stu AS (SELECT p.institution_id, count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id
+           WHERE e.academic_year = p_year AND e.status = 'active' GROUP BY 1),
+  st AS (SELECT i.state, count(*) FILTER (WHERE i.status = 'approved') institutions, count(rep.institution_id) reporting,
+                coalesce(sum(stu.n), 0)::bigint students
+           FROM institutions i LEFT JOIN rep ON rep.institution_id = i.id LEFT JOIN stu ON stu.institution_id = i.id
+          GROUP BY i.state)
+  SELECT jsonb_build_object(
+    'institutions_approved', (SELECT count(*) FROM institutions i WHERE i.status = 'approved'),
+    'institutions_reporting', (SELECT count(*) FROM rep),
+    'students_recorded', (SELECT coalesce(sum(n), 0) FROM stu),
+    'credentials_issued', (SELECT count(*) FROM credentials),
+    'states', coalesce((SELECT jsonb_agg(to_jsonb(st) ORDER BY st.state) FROM st), '[]'::jsonb))
+$$;
+
+-- Public sign-in search: registry names + the account id to sign in with (no password data). p_q is LIKE-escaped by the app.
+CREATE OR REPLACE FUNCTION public_account_search(p_q text, p_state text, p_kind text, p_limit int)
+RETURNS TABLE (id text, name text, state text, kind text, login_id text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT x.* FROM (
+    SELECT DISTINCT ON (i.id) i.id, i.name, i.state, 'institution'::text AS kind, u.id AS login_id
+      FROM institutions i JOIN users u ON u.institution_id = i.id AND u.role = 'institution_admin'
+     WHERE p_kind = 'institution' AND (p_state IS NULL OR i.state = p_state)
+       AND (p_q IS NULL OR i.name ILIKE '%' || p_q || '%' OR i.id ILIKE p_q || '%')
+     ORDER BY i.id, u.id) x
+  UNION ALL
+  SELECT r.did, r.name, NULL, 'university'::text, u.id
+    FROM issuer_registry r JOIN users u ON u.issuer_did = r.did AND u.role = 'university_registrar'
+   WHERE p_kind = 'university' AND r.kind = 'university' AND p_state IS NULL AND (p_q IS NULL OR r.name ILIKE '%' || p_q || '%')
+  ORDER BY 2 LIMIT least(greatest(p_limit, 1), 20)
+$$;
+
+-- AICTE officer: one-time code that sets the first password of an institution, registrar or verifier account.
+-- A new code voids the account's earlier unused codes. Idempotency-Key is scoped to the issuing officer.
+CREATE OR REPLACE FUNCTION issue_account_code(p_user text, p_code_hash text, p_reason text, p_idem text, p_req_hash text)
+RETURNS TABLE (code_id bigint, user_id text, display_name text, replay boolean, expires_at timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE u record; prev record; cid bigint; exp timestamptz;
+BEGIN
+  IF app_role() <> 'aicte_officer' THEN RAISE EXCEPTION 'issue_account_code: not allowed' USING ERRCODE = 'P0002'; END IF;
+  SELECT x.id, x.display_name INTO u FROM users x
+   WHERE x.id = p_user AND x.role IN ('institution_admin', 'university_registrar', 'verifier');
+  IF u.id IS NULL THEN RAISE EXCEPTION 'issue_account_code: no such account' USING ERRCODE = 'P0002'; END IF;
+  IF p_idem IS NOT NULL THEN
+    SELECT a.* INTO prev FROM account_codes a WHERE a.issued_by = current_setting('app.user_id', true) AND a.idempotency_key = p_idem;
+    IF prev.id IS NOT NULL THEN
+      IF prev.request_hash <> p_req_hash THEN RAISE EXCEPTION 'idempotency key reused' USING ERRCODE = 'P0003'; END IF;
+      RETURN QUERY SELECT prev.id, u.id, u.display_name, true, prev.expires_at;
+      RETURN;
+    END IF;
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('account:' || u.id, 0));
+  UPDATE account_codes a SET voided_at = now() WHERE a.user_id = u.id AND a.used_at IS NULL AND a.voided_at IS NULL;
+  exp := now() + interval '7 days';
+  INSERT INTO account_codes (user_id, code_hash, issued_by, reason, idempotency_key, request_hash, expires_at)
+  VALUES (u.id, p_code_hash, current_setting('app.user_id', true), p_reason, p_idem, p_req_hash, exp) RETURNING id INTO cid;
+  RETURN QUERY SELECT cid, u.id, u.display_name, false, exp;
+END $$;
+
+-- Anonymous: burn a code and set the account's password (argon2 hash computed by the app). Nothing comes back on any
+-- mismatch. Audited here because anonymous connections can't write audit_logs.
+CREATE OR REPLACE FUNCTION redeem_account_code(p_user text, p_code_hash text, p_password_hash text, p_request_id text)
+RETURNS TABLE (user_id text, role text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE cid bigint; r text;
+BEGIN
+  IF app_role() <> '' THEN RAISE EXCEPTION 'redeem_account_code: not allowed'; END IF;
+  UPDATE account_codes a SET used_at = now()
+   WHERE a.user_id = p_user AND a.code_hash = p_code_hash AND a.used_at IS NULL AND a.voided_at IS NULL AND a.expires_at > now()
+  RETURNING a.id INTO cid;
+  IF cid IS NULL THEN RETURN; END IF;
+  UPDATE users x SET password_hash = p_password_hash WHERE x.id = p_user RETURNING x.role INTO r;
+  INSERT INTO audit_logs (actor, role, action, entity, entity_id, request_id)
+  VALUES (p_user, r, 'account.activate', 'account_code', cid::text, p_request_id);
+  RETURN QUERY SELECT p_user, r;
+END $$;
+
+-- Anonymous: a verifier organisation asks for access. The app takes the id from the sequence first so the contact
+-- ciphertexts can bind it (AAD); only that id (this session's currval) is accepted.
+CREATE OR REPLACE FUNCTION create_access_request(p_id bigint, p_org text, p_name_enc bytea, p_email_enc bytea, p_purpose text,
+                                                 p_request_id text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> '' OR p_id <> currval('access_requests_id_seq') THEN RAISE EXCEPTION 'create_access_request: not allowed'; END IF;
+  INSERT INTO access_requests (id, organisation, contact_name_enc, contact_email_enc, purpose)
+  VALUES (p_id, p_org, p_name_enc, p_email_enc, p_purpose);
+  INSERT INTO audit_logs (actor, role, action, entity, entity_id, request_id)
+  VALUES ('anonymous', 'public', 'access_request.create', 'access_request', p_id::text, p_request_id);
+END $$;
+
+-- AICTE officer: approve (creates a verifier account with no password yet) or reject a pending request.
+-- A request that is no longer pending comes back unchanged; the app compares the status.
+CREATE OR REPLACE FUNCTION decide_access_request(p_id bigint, p_decision text, p_reason text, p_new_user text)
+RETURNS SETOF access_requests
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE r record;
+BEGIN
+  IF app_role() <> 'aicte_officer' OR p_decision NOT IN ('approved', 'rejected') THEN
+    RAISE EXCEPTION 'decide_access_request: not allowed' USING ERRCODE = 'P0002';
+  END IF;
+  SELECT a.* INTO r FROM access_requests a WHERE a.id = p_id FOR UPDATE;
+  IF r.id IS NULL THEN RAISE EXCEPTION 'decide_access_request: not found' USING ERRCODE = 'P0002'; END IF;
+  IF r.status <> 'pending' THEN RETURN QUERY SELECT a.* FROM access_requests a WHERE a.id = p_id; RETURN; END IF;
+  IF p_decision = 'approved' THEN
+    INSERT INTO users (id, role, display_name) VALUES (p_new_user, 'verifier', r.organisation);
+  END IF;
+  RETURN QUERY UPDATE access_requests a SET status = p_decision, decided_by = current_setting('app.user_id', true),
+      decision_reason = p_reason, decided_at = now(), user_id = CASE WHEN p_decision = 'approved' THEN p_new_user END
+    WHERE a.id = p_id RETURNING a.*;
+END $$;
+
+REVOKE ALL ON FUNCTION public_stats(text), public_account_search(text, text, text, int),
+  issue_account_code(text, text, text, text, text), redeem_account_code(text, text, text, text),
+  create_access_request(bigint, text, bytea, bytea, text, text), decide_access_request(bigint, text, text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public_stats(text), public_account_search(text, text, text, int),
+  issue_account_code(text, text, text, text, text), redeem_account_code(text, text, text, text),
+  create_access_request(bigint, text, bytea, bytea, text, text), decide_access_request(bigint, text, text, text) TO app_user;

@@ -252,7 +252,7 @@ def test_another_institution_cannot_take_over_a_student(pk):
     eid = pk.get("/v1/enrolments", params={"apaar": "590573056992"}, headers=hb).json()[0]["id"]
     r = pk.post(f"/v1/enrolments/{eid}/activation-code", json={"kind": "student", "reason": REASON}, headers=hb)
     assert r.status_code == 409 and "under AICTE review" in r.json()["title"]
-    assert "1-0000000001" not in r.text and "Demo Institute" not in r.text
+    assert "1-0000000001" not in r.text and "Kalyani Devi Hegde" not in r.text
     assert sign_in(pk, a).status_code == 200                # A's student is untouched
 
 

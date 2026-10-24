@@ -6,6 +6,7 @@ import uuid
 import zlib
 from contextlib import asynccontextmanager
 from datetime import datetime
+from typing import Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -13,9 +14,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
+from . import accounts, auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, FlagReviewIn, FlagReviewOut, NetworkOut, PeerStatus, RulePerformance, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
+from .contracts import (CSV_COLUMNS, AccessRequestCreated, AccessRequestDecided, AccessRequestDecisionIn, AccessRequestIn,
+                        AccessRequestOut, AccountActivateIn, AccountActivateOut, AccountCodeIn, AccountCodeOut, PublicAccount, PublicStats, AccessLogEntry, FlagReviewIn, FlagReviewOut, NetworkOut, PeerStatus, RulePerformance, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
                         PasskeyOut, SetupOut, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
                         WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
@@ -431,6 +433,58 @@ def auth_config():
                       "5 attempts per APAAR per 15 minutes.")
 def activate(body: ActivateIn, request: Request, conn=Depends(anon_conn)):
     return passkeys.activate(conn, body.apaar_id, body.code, request.client.host if request.client else "unknown")
+
+
+# ---------- T-LANDING: public portal, account activation, verifier access requests ----------
+@app.get("/v1/public/stats", response_model=PublicStats,
+         description="Public landing numbers: aggregates only; per-state student counts under 10 are withheld.")
+def public_stats(request: Request, conn=Depends(anon_conn)):
+    return accounts.public_stats(conn, request)
+
+
+@app.get("/v1/public/institutions", response_model=list[PublicAccount],
+         description="Public sign-in search over the registry (institutions by name, AICTE id or city; universities by name). "
+                     "Institutions need q (2+ characters) or a state; at most 20 results.")
+def public_institutions(request: Request, q: str | None = None, state: str | None = None,
+                        kind: Literal["institution", "university"] = "institution", limit: int = 20, conn=Depends(anon_conn)):
+    return accounts.search(conn, q, state, kind, limit, request)
+
+
+@app.post("/v1/users/{user_id}/account-code", response_model=AccountCodeOut, status_code=201,
+          description="AICTE officer: one-time code (7 days) that sets the first password of an institution, university or "
+                      "verifier account. Voids earlier unused codes. Reason audited. Accepts Idempotency-Key.")
+def issue_account_code(user_id: str, body: AccountCodeIn, request: Request, idempotency_key: str | None = Header(None),
+                       user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    out = accounts.issue_code(conn, user, user_id, body.reason, idempotency_key,
+                              crypto.sha256_hex(f"{user_id}|{body.model_dump_json()}".encode()), request)
+    return JSONResponse(AccountCodeOut(**out).model_dump(mode="json"), status_code=200 if out["status"] == "already_issued" else 201)
+
+
+@app.post("/v1/auth/activate-account", response_model=AccountActivateOut,
+          description="Public: redeem an AICTE account code and set the password (12+ characters). One error for every "
+                      "mismatch; 5 attempts per account per 15 minutes.")
+def activate_account(body: AccountActivateIn, request: Request, conn=Depends(anon_conn)):
+    return accounts.activate(conn, body.user_id.strip(), body.code, body.password, request)
+
+
+@app.post("/v1/access-requests", response_model=AccessRequestCreated, status_code=201,
+          description="Public: a verifier organisation asks AICTE for an account. Contact details are encrypted at rest.")
+def create_access_request(body: AccessRequestIn, request: Request, conn=Depends(anon_conn)):
+    return accounts.create_request(conn, body.model_dump(), request)
+
+
+@app.get("/v1/access-requests", response_model=list[AccessRequestOut],
+         description="Regulators: verifier access requests, pending first. Each read is audited.")
+def list_access_requests(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    return accounts.list_requests(conn, user, request)
+
+
+@app.post("/v1/access-requests/{request_id}/decide", response_model=AccessRequestDecided,
+          description="AICTE officer: approve (creates the verifier account and returns its one-time code) or reject, with a "
+                      "reason. Repeating the same decision returns the request (replayed, no new code).")
+def decide_access_request(request_id: int, body: AccessRequestDecisionIn, request: Request,
+                          user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    return accounts.decide(conn, user, request_id, body.decision, body.reason, request)
 
 
 @app.post("/v1/passkeys/register/options", description="Setup session: WebAuthn registration options (discoverable, UV required).")

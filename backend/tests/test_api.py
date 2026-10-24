@@ -99,7 +99,7 @@ def test_error_report_and_dashboards(client):
     cse = next(p for p in d["programmes"] if p["programme_id"] == "1-0000000002:CSE")
     reg = next(line for line in cse["lines"] if line["category_code"] == "REGULAR")
     assert reg["cap"] == 120 and reg["excess"] == 5
-    assert d["open_notices"] and all("1-0000000001" not in n and "Demo Institute" not in n for n in d["open_notices"])
+    assert d["open_notices"] and all("1-0000000001" not in n and "Kalyani Devi Hegde" not in n for n in d["open_notices"])
     da = client.get("/v1/dashboard/institution", headers=login(client, "inst-a")).json()
     assert da["open_notices"]  # the other side is notified too
     agg = client.get("/v1/dashboard/aicte", headers=login(client, "aicte")).json()

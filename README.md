@@ -155,10 +155,10 @@ Both files are gitignored. For a production deployment, keys belong in a KMS/HSM
 
 | User | Role | Scope |
 |---|---|---|
-| `inst-a` | institution_admin | Demo Institute of Technology (clean data) |
-| `inst-b` | institution_admin | Sample College of Engineering (messy data) |
-| `inst-c` | institution_admin | Example School of Management (enrolment spike) |
-| `inst-d` | institution_admin | Closed Polytechnic (not approved) |
+| `inst-a` | institution_admin | Kalyani Devi Hegde Institute of Technology, Hubballi (clean data) |
+| `inst-b` | institution_admin | Anandrao Kulkarni College of Engineering, Solapur (messy data) |
+| `inst-c` | institution_admin | Saraswati Narain Institute of Management Studies, Kanpur (enrolment spike) |
+| `inst-d` | institution_admin | Ram Lakhan Sinha Polytechnic, Darbhanga (not approved) |
 | `aicte` | aicte_officer | National monitoring |
 | `auditor` | auditor | Read-only regulator |
 | `employer` | verifier | Consent-based credential verification |

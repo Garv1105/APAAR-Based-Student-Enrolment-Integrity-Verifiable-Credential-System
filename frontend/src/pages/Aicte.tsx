@@ -3,6 +3,7 @@ import {
   AlertOctagon, Building2, CalendarClock, CheckCircle2, FileText, Fingerprint, Landmark, Link2, Map as MapIcon, PieChart, ShieldAlert, Users,
 } from "lucide-react";
 import { ApiError, getJson, sendJson, type Role, type S } from "../api/client";
+import { AccountsCard } from "../accounts";
 import { CaseQueueCard } from "../cases";
 import GoldIndiaMap from "../components/GoldIndiaMap";
 import { NetworkCard } from "../network";
@@ -137,6 +138,8 @@ export default function AicteHome({ role }: { role: Role }) {
           <p className="mt-3 text-[11px] text-slate-400">Code reissues: passkey activation codes an institution re-issued. A spike can signal impersonation.</p>
         </Card>
       </div>
+
+      <AccountsCard canManage={role === "aicte_officer"} />
 
       <ReportsCard id="reports" institutions={data.upload_compliance.map((c) => ({ id: c.id, name: c.name }))} />
     </div>

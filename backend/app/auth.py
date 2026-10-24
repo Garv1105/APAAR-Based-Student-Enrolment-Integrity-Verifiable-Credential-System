@@ -19,7 +19,8 @@ _bearer = HTTPBearer(auto_error=False)
 
 def login(conn, user_id: str, password: str) -> dict | None:
     u = conn.execute("SELECT * FROM login_lookup(%s)", (user_id,)).fetchone()  # users table itself is not granted
-    if not u:
+    if not u or not u["password_hash"]:  # no password until the account is activated with an AICTE code
+        PasswordHasher().hash(password)  # same work as a real check
         return None
     try:
         PasswordHasher().verify(u["password_hash"], password)

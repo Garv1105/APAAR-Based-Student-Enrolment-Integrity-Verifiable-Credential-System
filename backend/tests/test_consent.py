@@ -41,7 +41,7 @@ def test_full_consent_flow_minimal_fields_and_transparency_log(client):
     cid = req.json()["id"]
     hs = student(client, r["apaar_id"])
     inbox = client.get("/v1/consents", headers=hs).json()
-    assert [c["id"] for c in inbox] == [cid] and inbox[0]["requester"].startswith("Acme Hiring")
+    assert [c["id"] for c in inbox] == [cid] and inbox[0]["requester"].startswith("Kaveri Talent Solutions")
     assert client.get(f"/v1/consents/{cid}/credential", headers=login(client, "employer")).status_code == 409  # not yet granted
 
     ok = client.post(f"/v1/consents/{cid}/approve", json={"otp": OTP}, headers=hs)

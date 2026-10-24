@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS users (
   student_id     bigint,
   issuer_did     text,                          -- university_registrar: the university it signs for
   display_name   text NOT NULL,
-  password_hash  text NOT NULL                  -- argon2
+  password_hash  text                          -- argon2; NULL until the account is activated with an AICTE code
 );
 
 CREATE TABLE IF NOT EXISTS students (
@@ -349,3 +349,32 @@ CREATE TABLE IF NOT EXISTS flag_reviews (
   UNIQUE (reviewer, idempotency_key)
 );
 CREATE INDEX IF NOT EXISTS flag_reviews_key_idx ON flag_reviews (flag_key);
+
+CREATE TABLE IF NOT EXISTS account_codes (         -- AICTE-issued one-time codes: set the first password of an account
+  id              bigserial PRIMARY KEY,
+  user_id         text NOT NULL REFERENCES users(id),
+  code_hash       text NOT NULL UNIQUE,            -- HMAC(k_activation, code); the plaintext is never stored
+  issued_by       text NOT NULL,
+  reason          text NOT NULL,
+  idempotency_key text,
+  request_hash    text NOT NULL,
+  expires_at      timestamptz NOT NULL,
+  used_at         timestamptz,
+  voided_at       timestamptz,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (issued_by, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS access_requests (       -- verifier organisations asking AICTE for an account
+  id                bigserial PRIMARY KEY,
+  organisation      text NOT NULL,
+  contact_name_enc  bytea NOT NULL,                -- AES-GCM, AAD access_requests|contact_name|id
+  contact_email_enc bytea NOT NULL,
+  purpose           text NOT NULL,
+  status            text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  decided_by        text,
+  decision_reason   text,
+  decided_at        timestamptz,
+  user_id           text REFERENCES users(id),
+  created_at        timestamptz NOT NULL DEFAULT now()
+);

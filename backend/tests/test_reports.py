@@ -32,9 +32,9 @@ def test_state_summary_numbers(client):
 def test_category_utilisation_scoped_by_rls(client):
     load(client)
     all_rows = get_csv(client, "aicte", "category-utilisation")
-    assert {r["institution"] for r in all_rows} >= {"Demo Institute of Technology", "Sample College of Engineering"}
+    assert {r["institution"] for r in all_rows} >= {"Kalyani Devi Hegde Institute of Technology, Hubballi", "Anandrao Kulkarni College of Engineering, Solapur"}
     b = get_csv(client, "inst-b", "category-utilisation")
-    assert b and {r["institution"] for r in b} == {"Sample College of Engineering"}
+    assert b and {r["institution"] for r in b} == {"Anandrao Kulkarni College of Engineering, Solapur"}
     sn = next(r for r in b if r["programme_code"] == "CSE" and r["category_code"] == "SN_FN_OCI_CIWG")
     assert (sn["cap"], sn["filled"], sn["excess"], sn["utilisation_pct"]) == ("18", "22", "4", "122.2")
     sub = next(r for r in b if r["category_code"] == "SN_FN_OCI_CIWG:CIWG" and r["programme_code"] == "CSE")
@@ -59,7 +59,7 @@ def test_excess_case_file_has_evidence_and_ledger_status(client):
     client.post("/v1/ledger/checkpoints", headers=login(client, "aicte"))
     rows = get_csv(client, "aicte", "excess-case-file")
     assert len(rows) == 10 and {r["code"] for r in rows} == {"E301", "E302"}   # 5 + 5 flagged rows in B1
-    assert all(r["institution"] == "Sample College of Engineering" for r in rows)
+    assert all(r["institution"] == "Anandrao Kulkarni College of Engineering, Solapur" for r in rows)
     assert all(r["ledger_consistent"] == "True" and r["ledger_checkpoint_root"] for r in rows)
     assert "CSE REGULAR: 125/120 (+5)" in rows[0]["current_over_cap"]
 

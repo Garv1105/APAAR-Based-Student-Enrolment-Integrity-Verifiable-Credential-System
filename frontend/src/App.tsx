@@ -63,6 +63,7 @@ export default function App() {
     return (
       <AppLayout currentHash="/login">
         <Login
+          hash={hash}
           onLogin={(s) => {
             setSession(s);
             go(HOME[s.role]);
