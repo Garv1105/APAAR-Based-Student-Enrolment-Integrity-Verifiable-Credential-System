@@ -5,6 +5,7 @@ import { passkeyError, passkeysSupported } from "../webauthn";
 import Hero from "../components/Hero";
 import IdentityPanel from "../components/IdentityPanel";
 import IndiaMap from "../components/IndiaMap";
+import Starfield from "../components/Starfield";
 import Navbar from "../components/Navbar";
 
 export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
@@ -35,26 +36,33 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   }
 
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#050816] text-white selection:bg-[#3b6bff]/60 selection:text-white">
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#050816] font-inter text-white selection:bg-[#3b6bff]/60 selection:text-white">
+      {/* living background: base light, drifting aurora bands, faint grid, particles */}
       <div aria-hidden className="ambient-blue pointer-events-none fixed inset-0 z-0" />
-      <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-70" />
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+        <div className="aurora-1 absolute -left-[10%] top-[-20%] h-[70vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(59,107,255,0.30),transparent)] blur-3xl" />
+        <div className="aurora-2 absolute -right-[15%] bottom-[-25%] h-[75vh] w-[65vw] rounded-full bg-[radial-gradient(closest-side,rgba(124,92,255,0.26),transparent)] blur-3xl" />
+        <div className="aurora-1 absolute left-[35%] top-[30%] h-[45vh] w-[40vw] rounded-full bg-[radial-gradient(closest-side,rgba(56,189,248,0.10),transparent)] blur-3xl" style={{ animationDelay: "-9s" }} />
+      </div>
+      <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-60" />
+      <Starfield />
 
       <Navbar />
 
-      <main className="relative z-10 mx-auto grid w-full max-w-[1320px] grid-cols-1 items-center gap-12 px-5 pb-14 pt-4 sm:px-8 lg:min-h-[calc(100vh-80px)] lg:grid-cols-[minmax(0,1fr)_420px] lg:gap-10 xl:gap-16">
-        {/* map: between the text and the panel; its eastern half sits under the frosted panel */}
-        <div className="pointer-events-none absolute left-[530px] top-1/2 hidden w-[620px] -translate-y-1/2 xl:block 2xl:left-[560px] 2xl:w-[660px]">
-          <IndiaMap />
-        </div>
-        <div className="relative min-w-0 max-w-[540px]">
+      <main className="relative z-10 mx-auto grid w-full max-w-[1440px] grid-cols-1 items-center gap-12 px-5 pb-14 pt-4 sm:px-8 lg:min-h-[calc(100vh-80px)] lg:grid-cols-[minmax(0,1fr)_450px] lg:gap-10 xl:grid-cols-[400px_minmax(0,1fr)_450px] xl:gap-4">
+        <div className="relative min-w-0">
           <Hero onOpenStudentModal={() => setShowStudentModal(true)} />
+        </div>
+        {/* map gets its own column on wide screens */}
+        <div className="pointer-events-none relative hidden min-w-0 xl:block">
+          <IndiaMap className="mx-auto w-full max-w-[600px] scale-[1.14]" />
         </div>
         <div className="relative">
           <IdentityPanel selectedId={selectedId} onSelectId={setSelectedId} password={password} onPasswordChange={setPassword}
             onSubmit={handlePortalLogin} busy={busy} error={error} />
         </div>
       </main>
-      <p className="relative z-10 mx-auto max-w-[1320px] px-5 pb-6 text-[10.5px] text-[#55607e] sm:px-8">
+      <p className="relative z-10 mx-auto max-w-[1440px] px-5 pb-6 text-[10.5px] text-[#55607e] sm:px-8">
         Map: India boundaries by <a className="underline decoration-white/20 underline-offset-2 hover:text-[#8b9bbd]" href="https://github.com/datameet/maps" target="_blank" rel="noreferrer">DataMeet</a> (CC BY 4.0), simplified. Illustration only.
       </p>
 
@@ -74,7 +82,7 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
             </button>
 
             <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#8ea8ff]">Passkey sign-in</p>
-            <h3 id="student-signin-title" className="mt-2 font-display text-[32px] leading-none text-white">Students and guardians</h3>
+            <h3 id="student-signin-title" className="mt-2 font-manrope text-[28px] font-extrabold tracking-[-0.03em] text-white">Students and guardians</h3>
             <p className="mt-2 text-[13px] text-[#8b9bbd]">Fingerprint, face or device PIN. No password.</p>
 
             <StudentSignIn onLogin={onLogin} />

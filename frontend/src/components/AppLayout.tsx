@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import type { Role, Session } from "../api/client";
 import { go } from "../ui";
+import BrandMark from "./BrandMark";
 
 interface AppLayoutProps {
   session?: Session | null;
@@ -71,9 +72,11 @@ function scrollToSection(id: string) {
 function Brand() {
   return (
     <span className="flex items-center gap-3">
-      <span aria-hidden className="grid h-10 w-10 place-items-center rounded-full border border-gold/60 font-display text-xl leading-none text-gold">A</span>
+      <span aria-hidden className="grid h-10 w-10 place-items-center rounded-xl border border-gold/35 bg-gradient-to-br from-gold/20 to-gold/[0.04] text-gold shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+        <BrandMark className="h-6 w-6" />
+      </span>
       <span className="leading-tight">
-        <span className="block text-[15px] font-semibold tracking-[-0.01em] text-ink">APAAR Integrity</span>
+        <span className="block text-[16px] font-semibold tracking-[-0.015em] text-ink">ShikshaNetra</span>
         <span className="block text-[11px] text-mute">Seat integrity &amp; credentials</span>
       </span>
     </span>
@@ -119,8 +122,12 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
   return (
     <MotionConfig reducedMotion="user">
       <div className="theme-gold min-h-screen antialiased lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
-        {/* ambient light behind the glass surfaces (static) */}
+        {/* ambient light behind the glass: a static base plus two slowly drifting lights */}
         <div aria-hidden className="ambient-gold no-print pointer-events-none fixed inset-0" />
+        <div aria-hidden className="no-print pointer-events-none fixed inset-0 overflow-hidden">
+          <div className="orb orb-a right-[-8%] top-[-10%] h-[55vh] w-[45vw] bg-[radial-gradient(closest-side,rgba(212,175,55,0.22),transparent)]" />
+          <div className="orb orb-b bottom-[-15%] left-[10%] h-[60vh] w-[50vw] bg-[radial-gradient(closest-side,rgba(80,112,165,0.26),transparent)]" />
+        </div>
         <div aria-hidden className="ambient-grid no-print pointer-events-none fixed inset-0 opacity-60" />
         {/* Sidebar (desktop) */}
         <aside className="no-print sticky top-0 z-20 hidden h-screen flex-col border-r border-white/[0.06] bg-[#0b0f14]/55 backdrop-blur-xl lg:flex">
@@ -174,9 +181,22 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
                 <span className="text-slate-300" aria-hidden>/</span>
                 <span className="text-slate-700">{PAGE_LABEL(currentHash, home)}</span>
               </div>
-              <span className="text-xs text-mute">
-                {new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
-              </span>
+              <div className="flex items-center gap-4">
+                <span className="text-xs text-mute">
+                  {new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+                </span>
+                <span aria-hidden className="h-4 w-px bg-white/10" />
+                <span className="flex items-center gap-2.5">
+                  <span aria-hidden className="grid h-7 w-7 place-items-center rounded-full bg-white/[0.05] text-[10.5px] font-semibold text-champagne ring-1 ring-gold/30">{initials}</span>
+                  <span className="max-w-[180px] truncate text-[12.5px] text-slate-700">{session.display_name}</span>
+                </span>
+                {onLogout && (
+                  <button type="button" onClick={onLogout}
+                    className="group inline-flex items-center gap-1.5 rounded-lg border border-white/[0.09] bg-white/[0.03] px-3 py-1.5 text-[12.5px] font-medium text-slate-700 transition-colors hover:border-critical-border hover:bg-critical-bg hover:text-critical-text">
+                    <LogOut className="h-3.5 w-3.5" aria-hidden /> Sign out
+                  </button>
+                )}
+              </div>
             </div>
           </header>
 
