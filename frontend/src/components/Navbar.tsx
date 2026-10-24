@@ -1,5 +1,6 @@
 import { ArrowRight } from "lucide-react";
 import { BrandLogo } from "./BrandMark";
+import { BTN_PRIMARY } from "./landing/styles";
 
 const LINKS = [
   ["#/", "Home", "/"],
@@ -16,7 +17,7 @@ const LINKS = [
  */
 export default function Navbar({ demo = false, current = "/" }: { demo?: boolean; current?: string }) {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-white/[0.06] bg-[#0b0f14]/70 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 w-full border-b border-white/[0.06] bg-[#07090E]/70 backdrop-blur-xl">
       <div className="mx-auto flex h-[84px] w-full max-w-[1440px] items-center justify-between gap-6 px-5 sm:px-8">
         <a href="#/" aria-label="VidyaPramaan home" className="shrink-0"><BrandLogo size="md" /></a>
         <nav aria-label="Main" className="hidden items-center gap-1 font-inter xl:flex">
@@ -37,7 +38,7 @@ export default function Navbar({ demo = false, current = "/" }: { demo?: boolean
               <span className="live-dot h-1.5 w-1.5 rounded-full bg-[#e3c05a]" aria-hidden />Demo environment
             </span>
           )}
-          <a href="#/signin" className="btn-gold group inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-manrope text-[14.5px] font-bold">
+          <a href="#/signin" className={`${BTN_PRIMARY} group !px-5 !py-2.5 text-[14.5px]`}>
             Sign in <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden />
           </a>
         </div>
