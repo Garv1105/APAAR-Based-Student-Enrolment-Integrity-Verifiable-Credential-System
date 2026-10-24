@@ -105,6 +105,17 @@ def test_access_matrix(client, dbconn):
         ("GET", "/v1/reports/category-utilisation.csv", {}, expect({"inst-a": 200, "inst-b": 200} | REG)),
         ("GET", "/v1/reports/accreditation.csv?institution_id=1-0000000001", {}, expect({"inst-a": 200, "inst-b": 200} | REG)),
         ("GET", "/healthz", {}, {u: 200 for u in USERS}),
+        # T-LANDING: public portal (anonymous; a token is ignored), AICTE onboarding
+        ("GET", "/v1/public/stats", {}, {u: 200 for u in USERS}),
+        ("GET", "/v1/public/institutions?q=1-0000", {}, {u: 200 for u in USERS}),
+        ("POST", "/v1/auth/activate-account", {"json": {"user_id": "inst-a", "code": "AAAA-AAAA-AA", "password": "short"}},
+         {u: 422 for u in USERS}),  # reachable by anyone; validation runs before the per-account throttle
+        ("POST", "/v1/access-requests", {"json": {"organisation": "x" * 5, "contact_name": "xy", "contact_email": "bad",
+                                                  "purpose": "x" * 20}}, {u: 422 for u in USERS}),
+        ("POST", "/v1/users/inst-b/account-code", {"json": {"reason": "access matrix test"}}, expect({"aicte": 201})),
+        ("GET", "/v1/access-requests", {}, expect(REG)),
+        ("POST", "/v1/access-requests/999999/decide", {"json": {"decision": "rejected", "reason": "access matrix test"}},
+         expect({"aicte": 404})),
     ]
     headers = {u: ({} if u == "anon" else login(client, u)) for u in USERS if u != "student"}
     a1 = csv.DictReader(open(Path(__file__).parent.parent / "data/synthetic/A1.csv", encoding="utf-8"))

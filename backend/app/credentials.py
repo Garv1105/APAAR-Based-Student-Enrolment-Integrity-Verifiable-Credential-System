@@ -374,6 +374,6 @@ def forged_credential() -> dict:
     did = "did:web:fake-university.example"
     vc = {"@context": VC_CONTEXT, "id": f"urn:uuid:{uuid.uuid4()}", "type": ["VerifiableCredential", "DegreeCredential"],
           "issuer": {"id": did, "name": "Global Open University (unregistered)"}, "validFrom": iso(now_utc()),
-          "credentialSubject": {"name": "Demo Holder", "degree": "B.Tech Computer Science", "apaarId": "999999999999",
+          "credentialSubject": {"name": "Ananya Iyer", "degree": "B.Tech Computer Science", "apaarId": "999999999999",
                                 "studentId": "GOU/2026/0001"}}
     return crypto.eddsa_jcs_2022_sign(vc, _proof_options(f"{did}#key-1"), crypto.signing_key(did))

@@ -5,7 +5,8 @@ import { useReducedMotion } from "./motion";
 /**
  * Landing illustration of India (DataMeet boundaries, CC BY 4.0): lit land with state borders, city lights,
  * routes to New Delhi with travelling signals, a scanning light and a slight 3D tilt that follows the mouse.
- * Purely illustrative, no data. Every animation stops when the user prefers reduced motion.
+ * With `values` (state -> count; null = withheld small count) states are shaded by count and name their number on
+ * hover; without it the map is purely illustrative. Every animation stops when the user prefers reduced motion.
  */
 
 // [lon, lat, tier]  tier 1 = metro, 2 = large city, 3 = city
@@ -60,17 +61,26 @@ const PALETTE = {
     core: ["#0B0F14", "#FBE7A1"], label: "#E8D9A8" },
 };
 
-export default function IndiaMap({ className = "", tone = "blue" }: { className?: string; tone?: keyof typeof PALETTE }) {
+export default function IndiaMap({ className = "", tone = "blue", values, unit = "students" }: {
+  className?: string; tone?: keyof typeof PALETTE; values?: Record<string, number | null>; unit?: string;
+}) {
   const p = PALETTE[tone];
   const u = useId().replace(/:/g, "");
   const reduce = useReducedMotion();
   const tilt = useTilt(reduce);
   const pts = CITIES.map(([lon, lat]) => project(lon, lat));
   const { w: W, h: H } = INDIA_VIEWBOX;
+  const max = Math.max(1, ...Object.values(values ?? {}).map((v) => v ?? 0));
+  const label = (name: string) => {
+    const v = values?.[name];
+    return v === undefined ? `${name}: no reporting institutions` : v === null ? `${name}: fewer than 10 ${unit}` : `${name}: ${v.toLocaleString("en-IN")} ${unit}`;
+  };
+  const summary = values && Object.keys(values).sort().map(label).join("; ");
 
   return (
     <div ref={tilt} className={`will-change-transform ${className}`} style={{ transform: "perspective(1400px) rotateX(8deg)" }}>
-      <svg viewBox={`-30 -30 ${W + 60} ${H + 60}`} className="h-auto w-full overflow-visible" aria-hidden="true">
+      <svg viewBox={`-30 -30 ${W + 60} ${H + 60}`} className="h-auto w-full overflow-visible"
+        {...(values ? { role: "img", "aria-label": `Map of India by state. ${summary || "No data yet."}` } : { "aria-hidden": true })}>
         <defs>
           <clipPath id={`clip-${u}`}><path d={INDIA_PATH} /></clipPath>
           <radialGradient id={`land-${u}`} cx="32%" cy="22%" r="85%">
@@ -111,8 +121,15 @@ export default function IndiaMap({ className = "", tone = "blue" }: { className?
 
         {/* state borders, then a scanning light, clipped to the land */}
         <g clipPath={`url(#clip-${u})`}>
-          {STATE_PATHS.map((s) => <path key={s.name} d={s.d} fill="none" stroke={p.state} strokeOpacity="0.2" strokeWidth="0.6" strokeLinejoin="round" />)}
-          {!reduce && <rect className="scan" x="0" y="0" width={W} height={H * 0.35} fill={`url(#scan-${u})`} />}
+          {STATE_PATHS.map((s) => {
+            const v = values?.[s.name];
+            const shade = values ? (v === undefined ? 0 : 0.06 + 0.36 * Math.sqrt((v ?? 0) / max)) : 0;
+            return (
+              <path key={s.name} d={s.d} fill={values ? p.state : "none"} fillOpacity={shade} stroke={p.state} strokeOpacity={values ? 0.35 : 0.2}
+                strokeWidth="0.6" strokeLinejoin="round" />
+            );
+          })}
+          {!reduce && <rect className="scan" x="0" y="0" width={W} height={H * 0.35} fill={`url(#scan-${u})`} pointerEvents="none" />}
         </g>
         <path d={INDIA_PATH} fill="none" stroke={`url(#edge-${u})`} strokeWidth="1.1" strokeLinejoin="round" />
         <path d={INDIA_PATH} fill="none" stroke={p.label} strokeOpacity="0.35" strokeWidth="3" strokeLinejoin="round" filter={`url(#soft-${u})`} />
@@ -155,6 +172,13 @@ export default function IndiaMap({ className = "", tone = "blue" }: { className?
         <circle cx={HUB[0]} cy={HUB[1]} r="4.6" fill={p.core[0]} stroke={p.core[1]} strokeWidth="1.5" />
         <circle cx={HUB[0]} cy={HUB[1]} r="1.8" fill="#ffffff" />
         <text x={HUB[0] + 20} y={HUB[1] - 14} fill={p.label} className="font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>
+
+        {/* hover layer on top of the decoration: each state names its number */}
+        {values && STATE_PATHS.map((s) => (
+          <path key={s.name} d={s.d} fill="#ffffff" fillOpacity={0} className="cursor-default transition-[fill-opacity] duration-150 hover:[fill-opacity:0.14]">
+            <title>{label(s.name)}</title>
+          </path>
+        ))}
       </svg>
     </div>
   );

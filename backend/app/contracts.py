@@ -65,6 +65,7 @@ class Issue(BaseModel):
     code: str
     severity: Severity
     field: str | None = None
+    title: str = Field(description="short plain-language name of the problem (same for every row with this code)")
     message: str = Field(description="rendered from i18n/<locale>.json for the requested locale")
     fix_hint: str
 
@@ -619,3 +620,100 @@ class ActivationCodeOut(BaseModel):
     reissue: bool
     cooldown_hours: int = Field(description="hours before the passkey registered from this code can approve consent")
     detail: str | None = None
+
+
+# ---------- T-LANDING: public portal, account activation, verifier access requests ----------
+class PublicStateStat(BaseModel):
+    state: str
+    institutions: int = Field(description="approved institutions in the registry")
+    reporting: int = Field(description="approved institutions with at least one completed upload")
+    students: int | None = Field(description="active enrolments this year; null when fewer than 10 (small-count suppression)")
+
+
+class PublicStats(BaseModel):
+    academic_year: str
+    institutions_approved: int
+    institutions_reporting: int
+    students_recorded: int
+    states_covered: int = Field(description="states with at least one reporting institution")
+    credentials_issued: int
+    states: list[PublicStateStat]
+
+
+class PublicAccount(BaseModel):
+    id: str = Field(description="AICTE institution id, or the university's DID")
+    name: str
+    state: str | None
+    kind: Literal["institution", "university"]
+    login_id: str = Field(description="the account to sign in with")
+
+
+class AccountCodeIn(BaseModel):
+    reason: str = Field(min_length=10, max_length=300, description="audited")
+
+
+class AccountCodeOut(BaseModel):
+    status: Literal["issued", "already_issued"]
+    user_id: str
+    display_name: str
+    code: str | None = Field(description="shown once; never stored (a replay returns null)")
+    expires_at: datetime
+
+
+class AccountActivateIn(BaseModel):
+    user_id: str = Field(min_length=1, max_length=100)
+    code: str = Field(max_length=20, description="one-time code issued by AICTE, e.g. 7K3M-Q9TB-2X")
+    password: str = Field(min_length=12, max_length=200)
+
+
+class AccountActivateOut(BaseModel):
+    user_id: str
+    role: str
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class AccessRequestIn(BaseModel):
+    organisation: str = Field(min_length=3, max_length=150)
+    contact_name: str = Field(min_length=2, max_length=100)
+    contact_email: str = Field(max_length=254)
+    purpose: str = Field(min_length=10, max_length=500, description="why the organisation needs to verify credentials")
+
+    @field_validator("contact_email")
+    @classmethod
+    def _email(cls, v: str) -> str:
+        v = v.strip()
+        if not EMAIL_RE.match(v):
+            raise ValueError("not an email address")
+        return v
+
+
+class AccessRequestCreated(BaseModel):
+    id: int
+    status: Literal["pending"]
+
+
+class AccessRequestOut(BaseModel):
+    id: int
+    organisation: str
+    contact_name: str
+    contact_email: str
+    purpose: str
+    status: Literal["pending", "approved", "rejected"]
+    decided_by: str | None
+    decision_reason: str | None
+    decided_at: datetime | None
+    user_id: str | None = Field(description="the verifier account created on approval")
+    created_at: datetime
+
+
+class AccessRequestDecisionIn(BaseModel):
+    decision: Literal["approved", "rejected"]
+    reason: str = Field(min_length=10, max_length=300, description="audited")
+
+
+class AccessRequestDecided(BaseModel):
+    request: AccessRequestOut
+    account: AccountCodeOut | None = Field(description="approved: the new verifier account's one-time code (shown once)")
+    replayed: bool = False

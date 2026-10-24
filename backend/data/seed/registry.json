@@ -4,10 +4,10 @@
     {"code": "2026-27", "window_start": "2026-07-01", "window_end": "2026-10-31", "deadline": "2026-11-15T23:59:59+05:30"}
   ],
   "institutions": [
-    {"id": "1-0000000001", "name": "Demo Institute of Technology", "state": "Karnataka", "status": "approved"},
-    {"id": "1-0000000002", "name": "Sample College of Engineering", "state": "Maharashtra", "status": "approved"},
-    {"id": "1-0000000003", "name": "Example School of Management", "state": "Uttar Pradesh", "status": "approved"},
-    {"id": "1-0000000004", "name": "Closed Polytechnic", "state": "Bihar", "status": "closed"}
+    {"id": "1-0000000001", "name": "Kalyani Devi Hegde Institute of Technology, Hubballi", "state": "Karnataka", "status": "approved"},
+    {"id": "1-0000000002", "name": "Anandrao Kulkarni College of Engineering, Solapur", "state": "Maharashtra", "status": "approved"},
+    {"id": "1-0000000003", "name": "Saraswati Narain Institute of Management Studies, Kanpur", "state": "Uttar Pradesh", "status": "approved"},
+    {"id": "1-0000000004", "name": "Ram Lakhan Sinha Polytechnic, Darbhanga", "state": "Bihar", "status": "closed"}
   ],
   "programmes": [
     {"institution_id": "1-0000000001", "code": "CSE", "name": "B.E. Computer Science and Engineering", "level": "UG", "duration_years": 4},
@@ -50,15 +50,15 @@
      "handbook_ref": "FN/OCI/CIWG up to 15% over approved intake, 1/3 of that for CIWG; vacant seats to NRI with AICTE approval (APH 2024-27, PRD S1). TODO verify rounding rule against Handbook text."}
   ],
   "users": [
-    {"id": "inst-a", "role": "institution_admin", "institution_id": "1-0000000001", "display_name": "Admin, Demo Institute of Technology"},
-    {"id": "inst-b", "role": "institution_admin", "institution_id": "1-0000000002", "display_name": "Admin, Sample College of Engineering"},
-    {"id": "inst-c", "role": "institution_admin", "institution_id": "1-0000000003", "display_name": "Admin, Example School of Management"},
-    {"id": "inst-d", "role": "institution_admin", "institution_id": "1-0000000004", "display_name": "Admin, Closed Polytechnic"},
-    {"id": "aicte", "role": "aicte_officer", "display_name": "AICTE Monitoring Officer"},
-    {"id": "auditor", "role": "auditor", "display_name": "Regulator (read-only auditor)"},
-    {"id": "employer", "role": "verifier", "display_name": "Acme Hiring Pvt Ltd (verifier)"},
+    {"id": "inst-a", "role": "institution_admin", "institution_id": "1-0000000001", "display_name": "Admin, Kalyani Devi Hegde Institute of Technology, Hubballi"},
+    {"id": "inst-b", "role": "institution_admin", "institution_id": "1-0000000002", "display_name": "Admin, Anandrao Kulkarni College of Engineering, Solapur"},
+    {"id": "inst-c", "role": "institution_admin", "institution_id": "1-0000000003", "display_name": "Admin, Saraswati Narain Institute of Management Studies, Kanpur"},
+    {"id": "inst-d", "role": "institution_admin", "institution_id": "1-0000000004", "display_name": "Admin, Ram Lakhan Sinha Polytechnic, Darbhanga"},
+    {"id": "aicte", "role": "aicte_officer", "display_name": "Monitoring & Evaluation Cell, AICTE"},
+    {"id": "auditor", "role": "auditor", "display_name": "National Education Audit Office (read-only)"},
+    {"id": "employer", "role": "verifier", "display_name": "Kaveri Talent Solutions Pvt Ltd"},
     {"id": "univ", "role": "university_registrar", "issuer_did": "did:web:registry.aicte-demo.in:univ:dtu-demo",
-     "display_name": "Registrar, Demo Technological University"}
+     "display_name": "Registrar, Narmada Valley Technological University"}
   ],
   "_trust_note": "MOCK trust registry (D4). DIDs use did:web style ids on a demo host; keys are generated locally at seed time.",
   "trust_registry": {
@@ -70,7 +70,7 @@
       {"institution_id": "1-0000000004", "valid_from": "2015-07-01T00:00:00Z", "valid_until": "2026-06-30T23:59:59Z"}
     ],
     "universities": [
-      {"did": "did:web:registry.aicte-demo.in:univ:dtu-demo", "name": "Demo Technological University (MOCK)",
+      {"did": "did:web:registry.aicte-demo.in:univ:dtu-demo", "name": "Narmada Valley Technological University",
        "valid_from": "2010-01-01T00:00:00Z", "valid_until": null, "affiliated": ["1-0000000001", "1-0000000002"]}
     ]
   }

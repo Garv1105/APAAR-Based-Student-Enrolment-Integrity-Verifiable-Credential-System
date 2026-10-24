@@ -571,6 +571,130 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/public/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Stats
+         * @description Public landing numbers: aggregates only; per-state student counts under 10 are withheld.
+         */
+        get: operations["public_stats_v1_public_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/public/institutions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Public Institutions
+         * @description Public sign-in search over the registry (institutions by name, AICTE id or city; universities by name). Institutions need q (2+ characters) or a state; at most 20 results.
+         */
+        get: operations["public_institutions_v1_public_institutions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/users/{user_id}/account-code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Issue Account Code
+         * @description AICTE officer: one-time code (7 days) that sets the first password of an institution, university or verifier account. Voids earlier unused codes. Reason audited. Accepts Idempotency-Key.
+         */
+        post: operations["issue_account_code_v1_users__user_id__account_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/auth/activate-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Activate Account
+         * @description Public: redeem an AICTE account code and set the password (12+ characters). One error for every mismatch; 5 attempts per account per 15 minutes.
+         */
+        post: operations["activate_account_v1_auth_activate_account_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/access-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Access Requests
+         * @description Regulators: verifier access requests, pending first. Each read is audited.
+         */
+        get: operations["list_access_requests_v1_access_requests_get"];
+        put?: never;
+        /**
+         * Create Access Request
+         * @description Public: a verifier organisation asks AICTE for an account. Contact details are encrypted at rest.
+         */
+        post: operations["create_access_request_v1_access_requests_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/access-requests/{request_id}/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Access Request
+         * @description AICTE officer: approve (creates the verifier account and returns its one-time code) or reject, with a reason. Repeating the same decision returns the request (replayed, no new code).
+         */
+        post: operations["decide_access_request_v1_access_requests__request_id__decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/passkeys/register/options": {
         parameters: {
             query?: never;
@@ -1212,6 +1336,137 @@ export interface components {
             entity: string;
             /** Entity Id */
             entity_id: string | null;
+        };
+        /** AccessRequestCreated */
+        AccessRequestCreated: {
+            /** Id */
+            id: number;
+            /**
+             * Status
+             * @constant
+             */
+            status: "pending";
+        };
+        /** AccessRequestDecided */
+        AccessRequestDecided: {
+            request: components["schemas"]["AccessRequestOut"];
+            /** @description approved: the new verifier account's one-time code (shown once) */
+            account: components["schemas"]["AccountCodeOut"] | null;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /** AccessRequestDecisionIn */
+        AccessRequestDecisionIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approved" | "rejected";
+            /**
+             * Reason
+             * @description audited
+             */
+            reason: string;
+        };
+        /** AccessRequestIn */
+        AccessRequestIn: {
+            /** Organisation */
+            organisation: string;
+            /** Contact Name */
+            contact_name: string;
+            /** Contact Email */
+            contact_email: string;
+            /**
+             * Purpose
+             * @description why the organisation needs to verify credentials
+             */
+            purpose: string;
+        };
+        /** AccessRequestOut */
+        AccessRequestOut: {
+            /** Id */
+            id: number;
+            /** Organisation */
+            organisation: string;
+            /** Contact Name */
+            contact_name: string;
+            /** Contact Email */
+            contact_email: string;
+            /** Purpose */
+            purpose: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "approved" | "rejected";
+            /** Decided By */
+            decided_by: string | null;
+            /** Decision Reason */
+            decision_reason: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            /**
+             * User Id
+             * @description the verifier account created on approval
+             */
+            user_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AccountActivateIn */
+        AccountActivateIn: {
+            /** User Id */
+            user_id: string;
+            /**
+             * Code
+             * @description one-time code issued by AICTE, e.g. 7K3M-Q9TB-2X
+             */
+            code: string;
+            /** Password */
+            password: string;
+        };
+        /** AccountActivateOut */
+        AccountActivateOut: {
+            /** User Id */
+            user_id: string;
+            /** Role */
+            role: string;
+        };
+        /** AccountCodeIn */
+        AccountCodeIn: {
+            /**
+             * Reason
+             * @description audited
+             */
+            reason: string;
+        };
+        /** AccountCodeOut */
+        AccountCodeOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "issued" | "already_issued";
+            /** User Id */
+            user_id: string;
+            /** Display Name */
+            display_name: string;
+            /**
+             * Code
+             * @description shown once; never stored (a replay returns null)
+             */
+            code: string | null;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
         };
         /** ActivateIn */
         ActivateIn: {
@@ -1897,6 +2152,11 @@ export interface components {
             /** Field */
             field?: string | null;
             /**
+             * Title
+             * @description short plain-language name of the problem (same for every row with this code)
+             */
+            title: string;
+            /**
              * Message
              * @description rendered from i18n/<locale>.json for the requested locale
              */
@@ -2123,6 +2383,68 @@ export interface components {
             source: "mock";
             /** Lines */
             lines: components["schemas"]["SeatLine"][];
+        };
+        /** PublicAccount */
+        PublicAccount: {
+            /**
+             * Id
+             * @description AICTE institution id, or the university's DID
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** State */
+            state: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "institution" | "university";
+            /**
+             * Login Id
+             * @description the account to sign in with
+             */
+            login_id: string;
+        };
+        /** PublicStateStat */
+        PublicStateStat: {
+            /** State */
+            state: string;
+            /**
+             * Institutions
+             * @description approved institutions in the registry
+             */
+            institutions: number;
+            /**
+             * Reporting
+             * @description approved institutions with at least one completed upload
+             */
+            reporting: number;
+            /**
+             * Students
+             * @description active enrolments this year; null when fewer than 10 (small-count suppression)
+             */
+            students: number | null;
+        };
+        /** PublicStats */
+        PublicStats: {
+            /** Academic Year */
+            academic_year: string;
+            /** Institutions Approved */
+            institutions_approved: number;
+            /** Institutions Reporting */
+            institutions_reporting: number;
+            /** Students Recorded */
+            students_recorded: number;
+            /**
+             * States Covered
+             * @description states with at least one reporting institution
+             */
+            states_covered: number;
+            /** Credentials Issued */
+            credentials_issued: number;
+            /** States */
+            states: components["schemas"]["PublicStateStat"][];
         };
         /** RegistryIssuer */
         RegistryIssuer: {
@@ -2578,6 +2900,8 @@ export interface operations {
             query?: never;
             header?: {
                 "idempotency-key"?: string | null;
+                /** @description DEMO_MODE only: ISO 8601 time with offset, used as the batch's upload time (deadline features). Otherwise ignored. */
+                "x-demo-upload-time"?: string | null;
             };
             path?: never;
             cookie?: never;
@@ -3272,6 +3596,218 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    public_stats_v1_public_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicStats"];
+                };
+            };
+        };
+    };
+    public_institutions_v1_public_institutions_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                state?: string | null;
+                kind?: "institution" | "university";
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicAccount"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_account_code_v1_users__user_id__account_code_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountCodeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountCodeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    activate_account_v1_auth_activate_account_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountActivateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountActivateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_access_requests_v1_access_requests_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestOut"][];
+                };
+            };
+        };
+    };
+    create_access_request_v1_access_requests_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_access_request_v1_access_requests__request_id__decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccessRequestDecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRequestDecided"];
                 };
             };
             /** @description Validation Error */

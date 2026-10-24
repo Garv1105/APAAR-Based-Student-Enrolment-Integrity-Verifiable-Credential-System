@@ -1196,6 +1196,346 @@
     }
    }
   },
+  "/v1/public/stats": {
+   "get": {
+    "summary": "Public Stats",
+    "description": "Public landing numbers: aggregates only; per-state student counts under 10 are withheld.",
+    "operationId": "public_stats_v1_public_stats_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublicStats"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/public/institutions": {
+   "get": {
+    "summary": "Public Institutions",
+    "description": "Public sign-in search over the registry (institutions by name, AICTE id or city; universities by name). Institutions need q (2+ characters) or a state; at most 20 results.",
+    "operationId": "public_institutions_v1_public_institutions_get",
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Q"
+      }
+     },
+     {
+      "name": "state",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "State"
+      }
+     },
+     {
+      "name": "kind",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "institution",
+        "university"
+       ],
+       "type": "string",
+       "default": "institution",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/PublicAccount"
+         },
+         "title": "Response Public Institutions V1 Public Institutions Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/users/{user_id}/account-code": {
+   "post": {
+    "summary": "Issue Account Code",
+    "description": "AICTE officer: one-time code (7 days) that sets the first password of an institution, university or verifier account. Voids earlier unused codes. Reason audited. Accepts Idempotency-Key.",
+    "operationId": "issue_account_code_v1_users__user_id__account_code_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "user_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "User Id"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AccountCodeIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AccountCodeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/activate-account": {
+   "post": {
+    "summary": "Activate Account",
+    "description": "Public: redeem an AICTE account code and set the password (12+ characters). One error for every mismatch; 5 attempts per account per 15 minutes.",
+    "operationId": "activate_account_v1_auth_activate_account_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AccountActivateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AccountActivateOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/access-requests": {
+   "get": {
+    "summary": "List Access Requests",
+    "description": "Regulators: verifier access requests, pending first. Each read is audited.",
+    "operationId": "list_access_requests_v1_access_requests_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AccessRequestOut"
+         },
+         "type": "array",
+         "title": "Response List Access Requests V1 Access Requests Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "post": {
+    "summary": "Create Access Request",
+    "description": "Public: a verifier organisation asks AICTE for an account. Contact details are encrypted at rest.",
+    "operationId": "create_access_request_v1_access_requests_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AccessRequestIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AccessRequestCreated"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/access-requests/{request_id}/decide": {
+   "post": {
+    "summary": "Decide Access Request",
+    "description": "AICTE officer: approve (creates the verifier account and returns its one-time code) or reject, with a reason. Repeating the same decision returns the request (replayed, no new code).",
+    "operationId": "decide_access_request_v1_access_requests__request_id__decide_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "request_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Request Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AccessRequestDecisionIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AccessRequestDecided"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/passkeys/register/options": {
    "post": {
     "summary": "Passkey Register Options",
@@ -2581,6 +2921,323 @@
      "entity_id"
     ],
     "title": "AccessLogEntry"
+   },
+   "AccessRequestCreated": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "status": {
+      "type": "string",
+      "const": "pending",
+      "title": "Status"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "status"
+    ],
+    "title": "AccessRequestCreated"
+   },
+   "AccessRequestDecided": {
+    "properties": {
+     "request": {
+      "$ref": "#/components/schemas/AccessRequestOut"
+     },
+     "account": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AccountCodeOut"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "description": "approved: the new verifier account's one-time code (shown once)"
+     },
+     "replayed": {
+      "type": "boolean",
+      "title": "Replayed",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "request",
+     "account"
+    ],
+    "title": "AccessRequestDecided"
+   },
+   "AccessRequestDecisionIn": {
+    "properties": {
+     "decision": {
+      "type": "string",
+      "enum": [
+       "approved",
+       "rejected"
+      ],
+      "title": "Decision"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "audited"
+     }
+    },
+    "type": "object",
+    "required": [
+     "decision",
+     "reason"
+    ],
+    "title": "AccessRequestDecisionIn"
+   },
+   "AccessRequestIn": {
+    "properties": {
+     "organisation": {
+      "type": "string",
+      "maxLength": 150,
+      "minLength": 3,
+      "title": "Organisation"
+     },
+     "contact_name": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 2,
+      "title": "Contact Name"
+     },
+     "contact_email": {
+      "type": "string",
+      "maxLength": 254,
+      "title": "Contact Email"
+     },
+     "purpose": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 10,
+      "title": "Purpose",
+      "description": "why the organisation needs to verify credentials"
+     }
+    },
+    "type": "object",
+    "required": [
+     "organisation",
+     "contact_name",
+     "contact_email",
+     "purpose"
+    ],
+    "title": "AccessRequestIn"
+   },
+   "AccessRequestOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "organisation": {
+      "type": "string",
+      "title": "Organisation"
+     },
+     "contact_name": {
+      "type": "string",
+      "title": "Contact Name"
+     },
+     "contact_email": {
+      "type": "string",
+      "title": "Contact Email"
+     },
+     "purpose": {
+      "type": "string",
+      "title": "Purpose"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "approved",
+       "rejected"
+      ],
+      "title": "Status"
+     },
+     "decided_by": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided By"
+     },
+     "decision_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decision Reason"
+     },
+     "decided_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Decided At"
+     },
+     "user_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "User Id",
+      "description": "the verifier account created on approval"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "organisation",
+     "contact_name",
+     "contact_email",
+     "purpose",
+     "status",
+     "decided_by",
+     "decision_reason",
+     "decided_at",
+     "user_id",
+     "created_at"
+    ],
+    "title": "AccessRequestOut"
+   },
+   "AccountActivateIn": {
+    "properties": {
+     "user_id": {
+      "type": "string",
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "User Id"
+     },
+     "code": {
+      "type": "string",
+      "maxLength": 20,
+      "title": "Code",
+      "description": "one-time code issued by AICTE, e.g. 7K3M-Q9TB-2X"
+     },
+     "password": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 12,
+      "title": "Password"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user_id",
+     "code",
+     "password"
+    ],
+    "title": "AccountActivateIn"
+   },
+   "AccountActivateOut": {
+    "properties": {
+     "user_id": {
+      "type": "string",
+      "title": "User Id"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     }
+    },
+    "type": "object",
+    "required": [
+     "user_id",
+     "role"
+    ],
+    "title": "AccountActivateOut"
+   },
+   "AccountCodeIn": {
+    "properties": {
+     "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "audited"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "AccountCodeIn"
+   },
+   "AccountCodeOut": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "issued",
+       "already_issued"
+      ],
+      "title": "Status"
+     },
+     "user_id": {
+      "type": "string",
+      "title": "User Id"
+     },
+     "display_name": {
+      "type": "string",
+      "title": "Display Name"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code",
+      "description": "shown once; never stored (a replay returns null)"
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "user_id",
+     "display_name",
+     "code",
+     "expires_at"
+    ],
+    "title": "AccountCodeOut"
    },
    "ActivateIn": {
     "properties": {
@@ -4128,6 +4785,11 @@
       ],
       "title": "Field"
      },
+     "title": {
+      "type": "string",
+      "title": "Title",
+      "description": "short plain-language name of the problem (same for every row with this code)"
+     },
      "message": {
       "type": "string",
       "title": "Message",
@@ -4143,6 +4805,7 @@
      "row_no",
      "code",
      "severity",
+     "title",
      "message",
      "fix_hint"
     ],
@@ -4647,6 +5310,137 @@
      "lines"
     ],
     "title": "ProgrammeSeats"
+   },
+   "PublicAccount": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id",
+      "description": "AICTE institution id, or the university's DID"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "institution",
+       "university"
+      ],
+      "title": "Kind"
+     },
+     "login_id": {
+      "type": "string",
+      "title": "Login Id",
+      "description": "the account to sign in with"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "state",
+     "kind",
+     "login_id"
+    ],
+    "title": "PublicAccount"
+   },
+   "PublicStateStat": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "institutions": {
+      "type": "integer",
+      "title": "Institutions",
+      "description": "approved institutions in the registry"
+     },
+     "reporting": {
+      "type": "integer",
+      "title": "Reporting",
+      "description": "approved institutions with at least one completed upload"
+     },
+     "students": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Students",
+      "description": "active enrolments this year; null when fewer than 10 (small-count suppression)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "state",
+     "institutions",
+     "reporting",
+     "students"
+    ],
+    "title": "PublicStateStat"
+   },
+   "PublicStats": {
+    "properties": {
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "institutions_approved": {
+      "type": "integer",
+      "title": "Institutions Approved"
+     },
+     "institutions_reporting": {
+      "type": "integer",
+      "title": "Institutions Reporting"
+     },
+     "students_recorded": {
+      "type": "integer",
+      "title": "Students Recorded"
+     },
+     "states_covered": {
+      "type": "integer",
+      "title": "States Covered",
+      "description": "states with at least one reporting institution"
+     },
+     "credentials_issued": {
+      "type": "integer",
+      "title": "Credentials Issued"
+     },
+     "states": {
+      "items": {
+       "$ref": "#/components/schemas/PublicStateStat"
+      },
+      "type": "array",
+      "title": "States"
+     }
+    },
+    "type": "object",
+    "required": [
+     "academic_year",
+     "institutions_approved",
+     "institutions_reporting",
+     "students_recorded",
+     "states_covered",
+     "credentials_issued",
+     "states"
+    ],
+    "title": "PublicStats"
    },
    "RegistryIssuer": {
     "properties": {

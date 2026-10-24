@@ -11,19 +11,21 @@ from .auth import audit
 from .ingest import current_year
 
 
-def programme_features(conn, year: str) -> list[dict]:
+def programme_features(conn, year: str, institution_id: str | None = None) -> list[dict]:
+    """Per-programme inputs for the anomaly rules. institution_id limits it to one college (its own DQS view)."""
     progs = conn.execute("""
-        SELECT p.id, p.institution_id, p.code, a.approved_intake, i.state,
-               (SELECT filled FROM programme_category_counters c WHERE c.programme_id = p.id AND c.academic_year = %(y)s
-                 AND c.category_code = 'REGULAR') AS regular,
-               (SELECT filled FROM programme_category_counters c WHERE c.programme_id = p.id AND c.academic_year = %(y)s
-                 AND c.category_code = 'SN_FN_OCI_CIWG') AS foreign_pool,
-               (SELECT count(*) FROM enrolments e WHERE e.programme_id = p.id AND e.academic_year = %(y)s AND e.status = 'active') AS active,
-               (SELECT max(max_dob_cluster) FROM batch_features f WHERE f.programme_id = p.id) AS dob_cluster,
-               (SELECT max(longest_apaar_run) FROM batch_features f WHERE f.programme_id = p.id) AS apaar_run
+        WITH act AS (SELECT programme_id, count(*) n FROM enrolments WHERE academic_year = %(y)s AND status = 'active' GROUP BY 1),
+             bf AS (SELECT programme_id, max(max_dob_cluster) dob, max(longest_apaar_run) run FROM batch_features GROUP BY 1),
+             cc AS (SELECT programme_id, max(filled) FILTER (WHERE category_code = 'REGULAR') regular,
+                           max(filled) FILTER (WHERE category_code = 'SN_FN_OCI_CIWG') foreign_pool
+                      FROM programme_category_counters WHERE academic_year = %(y)s GROUP BY 1)
+        SELECT p.id, p.institution_id, p.code, a.approved_intake, i.state, cc.regular, cc.foreign_pool,
+               coalesce(act.n, 0) AS active, bf.dob AS dob_cluster, bf.run AS apaar_run
           FROM programmes p JOIN approved_intake a ON a.programme_id = p.id AND a.academic_year = %(y)s
           JOIN institutions i ON i.id = p.institution_id
-         ORDER BY p.id""", {"y": year}).fetchall()
+          LEFT JOIN act ON act.programme_id = p.id LEFT JOIN bf ON bf.programme_id = p.id LEFT JOIN cc ON cc.programme_id = p.id
+         WHERE %(inst)s::text IS NULL OR p.institution_id = %(inst)s
+         ORDER BY p.id""", {"y": year, "inst": institution_id}).fetchall()
     hist = defaultdict(list)
     for h in conn.execute("SELECT * FROM intake_history ORDER BY academic_year"):
         hist[h["programme_id"]].append(h)
@@ -105,10 +107,11 @@ def network_view(conn) -> dict:
             "flags": res["flags"], "edge_min": anomaly.network.EDGE_MIN, "note": NETWORK_NOTE}
 
 
-def flags(conn, regulator: bool = False) -> list[dict]:
-    """Own-data rules for everyone; peer comparisons (A1) only on a regulator connection (they need every college's numbers)."""
+def flags(conn, regulator: bool = False, institution_id: str | None = None) -> list[dict]:
+    """Own-data rules for everyone; peer comparisons (A1) only on a regulator connection (they need every college's numbers).
+    institution_id (non-regulator only): compute just that college's programme flags."""
     year = current_year(conn)["code"]
-    feats = programme_features(conn, year)
+    feats = programme_features(conn, year, None if regulator else institution_id)
     out = [f for x in feats if x["rows"] or x["max_dob_cluster"] or x["longest_apaar_run"]
            for f in anomaly.programme_flags(x)]
     if regulator:
@@ -122,44 +125,56 @@ def flags(conn, regulator: bool = False) -> list[dict]:
     return out
 
 
-def dqs_inputs(conn, institution_id: str, year: str, flag_count: int, updates: int) -> dict | None:
-    b = conn.execute("SELECT count(*) n, coalesce(sum((row_counts_json->>'rows')::int), 0) rows, "
-                     "coalesce(sum((row_counts_json->>'accepted')::int), 0) accepted FROM upload_batches WHERE institution_id = %s",
-                     (institution_id,)).fetchone()
-    if not b["n"]:
-        return None
-    one = lambda q, *a: conn.execute(q, a).fetchone()["n"]  # noqa: E731
-    return {
-        "rows": b["rows"], "accepted": b["accepted"],
-        "active": one("SELECT count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id "
-                      "WHERE p.institution_id = %s AND e.academic_year = %s AND e.status = 'active'", institution_id, year),
-        "excess": one("SELECT coalesce(sum(greatest(c.filled - c.cap, 0)), 0) n FROM programme_category_counters c "
-                      "JOIN programmes p ON p.id = c.programme_id WHERE p.institution_id = %s AND c.academic_year = %s "
-                      "AND c.category_code NOT LIKE '%%:%%'", institution_id, year),
-        "late_rows": one("SELECT coalesce(sum(f.rows), 0) n FROM batch_features f JOIN upload_batches b ON b.id = f.batch_id "
-                         "WHERE b.institution_id = %s AND f.minutes_before_deadline <= 1440", institution_id),
+def dqs_inputs_all(conn, year: str, institution_id: str | None = None) -> dict[str, dict]:
+    """DQS inputs for every institution that has uploaded (or just one), in a handful of grouped queries."""
+    q = {"y": year, "i": institution_id}
+    only = "(%(i)s::text IS NULL OR {col} = %(i)s)"
+
+    def per(sql: str, col: str) -> dict:
+        return {r["k"]: r["n"] for r in conn.execute(sql.format(only=only.format(col=col)), q)}
+
+    out = {r["institution_id"]: {"rows": r["rows"], "accepted": r["accepted"]} for r in conn.execute(
+        "SELECT institution_id, coalesce(sum((row_counts_json->>'rows')::int), 0) rows, "
+        "coalesce(sum((row_counts_json->>'accepted')::int), 0) accepted FROM upload_batches "
+        "WHERE " + only.format(col="institution_id") + " GROUP BY 1", q)}
+    enrol = "FROM enrolments e JOIN programmes p ON p.id = e.programme_id WHERE {only}"
+    cols = {
+        "active": per("SELECT p.institution_id k, count(*) n " + enrol + " AND e.academic_year = %(y)s AND e.status = 'active' GROUP BY 1",
+                      "p.institution_id"),
+        "excess": per("SELECT p.institution_id k, coalesce(sum(greatest(c.filled - c.cap, 0)), 0) n FROM programme_category_counters c "
+                      "JOIN programmes p ON p.id = c.programme_id WHERE {only} AND c.academic_year = %(y)s "
+                      "AND c.category_code NOT LIKE '%%:%%' GROUP BY 1", "p.institution_id"),
+        "late_rows": per("SELECT b.institution_id k, coalesce(sum(f.rows), 0) n FROM batch_features f JOIN upload_batches b "
+                         "ON b.id = f.batch_id WHERE {only} AND f.minutes_before_deadline <= 1440 GROUP BY 1", "b.institution_id"),
         # A4 fairness: an open case counts only against institutions whose enrolment was NOT submitted first
         # (lowest enrolment id = earliest upload, observed by the platform, unlike the self-declared admission date)
-        "open_cases": one("SELECT count(DISTINCT c.id) n FROM duplicate_cases c JOIN enrolments e ON e.id = ANY(c.enrolment_ids) "
-                          "JOIN programmes p ON p.id = e.programme_id WHERE p.institution_id = %s "
-                          "AND c.status IN ('flagged','under_investigation') AND NOT EXISTS ("
+        "open_cases": per("SELECT p.institution_id k, count(DISTINCT c.id) n FROM duplicate_cases c "
+                          "JOIN enrolments e ON e.id = ANY(c.enrolment_ids) JOIN programmes p ON p.id = e.programme_id "
+                          "WHERE {only} AND c.status IN ('flagged','under_investigation') AND NOT EXISTS ("
                           "SELECT 1 FROM enrolments f JOIN programmes fp ON fp.id = f.programme_id "
-                          "WHERE f.id = (SELECT min(x) FROM unnest(c.enrolment_ids) x) AND fp.institution_id = %s)",
-                          institution_id, institution_id),
-        "flags": flag_count, "updates": updates,
-        "created": one("SELECT count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id WHERE p.institution_id = %s",
-                       institution_id),
-        "e303": one("SELECT count(*) n FROM validation_issues v JOIN upload_batches b ON b.id = v.batch_id "
-                    "WHERE b.institution_id = %s AND v.code = 'E303'", institution_id),
-        "e501": one("SELECT count(*) n FROM anomaly_flags WHERE institution_id = %s AND type = 'E501'", institution_id),
+                          "WHERE f.id = (SELECT min(x) FROM unnest(c.enrolment_ids) x) AND fp.institution_id = p.institution_id) "
+                          "GROUP BY 1", "p.institution_id"),
+        "created": per("SELECT p.institution_id k, count(*) n " + enrol + " GROUP BY 1", "p.institution_id"),
+        "e303": per("SELECT b.institution_id k, count(*) n FROM validation_issues v JOIN upload_batches b ON b.id = v.batch_id "
+                    "WHERE {only} AND v.code = 'E303' GROUP BY 1", "b.institution_id"),
+        "e501": per("SELECT institution_id k, count(*) n FROM anomaly_flags WHERE {only} AND type = 'E501' GROUP BY 1", "institution_id"),
     }
+    for inst, m in out.items():
+        m.update({name: vals.get(inst, 0) for name, vals in cols.items()})
+    return out
+
+
+def dqs_inputs(conn, institution_id: str, year: str, flag_count: int, updates: int, pre: dict | None = None) -> dict | None:
+    """pre: dqs_inputs_all() result, so a ranking of every institution doesn't query once per institution."""
+    m = (pre if pre is not None else dqs_inputs_all(conn, year, institution_id)).get(institution_id)
+    return None if m is None else {**m, "flags": flag_count, "updates": updates}
 
 
 def institution_view(conn, institution_id: str) -> dict:
     """An institution's own DQS (RLS connection of that institution)."""
     year = current_year(conn)["code"]
     # second guard: cross-institution flags (their evidence can name other colleges) never reach an institution
-    fl = [f for f in flags(conn) if f["institution_id"] == institution_id and f["type"] not in CROSS_INSTITUTION]
+    fl = [f for f in flags(conn, institution_id=institution_id) if f["institution_id"] == institution_id and f["type"] not in CROSS_INSTITUTION]
     updates = conn.execute("SELECT own_correction_count() n").fetchone()["n"]
     m = dqs_inputs(conn, institution_id, year, len(fl), updates)
     return {"institution_id": institution_id, "dqs": anomaly.dqs(m) if m else None, "flags": fl}
@@ -228,11 +243,11 @@ def inspection_queue(conn) -> list[dict]:
     all_flags = [f for f in annotate(flags(conn, regulator=True), review_rows, year) if not f["suppressed"]]  # dismissed: hidden
     updates = {r["institution_id"]: r["n"] for r in conn.execute(
         "SELECT institution_id, count(*) n FROM ledger_entries WHERE event_type = 'enrolment.updated' GROUP BY 1")}
-    entries = []
+    entries, pre = [], dqs_inputs_all(conn, year)
     for i in conn.execute("SELECT * FROM institutions ORDER BY id"):
         fl = [f for f in all_flags if f["institution_id"] == i["id"]]
         own = [f for f in fl if f["type"] not in CROSS_INSTITUTION]  # DQS uses the institution's own data only (matches its own view)
-        m = dqs_inputs(conn, i["id"], year, len(own), updates.get(i["id"], 0))
+        m = dqs_inputs(conn, i["id"], year, len(own), updates.get(i["id"], 0), pre)
         entries.append({"institution_id": i["id"], "name": i["name"], "state": i["state"], "status": i["status"],
                         "active": m["active"] if m else 0, "dqs": anomaly.dqs(m) if m else None, "flags": fl})
     ranked = anomaly.inspection_queue(entries, anomaly.feedback.rule_weights(review_rows))

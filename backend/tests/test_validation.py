@@ -148,7 +148,7 @@ def test_every_code_has_english_template_and_fix_hint():
     from app.i18n import catalogue, render
     en = catalogue("en")
     for code in CODES:
-        assert code in en and en[code]["template"] and en[code]["fix_hint"], code
+        assert code in en and en[code]["title"] and en[code]["template"] and en[code]["fix_hint"], code
         used = {f for _, f, _, _ in string.Formatter().parse(en[code]["template"]) if f}
         assert used <= PLACEHOLDERS, (code, used)
         render(code, {"field": "x", "detail": "y"})

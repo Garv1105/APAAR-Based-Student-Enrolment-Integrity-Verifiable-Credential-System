@@ -8,7 +8,7 @@ import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
 import { EnrolmentLookup } from "./Registrar";
 import IndiaMap from "../components/IndiaMap";
 import { useMounted } from "../components/motion";
-import { FLAG_LABEL, COMPONENT_LABEL } from "../risk";
+import { COMPONENT_HELP, COMPONENT_LABEL, FLAG_INFO, FLAG_LABEL } from "../risk";
 import { AnimatedCounter, Badge, Button, Empty, ErrorNote, go, Loading, Ring, SparkBars, usePoll } from "../ui";
 
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
@@ -477,7 +477,7 @@ function Quality({ risk, error }: { risk: S["InstitutionRisk"] | null; error: st
                 <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07]">
                   <div className={`h-full rounded-full bg-gradient-to-r transition-[width] duration-1000 ease-out ${barColor(v)}`} style={{ width: `${on ? v * 100 : 0}%` }} />
                 </div>
-                <p className="mt-1.5 text-[13px] text-slate-500">Weight {Math.round(d.weights[k] * 100)}% of the score</p>
+                <p className="mt-1.5 text-[13.5px] leading-snug text-slate-500">{COMPONENT_HELP[k] ? `${COMPONENT_HELP[k]} ` : ""}Counts for {Math.round(d.weights[k] * 100)}% of the score.</p>
               </li>
             ))}
           </ul>
@@ -486,13 +486,13 @@ function Quality({ risk, error }: { risk: S["InstitutionRisk"] | null; error: st
 
       <div className="border-t border-white/[0.07] pt-8">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h3 className="font-display text-[20px] font-bold text-ink">Anomaly flags</h3>
-          <p className="text-[14px] text-slate-500">Risk indicators for review, not proof of misconduct.</p>
+          <h3 className="font-display text-[20px] font-bold text-ink">Warning signs in your data</h3>
+          <p className="text-[14px] text-slate-500">Patterns AICTE looks into. A warning sign is not proof of wrongdoing.</p>
         </div>
         {flags.length === 0 ? (
           <p className="mt-4 flex items-start gap-3 text-[16px] leading-relaxed text-slate-700">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success-text" aria-hidden />
-            <span><span className="font-semibold text-success-text">None active.</span> Nothing from your uploads is in AICTE's risk-based inspection queue for anomalies.</span>
+            <span><span className="font-semibold text-success-text">None.</span> Nothing unusual was found in your uploads.</span>
           </p>
         ) : (
           <ul className="mt-5 grid gap-x-10 gap-y-5 md:grid-cols-2">
@@ -500,6 +500,7 @@ function Quality({ risk, error }: { risk: S["InstitutionRisk"] | null; error: st
               <li key={i} className="border-l-2 border-warning/60 pl-4">
                 <p className="flex flex-wrap items-center gap-2"><Badge tone="warning">{FLAG_LABEL[f.type] ?? f.type}</Badge>{f.programme && <span className="text-[14px] text-slate-600">{f.programme}</span>}</p>
                 <p className="mt-2 text-[15.5px] leading-relaxed text-slate-700">{f.explanation}</p>
+                {FLAG_INFO[f.type] && <p className="mt-1 text-[14px] leading-relaxed text-slate-500">Why AICTE checks this: {FLAG_INFO[f.type].why}</p>}
               </li>
             ))}
           </ul>

@@ -155,7 +155,7 @@ def test_untrusted_issuers_and_registry_window(client, dbconn):
     assert verify(client, client.get("/v1/demo/forged-credential", headers=login(client, "employer")).json())["result"] == "UNTRUSTED_ISSUER"
     # a closed institution's credential issued after its approval window is untrusted; an earlier one still verifies
     base = {"@context": credentials.VC_CONTEXT, "id": "urn:uuid:00000000-0000-0000-0000-000000000004",
-            "type": ["VerifiableCredential", "EnrolmentCredential"], "issuer": {"id": D_DID, "name": "Closed Polytechnic"},
+            "type": ["VerifiableCredential", "EnrolmentCredential"], "issuer": {"id": D_DID, "name": "Ram Lakhan Sinha Polytechnic, Darbhanga"},
             "credentialSubject": {"name": "X", "studentId": "D/1"}}
     key = crypto.signing_key(D_DID)
     late = crypto.eddsa_jcs_2022_sign(base | {"validFrom": "2026-08-01T00:00:00Z"}, credentials._proof_options(f"{D_DID}#key-1"), key)

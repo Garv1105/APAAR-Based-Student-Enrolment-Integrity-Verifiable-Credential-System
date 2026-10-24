@@ -21,7 +21,7 @@ def _inst_of(dbconn, eid):
 
 def test_institution_sees_neutral_case_with_own_enrolments_only(client, dbconn):
     case = _setup(client)[0]
-    client.post(f"/v1/cases/{case['id']}/resolve", json={"status": "under_investigation", "note": "Demo Institute of Technology says first"},
+    client.post(f"/v1/cases/{case['id']}/resolve", json={"status": "under_investigation", "note": "Kalyani Devi Hegde Institute of Technology, Hubballi says first"},
                 headers=login(client, "aicte"))
     b = client.get("/v1/cases", headers=login(client, "inst-b"))
     assert b.status_code == 200 and b.json()
@@ -29,7 +29,7 @@ def test_institution_sees_neutral_case_with_own_enrolments_only(client, dbconn):
     assert mine["enrolment_ids"] and all(_inst_of(dbconn, i) == "1-0000000002" for i in mine["enrolment_ids"])
     assert mine["resolution_note"] is None and mine["detail"] is None
     text = json.dumps(b.json())
-    assert "1-0000000001" not in text and "Demo Institute" not in text
+    assert "1-0000000001" not in text and "Kalyani Devi Hegde" not in text
 
 
 def test_only_officer_resolves_and_unmask_needs_reason(client):

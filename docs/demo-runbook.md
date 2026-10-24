@@ -26,7 +26,7 @@ Reset between rehearsals by running step 3 again. Sign out of both windows first
 | 3 | W1 `inst-b` dashboard | **Notices from AICTE** | "A record in batch #… needs AICTE review (case #…)" | "B learns nothing about the other institution." |
 | | W2 `aicte` | **Duplicate cases**: type a reason, **Unmask** | Both enrolments: A and B, names, student IDs | "Unmasking needs a reason, is logged, and the student sees it." |
 | | | **Investigate** (note: "asking both") | Status: under investigation; credentials suspended | |
-| 4 | W2 `aicte` | **Risk-based inspection queue**: click *Example School of Management* | DQS breakdown; ENROLMENT_SPIKE flag with its evidence numbers | "Risk indicator for review, not proof. Every rank is explainable." |
+| 4 | W2 `aicte` | **Risk-based inspection queue**: click *Saraswati Narain Institute of Management Studies, Kanpur* | DQS breakdown; ENROLMENT_SPIKE flag with its evidence numbers | "Risk indicator for review, not proof. Every rank is explainable." |
 | | | Excess admissions card | B.Tech CSE 125/120 regular, 22/18 supernumerary | |
 | 5 | W1 `employer` | **My consent requests** | A pending request for Asha (name, programme, institution, status) | "Employers can't look anyone up. They ask; the student decides." |
 | | W1 sign-in page | **Activate and register passkey** with APAAR `328865551724` + the printed code, confirm with Windows Hello, then **Sign in with passkey** | Student portal | "The DOB no longer gets anyone in. The institution hands the student a one-time code, and the student registers a passkey." |
