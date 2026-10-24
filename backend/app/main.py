@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, FlagReviewIn, FlagReviewOut, NetworkOut, PeerStatus, RulePerformance, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
                         PasskeyOut, SetupOut, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
                         WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
@@ -57,7 +57,8 @@ async def http_problem(_, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_problem(_, exc: RequestValidationError):
-    return problem(422, "Request validation failed", exc.errors())
+    # no 'input' (may hold PII) and no 'ctx' (may hold exception objects)
+    return problem(422, "Request validation failed", [{k: e[k] for k in ("type", "loc", "msg") if k in e} for e in exc.errors()])
 
 
 @app.exception_handler(ingest.ApiError)
@@ -299,7 +300,42 @@ def ledger_latest(conn=Depends(get_conn)):
 @app.get("/v1/anomalies", response_model=list[AnomalyFlag],
          description="Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).")
 def anomalies(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
-    return risk.flags(conn)
+    out = risk.regulator_flags(conn)
+    auth.audit(conn, user, "anomalies.read", "anomalies", None, request=request)
+    conn.commit()
+    return out
+
+
+@app.get("/v1/network", response_model=NetworkOut,
+         description="A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.")
+def shared_student_network(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    out = risk.network_view(conn)
+    auth.audit(conn, user, "network.read", "network", out["academic_year"], request=request)
+    conn.commit()
+    return out
+
+
+@app.post("/v1/flags/{flag_key}/review", response_model=FlagReviewOut, status_code=201,
+          description="AICTE officer confirms, dismisses or asks for more info on a flag, with a written reason (audited). "
+                      "Accepts Idempotency-Key.")
+def review_flag(flag_key: str, body: FlagReviewIn, request: Request, idempotency_key: str | None = Header(None),
+                user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    row, replayed = risk.review_flag(conn, user, flag_key, body.decision, body.reason, idempotency_key,
+                                     crypto.sha256_hex(f"{flag_key}|{body.model_dump_json()}".encode()), request)
+    out = FlagReviewOut(**row, replayed=replayed).model_dump(mode="json")
+    return JSONResponse(out, status_code=200 if replayed else 201)
+
+
+@app.get("/v1/rules/performance", response_model=RulePerformance,
+         description="A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.")
+def rules_performance(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    return risk.rules_performance(conn)
+
+
+@app.get("/v1/anomalies/peer-status", response_model=PeerStatus,
+         description="A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.")
+def anomalies_peer_status(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    return risk.peer_status(conn)
 
 
 @app.get("/v1/inspection-queue", response_model=list[InspectionEntry],

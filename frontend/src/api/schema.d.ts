@@ -311,6 +311,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/network": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Shared Student Network
+         * @description A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.
+         */
+        get: operations["shared_student_network_v1_network_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/flags/{flag_key}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Flag
+         * @description AICTE officer confirms, dismisses or asks for more info on a flag, with a written reason (audited). Accepts Idempotency-Key.
+         */
+        post: operations["review_flag_v1_flags__flag_key__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/rules/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rules Performance
+         * @description A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.
+         */
+        get: operations["rules_performance_v1_rules_performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/anomalies/peer-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Anomalies Peer Status
+         * @description A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.
+         */
+        get: operations["anomalies_peer_status_v1_anomalies_peer_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inspection-queue": {
         parameters: {
             query?: never;
@@ -1224,7 +1304,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP";
+            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP" | "PEER_OUTLIER" | "SHARED_STUDENT_RING" | "SEAT_BLOCKING";
             /** Institution Id */
             institution_id: string;
             /** Programme */
@@ -1245,6 +1325,34 @@ export interface components {
              * @description always: risk indicator for review, not proof of misconduct
              */
             label: string;
+            /**
+             * Flag Key
+             * @description A4: stable identity of the flag (regulator views)
+             */
+            flag_key?: string | null;
+            /**
+             * Weight
+             * @description A4: current weight of this rule in the inspection queue
+             */
+            weight?: number | null;
+            /**
+             * Severity
+             * @description A4: severity mapped to 0..1, comparable across rules
+             */
+            severity?: number | null;
+            /**
+             * Review
+             * @description A4: latest inspector review (decision, reason, reviewer, reviewed_at)
+             */
+            review?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Suppressed
+             * @description A4: dismissed and the primary evidence hasn't changed by more than 20%
+             * @default false
+             */
+            suppressed: boolean;
         };
         /** AuthConfig */
         AuthConfig: {
@@ -1663,6 +1771,46 @@ export interface components {
             /** Excess */
             excess: number;
         };
+        /** FlagReviewIn */
+        FlagReviewIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirmed" | "dismissed" | "needs_info";
+            /**
+             * Reason
+             * @description written reason without IDs, phone numbers or dates; stored, not audit-logged
+             */
+            reason: string;
+        };
+        /** FlagReviewOut */
+        FlagReviewOut: {
+            /** Id */
+            id: number;
+            /** Flag Key */
+            flag_key: string;
+            /** Rule */
+            rule: string;
+            /** Institution Id */
+            institution_id: string;
+            /** Decision */
+            decision: string;
+            /** Reason */
+            reason: string;
+            /** Reviewer */
+            reviewer: string;
+            /**
+             * Reviewed At
+             * Format: date-time
+             */
+            reviewed_at: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1685,9 +1833,14 @@ export interface components {
             dqs: components["schemas"]["Dqs"] | null;
             /**
              * Risk
-             * @description (100 - DQS) x active enrolments; null = not submitted (listed first)
+             * @description active x ((100 - DQS) + flag_points); null = not submitted (listed first)
              */
             risk: number | null;
+            /**
+             * Flag Points
+             * @description sum of weight(rule) x severity x 10 over visible flags, in DQS points
+             */
+            flag_points?: number | null;
             /** Why */
             why: string[];
             /** Flags */
@@ -1801,6 +1954,96 @@ export interface components {
             /** Display Name */
             display_name: string;
         };
+        /** NetworkComponent */
+        NetworkComponent: {
+            /** Id */
+            id: string;
+            /** Members */
+            members: string[];
+            /** Colleges */
+            colleges: number;
+            /** Density */
+            density: number;
+            /** Shared Students */
+            shared_students: number;
+            /** Carousel */
+            carousel: number;
+            /** Active Shared Inside */
+            active_shared_inside: number;
+            /** Shared Ratio */
+            shared_ratio: number;
+            /** Has Cycle */
+            has_cycle: boolean;
+            /** Flagged */
+            flagged: boolean;
+        };
+        /** NetworkEdge */
+        NetworkEdge: {
+            /** Inst A */
+            inst_a: string;
+            /** Inst B */
+            inst_b: string;
+            /**
+             * Active Shared
+             * @description students active at both colleges this year
+             */
+            active_shared: number;
+            /**
+             * Historical Shared
+             * @description students enrolled at both in the last 3 years, not active at both now
+             */
+            historical_shared: number;
+            /**
+             * Carousel
+             * @description students who moved A -> B -> A
+             */
+            carousel: number;
+            /** Weight */
+            weight: number;
+            /** Kept */
+            kept: boolean;
+        };
+        /** NetworkNode */
+        NetworkNode: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** State */
+            state: string;
+            /**
+             * Active
+             * @description active enrolments this year
+             */
+            active: number;
+            /**
+             * Ring
+             * @description id of the flagged ring this college belongs to
+             */
+            ring: string | null;
+            /**
+             * Connected
+             * @description has at least one kept edge
+             */
+            connected: boolean;
+        };
+        /** NetworkOut */
+        NetworkOut: {
+            /** Academic Year */
+            academic_year: string;
+            /** Nodes */
+            nodes: components["schemas"]["NetworkNode"][];
+            /** Edges */
+            edges: components["schemas"]["NetworkEdge"][];
+            /** Components */
+            components: components["schemas"]["NetworkComponent"][];
+            /** Flags */
+            flags: components["schemas"]["AnomalyFlag"][];
+            /** Edge Min */
+            edge_min: number;
+            /** Note */
+            note: string;
+        };
         /** PasskeyCredentialIn */
         PasskeyCredentialIn: {
             /**
@@ -1834,6 +2077,33 @@ export interface components {
             approve_after: string;
             /** Revoked */
             revoked: boolean;
+        };
+        /** PeerStatus */
+        PeerStatus: {
+            /**
+             * Tests
+             * @description peer comparisons run nationally (programme and institution level)
+             */
+            tests: number;
+            /**
+             * Flagged
+             * @description comparisons that survived Benjamini-Hochberg and the minimum practical gap
+             */
+            flagged: number;
+            /**
+             * Insufficient
+             * @description comparisons skipped because the peer group had fewer than min_peers members
+             */
+            insufficient: number;
+            /** Min Peers */
+            min_peers: number;
+            /**
+             * Fdr Q
+             * @description false discovery rate controlled across all tests
+             */
+            fdr_q: number;
+            /** Note */
+            note: string;
         };
         /** ProgrammeSeats */
         ProgrammeSeats: {
@@ -1881,6 +2151,56 @@ export interface components {
              * @constant
              */
             source: "mock";
+        };
+        /** ReviewerRow */
+        ReviewerRow: {
+            /** Reviewer */
+            reviewer: string;
+            /** Reviews */
+            reviews: number;
+            /** Dismissed */
+            dismissed: number;
+            /** Dismissal Rate */
+            dismissal_rate: number;
+        };
+        /** RulePerformance */
+        RulePerformance: {
+            /** Rules */
+            rules: components["schemas"]["RulePerformanceRow"][];
+            /** Reviewers */
+            reviewers: components["schemas"]["ReviewerRow"][];
+            /** Weight Floor */
+            weight_floor: number;
+            /** Flag Dqs Points */
+            flag_dqs_points: number;
+            /** Note */
+            note: string;
+        };
+        /** RulePerformanceRow */
+        RulePerformanceRow: {
+            /** Rule */
+            rule: string;
+            /** Confirmed */
+            confirmed: number;
+            /** Dismissed */
+            dismissed: number;
+            /** Needs Info */
+            needs_info: number;
+            /**
+             * Precision
+             * @description (confirmed + 1) / (confirmed + dismissed + 2), Beta(1,1) prior
+             */
+            precision: number;
+            /**
+             * Interval
+             * @description 90% credible interval
+             */
+            interval: number[];
+            /**
+             * Weight
+             * @description max(weight_floor, precision)
+             */
+            weight: number;
         };
         /** SeatLine */
         SeatLine: {
@@ -2617,6 +2937,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnomalyFlag"][];
+                };
+            };
+        };
+    };
+    shared_student_network_v1_network_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+        };
+    };
+    review_flag_v1_flags__flag_key__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                flag_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlagReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_performance_v1_rules_performance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulePerformance"];
+                };
+            };
+        };
+    };
+    anomalies_peer_status_v1_anomalies_peer_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerStatus"];
                 };
             };
         };

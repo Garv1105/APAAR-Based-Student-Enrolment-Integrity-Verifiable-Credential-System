@@ -678,6 +678,149 @@
     ]
    }
   },
+  "/v1/network": {
+   "get": {
+    "summary": "Shared Student Network",
+    "description": "A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.",
+    "operationId": "shared_student_network_v1_network_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NetworkOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/flags/{flag_key}/review": {
+   "post": {
+    "summary": "Review Flag",
+    "description": "AICTE officer confirms, dismisses or asks for more info on a flag, with a written reason (audited). Accepts Idempotency-Key.",
+    "operationId": "review_flag_v1_flags__flag_key__review_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "flag_key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Flag Key"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FlagReviewIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FlagReviewOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/rules/performance": {
+   "get": {
+    "summary": "Rules Performance",
+    "description": "A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.",
+    "operationId": "rules_performance_v1_rules_performance_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RulePerformance"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/anomalies/peer-status": {
+   "get": {
+    "summary": "Anomalies Peer Status",
+    "description": "A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.",
+    "operationId": "anomalies_peer_status_v1_anomalies_peer_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PeerStatus"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/inspection-queue": {
    "get": {
     "summary": "Inspection Queue",
@@ -2642,7 +2785,10 @@
        "CATEGORY_MIX_SHIFT",
        "DOB_CLUSTER",
        "SEQUENTIAL_APAAR",
-       "DEADLINE_DUMP"
+       "DEADLINE_DUMP",
+       "PEER_OUTLIER",
+       "SHARED_STUDENT_RING",
+       "SEAT_BLOCKING"
       ],
       "title": "Type"
      },
@@ -2679,6 +2825,61 @@
       "type": "string",
       "title": "Label",
       "description": "always: risk indicator for review, not proof of misconduct"
+     },
+     "flag_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flag Key",
+      "description": "A4: stable identity of the flag (regulator views)"
+     },
+     "weight": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weight",
+      "description": "A4: current weight of this rule in the inspection queue"
+     },
+     "severity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Severity",
+      "description": "A4: severity mapped to 0..1, comparable across rules"
+     },
+     "review": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Review",
+      "description": "A4: latest inspector review (decision, reason, reviewer, reviewed_at)"
+     },
+     "suppressed": {
+      "type": "boolean",
+      "title": "Suppressed",
+      "description": "A4: dismissed and the primary evidence hasn't changed by more than 20%",
+      "default": false
      }
     },
     "type": "object",
@@ -3605,6 +3806,86 @@
     ],
     "title": "ExcessRow"
    },
+   "FlagReviewIn": {
+    "properties": {
+     "decision": {
+      "type": "string",
+      "enum": [
+       "confirmed",
+       "dismissed",
+       "needs_info"
+      ],
+      "title": "Decision"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "written reason without IDs, phone numbers or dates; stored, not audit-logged"
+     }
+    },
+    "type": "object",
+    "required": [
+     "decision",
+     "reason"
+    ],
+    "title": "FlagReviewIn"
+   },
+   "FlagReviewOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "flag_key": {
+      "type": "string",
+      "title": "Flag Key"
+     },
+     "rule": {
+      "type": "string",
+      "title": "Rule"
+     },
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "decision": {
+      "type": "string",
+      "title": "Decision"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "reviewer": {
+      "type": "string",
+      "title": "Reviewer"
+     },
+     "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Reviewed At"
+     },
+     "replayed": {
+      "type": "boolean",
+      "title": "Replayed",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "flag_key",
+     "rule",
+     "institution_id",
+     "decision",
+     "reason",
+     "reviewer",
+     "reviewed_at"
+    ],
+    "title": "FlagReviewOut"
+   },
    "HTTPValidationError": {
     "properties": {
      "detail": {
@@ -3664,7 +3945,19 @@
        }
       ],
       "title": "Risk",
-      "description": "(100 - DQS) x active enrolments; null = not submitted (listed first)"
+      "description": "active x ((100 - DQS) + flag_points); null = not submitted (listed first)"
+     },
+     "flag_points": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flag Points",
+      "description": "sum of weight(rule) x severity x 10 over visible flags, in DQS points"
      },
      "why": {
       "items": {
@@ -3976,6 +4269,216 @@
     ],
     "title": "LoginOut"
    },
+   "NetworkComponent": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "members": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Members"
+     },
+     "colleges": {
+      "type": "integer",
+      "title": "Colleges"
+     },
+     "density": {
+      "type": "number",
+      "title": "Density"
+     },
+     "shared_students": {
+      "type": "integer",
+      "title": "Shared Students"
+     },
+     "carousel": {
+      "type": "integer",
+      "title": "Carousel"
+     },
+     "active_shared_inside": {
+      "type": "integer",
+      "title": "Active Shared Inside"
+     },
+     "shared_ratio": {
+      "type": "number",
+      "title": "Shared Ratio"
+     },
+     "has_cycle": {
+      "type": "boolean",
+      "title": "Has Cycle"
+     },
+     "flagged": {
+      "type": "boolean",
+      "title": "Flagged"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "members",
+     "colleges",
+     "density",
+     "shared_students",
+     "carousel",
+     "active_shared_inside",
+     "shared_ratio",
+     "has_cycle",
+     "flagged"
+    ],
+    "title": "NetworkComponent"
+   },
+   "NetworkEdge": {
+    "properties": {
+     "inst_a": {
+      "type": "string",
+      "title": "Inst A"
+     },
+     "inst_b": {
+      "type": "string",
+      "title": "Inst B"
+     },
+     "active_shared": {
+      "type": "integer",
+      "title": "Active Shared",
+      "description": "students active at both colleges this year"
+     },
+     "historical_shared": {
+      "type": "integer",
+      "title": "Historical Shared",
+      "description": "students enrolled at both in the last 3 years, not active at both now"
+     },
+     "carousel": {
+      "type": "integer",
+      "title": "Carousel",
+      "description": "students who moved A -> B -> A"
+     },
+     "weight": {
+      "type": "number",
+      "title": "Weight"
+     },
+     "kept": {
+      "type": "boolean",
+      "title": "Kept"
+     }
+    },
+    "type": "object",
+    "required": [
+     "inst_a",
+     "inst_b",
+     "active_shared",
+     "historical_shared",
+     "carousel",
+     "weight",
+     "kept"
+    ],
+    "title": "NetworkEdge"
+   },
+   "NetworkNode": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "state": {
+      "type": "string",
+      "title": "State"
+     },
+     "active": {
+      "type": "integer",
+      "title": "Active",
+      "description": "active enrolments this year"
+     },
+     "ring": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ring",
+      "description": "id of the flagged ring this college belongs to"
+     },
+     "connected": {
+      "type": "boolean",
+      "title": "Connected",
+      "description": "has at least one kept edge"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "state",
+     "active",
+     "ring",
+     "connected"
+    ],
+    "title": "NetworkNode"
+   },
+   "NetworkOut": {
+    "properties": {
+     "academic_year": {
+      "type": "string",
+      "title": "Academic Year"
+     },
+     "nodes": {
+      "items": {
+       "$ref": "#/components/schemas/NetworkNode"
+      },
+      "type": "array",
+      "title": "Nodes"
+     },
+     "edges": {
+      "items": {
+       "$ref": "#/components/schemas/NetworkEdge"
+      },
+      "type": "array",
+      "title": "Edges"
+     },
+     "components": {
+      "items": {
+       "$ref": "#/components/schemas/NetworkComponent"
+      },
+      "type": "array",
+      "title": "Components"
+     },
+     "flags": {
+      "items": {
+       "$ref": "#/components/schemas/AnomalyFlag"
+      },
+      "type": "array",
+      "title": "Flags"
+     },
+     "edge_min": {
+      "type": "number",
+      "title": "Edge Min"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "academic_year",
+     "nodes",
+     "edges",
+     "components",
+     "flags",
+     "edge_min",
+     "note"
+    ],
+    "title": "NetworkOut"
+   },
    "PasskeyCredentialIn": {
     "properties": {
      "credential": {
@@ -4042,6 +4545,48 @@
      "revoked"
     ],
     "title": "PasskeyOut"
+   },
+   "PeerStatus": {
+    "properties": {
+     "tests": {
+      "type": "integer",
+      "title": "Tests",
+      "description": "peer comparisons run nationally (programme and institution level)"
+     },
+     "flagged": {
+      "type": "integer",
+      "title": "Flagged",
+      "description": "comparisons that survived Benjamini-Hochberg and the minimum practical gap"
+     },
+     "insufficient": {
+      "type": "integer",
+      "title": "Insufficient",
+      "description": "comparisons skipped because the peer group had fewer than min_peers members"
+     },
+     "min_peers": {
+      "type": "integer",
+      "title": "Min Peers"
+     },
+     "fdr_q": {
+      "type": "number",
+      "title": "Fdr Q",
+      "description": "false discovery rate controlled across all tests"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tests",
+     "flagged",
+     "insufficient",
+     "min_peers",
+     "fdr_q",
+     "note"
+    ],
+    "title": "PeerStatus"
    },
    "ProgrammeSeats": {
     "properties": {
@@ -4148,6 +4693,122 @@
      "verificationMethod"
     ],
     "title": "RegistryIssuer"
+   },
+   "ReviewerRow": {
+    "properties": {
+     "reviewer": {
+      "type": "string",
+      "title": "Reviewer"
+     },
+     "reviews": {
+      "type": "integer",
+      "title": "Reviews"
+     },
+     "dismissed": {
+      "type": "integer",
+      "title": "Dismissed"
+     },
+     "dismissal_rate": {
+      "type": "number",
+      "title": "Dismissal Rate"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reviewer",
+     "reviews",
+     "dismissed",
+     "dismissal_rate"
+    ],
+    "title": "ReviewerRow"
+   },
+   "RulePerformance": {
+    "properties": {
+     "rules": {
+      "items": {
+       "$ref": "#/components/schemas/RulePerformanceRow"
+      },
+      "type": "array",
+      "title": "Rules"
+     },
+     "reviewers": {
+      "items": {
+       "$ref": "#/components/schemas/ReviewerRow"
+      },
+      "type": "array",
+      "title": "Reviewers"
+     },
+     "weight_floor": {
+      "type": "number",
+      "title": "Weight Floor"
+     },
+     "flag_dqs_points": {
+      "type": "number",
+      "title": "Flag Dqs Points"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rules",
+     "reviewers",
+     "weight_floor",
+     "flag_dqs_points",
+     "note"
+    ],
+    "title": "RulePerformance"
+   },
+   "RulePerformanceRow": {
+    "properties": {
+     "rule": {
+      "type": "string",
+      "title": "Rule"
+     },
+     "confirmed": {
+      "type": "integer",
+      "title": "Confirmed"
+     },
+     "dismissed": {
+      "type": "integer",
+      "title": "Dismissed"
+     },
+     "needs_info": {
+      "type": "integer",
+      "title": "Needs Info"
+     },
+     "precision": {
+      "type": "number",
+      "title": "Precision",
+      "description": "(confirmed + 1) / (confirmed + dismissed + 2), Beta(1,1) prior"
+     },
+     "interval": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array",
+      "title": "Interval",
+      "description": "90% credible interval"
+     },
+     "weight": {
+      "type": "number",
+      "title": "Weight",
+      "description": "max(weight_floor, precision)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rule",
+     "confirmed",
+     "dismissed",
+     "needs_info",
+     "precision",
+     "interval",
+     "weight"
+    ],
+    "title": "RulePerformanceRow"
    },
    "SeatLine": {
     "properties": {

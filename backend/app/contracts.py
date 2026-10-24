@@ -2,11 +2,12 @@
 `py -m app.export_openapi` writes openapi.json; the frontend codes against it.
 Change this file first, then backend and frontend.
 """
+import re
 from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ---------- upload row (data dictionary, PRD Req 2) ----------
 CSV_COLUMNS = [
@@ -195,13 +196,120 @@ class AicteDashboard(BaseModel):
 
 
 class AnomalyFlag(BaseModel):
-    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP"]
+    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP", "PEER_OUTLIER",
+                  "SHARED_STUDENT_RING", "SEAT_BLOCKING"]
     institution_id: str
     programme: str | None
     score: float
     evidence: dict = Field(description="the numbers that triggered the rule")
     explanation: str
     label: str = Field(description="always: risk indicator for review, not proof of misconduct")
+    flag_key: str | None = Field(None, description="A4: stable identity of the flag (regulator views)")
+    weight: float | None = Field(None, description="A4: current weight of this rule in the inspection queue")
+    severity: float | None = Field(None, description="A4: severity mapped to 0..1, comparable across rules")
+    review: dict | None = Field(None, description="A4: latest inspector review (decision, reason, reviewer, reviewed_at)")
+    suppressed: bool = Field(False, description="A4: dismissed and the primary evidence hasn't changed by more than 20%")
+
+
+class NetworkNode(BaseModel):
+    id: str
+    name: str
+    state: str
+    active: int = Field(description="active enrolments this year")
+    ring: str | None = Field(description="id of the flagged ring this college belongs to")
+    connected: bool = Field(description="has at least one kept edge")
+
+
+class NetworkEdge(BaseModel):
+    inst_a: str
+    inst_b: str
+    active_shared: int = Field(description="students active at both colleges this year")
+    historical_shared: int = Field(description="students enrolled at both in the last 3 years, not active at both now")
+    carousel: int = Field(description="students who moved A -> B -> A")
+    weight: float
+    kept: bool
+
+
+class NetworkComponent(BaseModel):
+    id: str
+    members: list[str]
+    colleges: int
+    density: float
+    shared_students: int
+    carousel: int
+    active_shared_inside: int
+    shared_ratio: float
+    has_cycle: bool
+    flagged: bool
+
+
+class NetworkOut(BaseModel):
+    academic_year: str
+    nodes: list[NetworkNode]
+    edges: list[NetworkEdge]
+    components: list[NetworkComponent]
+    flags: list[AnomalyFlag]
+    edge_min: float
+    note: str
+
+
+class FlagReviewIn(BaseModel):
+    decision: Literal["confirmed", "dismissed", "needs_info"]
+    reason: str = Field(min_length=10, max_length=500, description="written reason without IDs, phone numbers or dates; stored, not audit-logged")
+
+    @field_validator("reason")
+    @classmethod
+    def no_pii(cls, v: str) -> str:
+        # digit runs of 6+ (APAAR, phone, Aadhaar) or dates (DOB): reasons are shown to every regulator
+        if re.search(r"\d[\d\s-]{4,}\d|\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}", v):
+            raise ValueError("reason must not contain ID numbers, phone numbers or dates")
+        return v
+
+
+class FlagReviewOut(BaseModel):
+    id: int
+    flag_key: str
+    rule: str
+    institution_id: str
+    decision: str
+    reason: str
+    reviewer: str
+    reviewed_at: datetime
+    replayed: bool = False
+
+
+class RulePerformanceRow(BaseModel):
+    rule: str
+    confirmed: int
+    dismissed: int
+    needs_info: int
+    precision: float = Field(description="(confirmed + 1) / (confirmed + dismissed + 2), Beta(1,1) prior")
+    interval: list[float] = Field(description="90% credible interval")
+    weight: float = Field(description="max(weight_floor, precision)")
+
+
+class ReviewerRow(BaseModel):
+    reviewer: str
+    reviews: int
+    dismissed: int
+    dismissal_rate: float
+
+
+class RulePerformance(BaseModel):
+    rules: list[RulePerformanceRow]
+    reviewers: list[ReviewerRow]
+    weight_floor: float
+    flag_dqs_points: float
+    note: str
+
+
+class PeerStatus(BaseModel):
+    tests: int = Field(description="peer comparisons run nationally (programme and institution level)")
+    flagged: int = Field(description="comparisons that survived Benjamini-Hochberg and the minimum practical gap")
+    insufficient: int = Field(description="comparisons skipped because the peer group had fewer than min_peers members")
+    min_peers: int
+    fdr_q: float = Field(description="false discovery rate controlled across all tests")
+    note: str
 
 
 class Dqs(BaseModel):
@@ -225,7 +333,8 @@ class InspectionEntry(BaseModel):
     status: str
     active: int
     dqs: Dqs | None
-    risk: float | None = Field(description="(100 - DQS) x active enrolments; null = not submitted (listed first)")
+    risk: float | None = Field(description="active x ((100 - DQS) + flag_points); null = not submitted (listed first)")
+    flag_points: float | None = Field(None, description="sum of weight(rule) x severity x 10 over visible flags, in DQS points")
     why: list[str]
     flags: list[AnomalyFlag]
 

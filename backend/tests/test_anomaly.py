@@ -78,7 +78,9 @@ def test_platform_flags_spike_and_ghost_batches(client, dbconn):
     for user, f in (("inst-a", "A1.csv"), ("inst-b", "B1.csv"), ("inst-c", "C1.csv")):
         upload(client, user, f)
     flags = client.get("/v1/anomalies", headers=login(client, "aicte")).json()
-    assert [(f["type"], f["institution_id"], f["programme"]) for f in flags] == [("ENROLMENT_SPIKE", "1-0000000003", "MBA")]
+    # A3: the 5 students active at both A and B also raise SEAT_BLOCKING on both (a pair, not a ring)
+    assert [(f["type"], f["institution_id"], f["programme"]) for f in flags] == [
+        ("ENROLMENT_SPIKE", "1-0000000003", "MBA"), ("SEAT_BLOCKING", "1-0000000001", None), ("SEAT_BLOCKING", "1-0000000002", None)]
     ev = flags[0]["evidence"]
     assert ev["fill_ratio"] > 0.95 and ev["history_median"] == 0.6   # 118/120 vs 72/120 median
     # ghost batch at A: 12 students sharing one DOB, and 12 consecutive APAARs (rejected: not in the registry)
@@ -95,7 +97,7 @@ def test_platform_flags_spike_and_ghost_batches(client, dbconn):
     assert r.status_code == 201 and r.json()["counts"]["rejected"] == 12   # sequential IDs fail E103, yet the batch is suspicious
     got = {(f["type"], f["programme"]) for f in client.get("/v1/anomalies", headers=login(client, "aicte")).json()
            if f["institution_id"] == "1-0000000001"}
-    assert got == {("DOB_CLUSTER", "ECE"), ("SEQUENTIAL_APAAR", "ECE")}
+    assert got == {("DOB_CLUSTER", "ECE"), ("SEQUENTIAL_APAAR", "ECE"), ("SEAT_BLOCKING", None)}
     # only aggregates were stored: no DOBs or APAARs in batch_features
     assert set(dbconn.execute("SELECT * FROM batch_features LIMIT 1").fetchone()) == {
         "batch_id", "programme_id", "rows", "max_dob_cluster", "longest_apaar_run", "minutes_before_deadline"}
@@ -119,7 +121,8 @@ def test_inspection_queue_and_own_dqs(client):
     assert ids.index("1-0000000002") < ids.index("1-0000000001")   # B (rejects, excess, cases) above clean A
     b = next(e for e in q if e["institution_id"] == "1-0000000002")
     assert abs(sum(b["dqs"]["points"].values()) - b["dqs"]["score"]) < 0.1 and b["why"]
-    assert b["risk"] == round((100 - b["dqs"]["score"]) * b["active"], 1)
+    # A4: risk = active x ((100 - DQS) + flag points), flag points in DQS units
+    assert b["risk"] == round(b["active"] * ((100 - b["dqs"]["score"]) + b["flag_points"]), 1) and b["flag_points"] > 0
     own = client.get("/v1/dqs", headers=login(client, "inst-b")).json()
     assert own["institution_id"] == "1-0000000002" and own["dqs"]["score"] == b["dqs"]["score"]
     assert client.get("/v1/dqs", headers=login(client, "inst-c")).json()["dqs"] is None

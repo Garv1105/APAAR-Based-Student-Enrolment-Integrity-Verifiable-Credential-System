@@ -124,9 +124,11 @@ def dqs(m: dict) -> dict:
             "points": parts, "weights": DQS_WEIGHTS}
 
 
-def inspection_queue(entries: list[dict]) -> list[dict]:
-    """entries: {institution_id, name, state, status, active, dqs|None, flags[]}. Risk = (100 - DQS) x enrolment size
-    (PRD D3). Approved institutions that haven't submitted come first: their seats are unaccounted for."""
+def inspection_queue(entries: list[dict], weights: dict[str, float] | None = None) -> list[dict]:
+    """entries: {institution_id, name, state, status, active, dqs|None, flags[] (visible flags only)}.
+    risk = active x ((100 - DQS) + sum of weight(rule) x severity x FLAG_DQS_POINTS)  (A4: flags in DQS units, so
+    inspector feedback visibly reorders the queue). Approved institutions that haven't submitted come first."""
+    from .feedback import flag_points  # local import: feedback imports this module's thresholds
     out = []
     for e in entries:
         if e["dqs"] is None:
@@ -134,8 +136,9 @@ def inspection_queue(entries: list[dict]) -> list[dict]:
                 continue
             out.append({**e, "risk": None, "why": ["no student data submitted this year"]})
             continue
-        risk = round((100 - e["dqs"]["score"]) * e["active"], 1)
+        points = round(flag_points(e["flags"], weights or {}), 2)
+        risk = round(e["active"] * ((100 - e["dqs"]["score"]) + points), 1)
         weakest = sorted(e["dqs"]["components"].items(), key=lambda kv: kv[1])[:2]
         why = [f"{k.replace('_', ' ')} {v:.0%}" for k, v in weakest if v < 1] + [fl["explanation"] for fl in e["flags"][:3]]
-        out.append({**e, "risk": risk, "why": why or ["no issues found"]})
+        out.append({**e, "risk": risk, "flag_points": points, "why": why or ["no issues found"]})
     return sorted(out, key=lambda e: (e["risk"] is not None, -(e["risk"] or 0)))

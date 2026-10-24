@@ -39,6 +39,7 @@ GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, s
   duplicate_cases, anomaly_flags, consents TO app_user;
 GRANT SELECT, INSERT, UPDATE ON webhook_endpoints TO app_user;
 GRANT SELECT ON passkeys TO app_user;
+GRANT SELECT, INSERT ON flag_reviews TO app_user;
 GRANT UPDATE (sign_count, last_used_at) ON passkeys TO app_user;  -- insert/revoke only via register_passkey / revoke_own_passkey
 -- activation_codes and webauthn_challenges: no grants, functions only
 GRANT SELECT, UPDATE ON webhook_deliveries TO app_user;   -- inserts only via enqueue_event() / enqueue_case_event()
@@ -123,6 +124,12 @@ CREATE POLICY upd ON passkeys FOR UPDATE USING (student_id = app_student() AND k
   WITH CHECK (student_id = app_student() AND kind = app_role());
 ALTER TABLE activation_codes ENABLE ROW LEVEL SECURITY; ALTER TABLE activation_codes FORCE ROW LEVEL SECURITY;
 ALTER TABLE webauthn_challenges ENABLE ROW LEVEL SECURITY; ALTER TABLE webauthn_challenges FORCE ROW LEVEL SECURITY;
+
+-- flag_reviews (A4): AICTE officers record reviews as themselves; regulators read; institutions see nothing.
+ALTER TABLE flag_reviews ENABLE ROW LEVEL SECURITY; ALTER TABLE flag_reviews FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON flag_reviews; DROP POLICY IF EXISTS ins ON flag_reviews;
+CREATE POLICY sel ON flag_reviews FOR SELECT USING (app_is_regulator());
+CREATE POLICY ins ON flag_reviews FOR INSERT WITH CHECK (app_role() = 'aicte_officer' AND reviewer = current_setting('app.user_id', true));
 
 -- anomaly_flags (incl. E501)
 ALTER TABLE anomaly_flags ENABLE ROW LEVEL SECURITY; ALTER TABLE anomaly_flags FORCE ROW LEVEL SECURITY;
@@ -604,6 +611,35 @@ BEGIN
   RETURN QUERY SELECT a.institution_id, count(*) FROM activation_codes a WHERE a.reissue GROUP BY a.institution_id;
 END $$;
 
+-- A3 shared-student network (regulators only). Joins enrolments on the person row, i.e. the APAAR blind index
+-- (students without an APAAR are left out), over the 3 latest academic years <= p_year, and returns COUNTS only:
+-- active_shared = active at both in p_year; historical_shared = enrolled at both in the window but not active at both;
+-- carousel = students whose enrolments (by admission date) went A -> B -> A.
+CREATE OR REPLACE FUNCTION shared_student_edges(p_year text)
+RETURNS TABLE (inst_a text, inst_b text, active_shared bigint, historical_shared bigint, carousel bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
+BEGIN
+  IF NOT app_is_regulator() THEN
+    RAISE EXCEPTION 'shared_student_edges: regulators only' USING ERRCODE = '42501';
+  END IF;
+  RETURN QUERY
+  WITH win AS (SELECT y.code FROM academic_years y WHERE y.code <= p_year ORDER BY y.code DESC LIMIT 3),
+  e AS (SELECT en.id, en.student_id, p.institution_id AS inst, en.status, en.academic_year, en.admission_date
+          FROM enrolments en JOIN programmes p ON p.id = en.programme_id JOIN students s ON s.id = en.student_id
+         WHERE s.apaar_bi IS NOT NULL AND en.academic_year IN (SELECT code FROM win)),
+  pairs AS (SELECT x.student_id, x.inst AS a, y.inst AS b,
+                   bool_or(x.status = 'active' AND y.status = 'active' AND x.academic_year = p_year AND y.academic_year = p_year) AS both_active
+              FROM e x JOIN e y ON y.student_id = x.student_id AND x.inst < y.inst
+             GROUP BY 1, 2, 3),
+  seq AS (SELECT e.student_id, e.inst, lag(e.inst) OVER w AS prev, lag(e.inst, 2) OVER w AS prev2
+            FROM e WINDOW w AS (PARTITION BY e.student_id ORDER BY e.admission_date, e.id)),
+  car AS (SELECT DISTINCT q.student_id, least(q.inst, q.prev) AS a, greatest(q.inst, q.prev) AS b
+            FROM seq q WHERE q.prev2 = q.inst AND q.prev <> q.inst)
+  SELECT pr.a, pr.b, count(*) FILTER (WHERE pr.both_active), count(*) FILTER (WHERE NOT pr.both_active),
+         (SELECT count(*) FROM car c WHERE c.a = pr.a AND c.b = pr.b)
+    FROM pairs pr GROUP BY pr.a, pr.b ORDER BY pr.a, pr.b;
+END $$;
+
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
@@ -612,7 +648,8 @@ REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text)
   enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb),
   issue_activation_code(bigint, text, text, text, text), redeem_activation_code(text, text),
   store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
-  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint) FROM PUBLIC;
+  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint),
+  shared_student_edges(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
   open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
@@ -621,4 +658,5 @@ GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], te
   enqueue_event(text, jsonb, text), enqueue_case_event(bigint, text, jsonb),
   issue_activation_code(bigint, text, text, text, text), redeem_activation_code(text, text),
   store_challenge(bytea, text, bigint, text), take_challenge(bytea, text), passkey_for_login(bytea),
-  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint) TO app_user;
+  activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint),
+  shared_student_edges(text) TO app_user;

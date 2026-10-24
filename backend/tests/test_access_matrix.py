@@ -57,6 +57,10 @@ def test_access_matrix(client, dbconn):
         ("POST", f"/v1/enrolments/{eid}/activation-code", {"json": {"kind": "student", "reason": "access matrix test"}},
          expect(INST, 404)),
         ("POST", "/v1/consents/999999/approve/options", {}, expect({"student": 404})),
+        ("GET", "/v1/anomalies/peer-status", {}, expect(REG)),
+        ("GET", "/v1/network", {}, expect(REG)),
+        ("POST", "/v1/flags/nope/review", {"json": {"decision": "dismissed", "reason": "access matrix test"}}, expect({"aicte": 404})),
+        ("GET", "/v1/rules/performance", {}, expect(REG)),
         # webhooks (Req 7): institutions manage their own; 404 for anything that isn't theirs (public IP literal: no DNS)
         ("POST", "/v1/webhooks", {"json": {"url": "https://93.184.216.34/hook", "events": ["batch.validated"]}},
          expect({"inst-a": 201, "inst-b": 201})),
