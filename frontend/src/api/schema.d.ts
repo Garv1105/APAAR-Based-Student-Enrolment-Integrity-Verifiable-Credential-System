@@ -411,6 +411,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ai/explain-institution/{institution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ai Explain Institution
+         * @description Regulators: a short plain-language briefing on why a college ranks where it does in the inspection queue. Advisory; built from aggregates only (no student data). Falls back to a rule-based summary.
+         */
+        post: operations["ai_explain_institution_v1_ai_explain_institution__institution_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/upload-summary/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ai Upload Summary
+         * @description Institution: a short, ordered checklist of what to fix in its own upload. Advisory; built from problem codes, counts and column names only (no row contents). Falls back to a rule-based checklist.
+         */
+        post: operations["ai_upload_summary_v1_ai_upload_summary__batch_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/dqs": {
         parameters: {
             query?: never;
@@ -1522,6 +1562,26 @@ export interface components {
             cooldown_hours: number;
             /** Detail */
             detail?: string | null;
+        };
+        /** AiSummary */
+        AiSummary: {
+            /** Text */
+            text: string;
+            /**
+             * Source
+             * @description gemini = AI-generated; rules = the platform's own fallback summary
+             * @enum {string}
+             */
+            source: "gemini" | "rules";
+            /** Model */
+            model: string | null;
+            /** Cached */
+            cached: boolean;
+            /**
+             * Label
+             * @description show this next to the text
+             */
+            label: string;
         };
         /** AicteDashboard */
         AicteDashboard: {
@@ -3378,6 +3438,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InspectionEntry"][];
+                };
+            };
+        };
+    };
+    ai_explain_institution_v1_ai_explain_institution__institution_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                institution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_upload_summary_v1_ai_upload_summary__batch_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                batch_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

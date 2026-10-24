@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, ArrowLeft, CheckCircle2, Layers, ShieldAlert, Wrench, XCircle } from "lucide-react";
 import { ApiError, download, getJson, type S } from "../api/client";
+import { AiBox } from "../ai";
 import { Button, Card, ErrorNote, fmtTime, go, Loading, PageHeader, Stat } from "../ui";
 
 type Sev = "error" | "warning" | "flag";
@@ -69,6 +70,7 @@ export default function BatchDetail({ id }: { id: number }) {
       />
 
       <Summary c={c} />
+      {issues.length > 0 && <AiBox path={`/v1/ai/upload-summary/${id}`} title="What to fix first" cta="Get a fix checklist" />}
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <Stat label="Rows in the file" value={c.rows} icon={<Layers />} hint="Every student row you uploaded" />

@@ -717,3 +717,12 @@ class AccessRequestDecided(BaseModel):
     request: AccessRequestOut
     account: AccountCodeOut | None = Field(description="approved: the new verifier account's one-time code (shown once)")
     replayed: bool = False
+
+
+# ---------- T-AI: Gemini explainer (advisory) ----------
+class AiSummary(BaseModel):
+    text: str
+    source: Literal["gemini", "rules"] = Field(description="gemini = AI-generated; rules = the platform's own fallback summary")
+    model: str | None
+    cached: bool
+    label: str = Field(description="show this next to the text")

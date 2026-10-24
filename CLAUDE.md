@@ -25,7 +25,7 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 
 ## Non-negotiable rules
 - Validity, seat limits and duplicate detection are deterministic code. AI (if ever added) may explain, never decide.
-- IMPORTANT: No PII ever goes to an LLM or to logs. Gemini is deferred; if added, all calls go through one scrubbed + audited module, paid tier only.
+- IMPORTANT: No PII ever goes to an LLM or to logs. Gemini runs on the FREE tier (owner's decision, 2026-10-25; Google may use free-tier prompts), so it only ever sees synthetic, allow-listed aggregates (codes, counts, percentages, labels): never names, DOB, APAAR, guardian or row contents. All calls go through `backend/app/ai.py` (allow-listed inputs, audited, advisory output with a rule-based fallback). Re-decide the tier before any real data.
 - Approved intake comes ONLY from the AICTE registry tables (mock), never from upload data.
 - Every accepted enrolment row counts toward intake, with or without a valid APAAR.
 - Institution isolation is enforced by Postgres RLS (`rls.sql`): app connects as `app_user` (non-owner), tables use FORCE ROW LEVEL SECURITY, role/institution set per connection in `db.py`. Cross-institution checks go only through the SECURITY DEFINER functions in `rls.sql`.

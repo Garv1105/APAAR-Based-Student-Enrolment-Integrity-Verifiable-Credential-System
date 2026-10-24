@@ -867,6 +867,96 @@
     ]
    }
   },
+  "/v1/ai/explain-institution/{institution_id}": {
+   "post": {
+    "summary": "Ai Explain Institution",
+    "description": "Regulators: a short plain-language briefing on why a college ranks where it does in the inspection queue. Advisory; built from aggregates only (no student data). Falls back to a rule-based summary.",
+    "operationId": "ai_explain_institution_v1_ai_explain_institution__institution_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "institution_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Institution Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/ai/upload-summary/{batch_id}": {
+   "post": {
+    "summary": "Ai Upload Summary",
+    "description": "Institution: a short, ordered checklist of what to fix in its own upload. Advisory; built from problem codes, counts and column names only (no row contents). Falls back to a rule-based checklist.",
+    "operationId": "ai_upload_summary_v1_ai_upload_summary__batch_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "batch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Batch Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/dqs": {
    "get": {
     "summary": "Own Dqs",
@@ -3362,6 +3452,52 @@
      "cooldown_hours"
     ],
     "title": "ActivationCodeOut"
+   },
+   "AiSummary": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "gemini",
+       "rules"
+      ],
+      "title": "Source",
+      "description": "gemini = AI-generated; rules = the platform's own fallback summary"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "cached": {
+      "type": "boolean",
+      "title": "Cached"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label",
+      "description": "show this next to the text"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "source",
+     "model",
+     "cached",
+     "label"
+    ],
+    "title": "AiSummary"
    },
    "AicteDashboard": {
     "properties": {

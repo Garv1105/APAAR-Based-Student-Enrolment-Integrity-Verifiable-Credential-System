@@ -114,6 +114,9 @@ def test_access_matrix(client, dbconn):
                                                   "purpose": "x" * 20}}, {u: 422 for u in USERS}),
         ("POST", "/v1/users/inst-b/account-code", {"json": {"reason": "access matrix test"}}, expect({"aicte": 201})),
         ("GET", "/v1/access-requests", {}, expect(REG)),
+        # T-AI: advisory explanations (stubbed model in tests)
+        ("POST", "/v1/ai/explain-institution/1-0000000001", {}, expect(REG)),
+        ("POST", f"/v1/ai/upload-summary/{bid}", {}, expect({"inst-a": 200}, 404)),
         ("POST", "/v1/access-requests/999999/decide", {"json": {"decision": "rejected", "reason": "access matrix test"}},
          expect({"aicte": 404})),
     ]

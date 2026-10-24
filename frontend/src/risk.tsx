@@ -2,6 +2,7 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { ApiError, getJson, sendJson, type S } from "./api/client";
+import { AiBox } from "./ai";
 import { Badge, Button, Card, Empty, ErrorNote, Loading, Table, Td, usePoll, type Tone } from "./ui";
 
 export const COMPONENT_LABEL: Record<string, string> = {
@@ -241,6 +242,8 @@ export function InspectionList({ canReview = false }: { canReview?: boolean }) {
               </tr>
               {open === e.institution_id && (
                 <tr><td colSpan={6} className="bg-white/[0.02] px-5 py-5">
+                  <div className="mb-6"><AiBox path={`/v1/ai/explain-institution/${encodeURIComponent(e.institution_id)}`}
+                    title="Plain-language briefing" cta="Explain this college" /></div>
                   {e.dqs ? <div className="grid gap-8 lg:grid-cols-2"><DqsBreakdown d={e.dqs} />
                     <div><h3 className="mb-3 font-display text-[16px] font-bold text-ink">Warning signs ({e.flags.length})</h3>
                       <FlagList flags={e.flags} canReview={canReview} onChange={q.refresh} /></div></div>
