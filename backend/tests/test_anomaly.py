@@ -121,7 +121,8 @@ def test_inspection_queue_and_own_dqs(client):
     assert ids.index("1-0000000002") < ids.index("1-0000000001")   # B (rejects, excess, cases) above clean A
     b = next(e for e in q if e["institution_id"] == "1-0000000002")
     assert abs(sum(b["dqs"]["points"].values()) - b["dqs"]["score"]) < 0.1 and b["why"]
-    assert b["risk"] == round((100 - b["dqs"]["score"]) * b["active"], 1)
+    # A4: risk = active x ((100 - DQS) + flag points), flag points in DQS units
+    assert b["risk"] == round(b["active"] * ((100 - b["dqs"]["score"]) + b["flag_points"]), 1) and b["flag_points"] > 0
     own = client.get("/v1/dqs", headers=login(client, "inst-b")).json()
     assert own["institution_id"] == "1-0000000002" and own["dqs"]["score"] == b["dqs"]["score"]
     assert client.get("/v1/dqs", headers=login(client, "inst-c")).json()["dqs"] is None

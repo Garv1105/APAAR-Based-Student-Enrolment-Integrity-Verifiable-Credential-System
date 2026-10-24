@@ -21,6 +21,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
 - **A0 anomaly package:** `backend/app/anomaly/` (`rules.py` = the five D3 rules unchanged, `stats.py` shared helpers); same public interface. Spec: `docs/ANOMALY_V2_SPEC.md`.
 - **A1 peer baselines:** each programme (and each institution, for rejection rate and late uploads) is compared with similar units this year (programme+state+size, then programme+size, then programme; institutions: state+size, then size; at least 8 peers). Uses peer robust z, one-sided p (`math.erfc`), Benjamini–Hochberg at q=0.05 across all tests nationally, plus a minimum practical gap. Fill and foreign share are tested raw only for programmes with no history; with history, their change is tested. Regulator-only. Too few peers gives "insufficient peers" (`GET /v1/anomalies/peer-status`); today's 4-college DB has no peer groups.
 - **A3 shared-student network:** regulator-only `shared_student_edges(year)` (blind-index join, counts only: active, historical, A→B→A carousel). Rings are found on the 2-core of the kept-edge graph via union-find (`SHARED_STUDENT_RING`, with active sharing inside the ring counted in the ring flag); `SEAT_BLOCKING` for pairs outside rings. `GET /v1/network` feeds an AICTE SVG network view (kept edges by default, "show all" toggle, edge counts, drill-down to the duplicate cases).
+- **A4 inspector feedback:** AICTE officers confirm, dismiss or mark "needs info" on a flag, with a written reason (audited, idempotent). Each rule's precision uses a Beta(1,1) prior with a 90% interval, and its weight is max(0.25, precision), so no rule can be silenced. Queue risk = active × ((100 − DQS) + Σ weight × severity × 10). Severity is mapped per rule to 0..1. A dismissed flag stays hidden until its primary evidence field moves more than 20%. The Rule performance panel shows per-reviewer dismissal rates. Fairness: an open duplicate case counts only against the institution whose enrolment was uploaded later.
 - **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
 **Decisions:**
@@ -77,6 +78,20 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - The carousel detects return trips (A→B→A) only, not 3-college loops.
   - A ring's shared-student total adds up edge counts, so a student shared by 3 colleges counts on each edge.
   - Students without an APAAR are not in the network.
+- A4 feedback:
+  - Precision is learned only from flags inspectors actually review, so it leans toward flags that already rank high (normal for human-in-the-loop systems). Recall can't be learned from reviews; it comes only from the synthetic evaluation.
+  - "First" in the fairness rule means first uploaded to the platform (enrolment id), not the self-declared admission date.
+  - Severity mappings are fixed constants in `feedback.py`, not tuned on data.
+  - No dual control: one officer's dismissal hides a flag, and it can override another officer's review. Mitigations in place:
+    - re-dismissing keeps the first dismissal's evidence as the baseline
+    - dismissed flags stay listed (marked, with reviewer and reason) in `/v1/anomalies`
+    - per-reviewer dismissal rates are shown
+  - Not done:
+    - second-officer sign-off for high-severity dismissals
+    - dismissal expiry
+  - The reason field rejects digit runs and dates, but it is free text, not a full PII scrubber. It is stored for regulators only and not written to the audit log.
+  - Fairness side effect: an institution's own `duplicate_exposure` reveals whether another college's enrolment of the student came first. The neutral notice already tells both sides that a case exists. A scoped regulator-only path is the long-term fix (see L2).
+  - Each review recomputes all flags (peer and network) to find the key. There is no per-officer rate limit.
 - Credentials:
   - Student sign-in and consent use **passkeys** (P1). The old APAAR + DOB + fixed-OTP path exists only with `DEMO_MODE=true`, labelled MOCK.
   - Activation codes reach the student out of band. In the prototype the institution hands them over; production delivers them via DigiLocker or the registered mobile number. Whoever holds an unused code can register the passkey; a reissued code puts a 24 h consent cooldown on the new passkey and notifies the student.

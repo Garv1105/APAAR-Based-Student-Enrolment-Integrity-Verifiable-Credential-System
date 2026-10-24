@@ -331,6 +331,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/flags/{flag_key}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Review Flag
+         * @description AICTE officer confirms, dismisses or asks for more info on a flag, with a written reason (audited). Accepts Idempotency-Key.
+         */
+        post: operations["review_flag_v1_flags__flag_key__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/rules/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Rules Performance
+         * @description A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.
+         */
+        get: operations["rules_performance_v1_rules_performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/anomalies/peer-status": {
         parameters: {
             query?: never;
@@ -1285,6 +1325,34 @@ export interface components {
              * @description always: risk indicator for review, not proof of misconduct
              */
             label: string;
+            /**
+             * Flag Key
+             * @description A4: stable identity of the flag (regulator views)
+             */
+            flag_key?: string | null;
+            /**
+             * Weight
+             * @description A4: current weight of this rule in the inspection queue
+             */
+            weight?: number | null;
+            /**
+             * Severity
+             * @description A4: severity mapped to 0..1, comparable across rules
+             */
+            severity?: number | null;
+            /**
+             * Review
+             * @description A4: latest inspector review (decision, reason, reviewer, reviewed_at)
+             */
+            review?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Suppressed
+             * @description A4: dismissed and the primary evidence hasn't changed by more than 20%
+             * @default false
+             */
+            suppressed: boolean;
         };
         /** AuthConfig */
         AuthConfig: {
@@ -1703,6 +1771,46 @@ export interface components {
             /** Excess */
             excess: number;
         };
+        /** FlagReviewIn */
+        FlagReviewIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "confirmed" | "dismissed" | "needs_info";
+            /**
+             * Reason
+             * @description written reason without IDs, phone numbers or dates; stored, not audit-logged
+             */
+            reason: string;
+        };
+        /** FlagReviewOut */
+        FlagReviewOut: {
+            /** Id */
+            id: number;
+            /** Flag Key */
+            flag_key: string;
+            /** Rule */
+            rule: string;
+            /** Institution Id */
+            institution_id: string;
+            /** Decision */
+            decision: string;
+            /** Reason */
+            reason: string;
+            /** Reviewer */
+            reviewer: string;
+            /**
+             * Reviewed At
+             * Format: date-time
+             */
+            reviewed_at: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1725,9 +1833,14 @@ export interface components {
             dqs: components["schemas"]["Dqs"] | null;
             /**
              * Risk
-             * @description (100 - DQS) x active enrolments; null = not submitted (listed first)
+             * @description active x ((100 - DQS) + flag_points); null = not submitted (listed first)
              */
             risk: number | null;
+            /**
+             * Flag Points
+             * @description sum of weight(rule) x severity x 10 over visible flags, in DQS points
+             */
+            flag_points?: number | null;
             /** Why */
             why: string[];
             /** Flags */
@@ -2038,6 +2151,56 @@ export interface components {
              * @constant
              */
             source: "mock";
+        };
+        /** ReviewerRow */
+        ReviewerRow: {
+            /** Reviewer */
+            reviewer: string;
+            /** Reviews */
+            reviews: number;
+            /** Dismissed */
+            dismissed: number;
+            /** Dismissal Rate */
+            dismissal_rate: number;
+        };
+        /** RulePerformance */
+        RulePerformance: {
+            /** Rules */
+            rules: components["schemas"]["RulePerformanceRow"][];
+            /** Reviewers */
+            reviewers: components["schemas"]["ReviewerRow"][];
+            /** Weight Floor */
+            weight_floor: number;
+            /** Flag Dqs Points */
+            flag_dqs_points: number;
+            /** Note */
+            note: string;
+        };
+        /** RulePerformanceRow */
+        RulePerformanceRow: {
+            /** Rule */
+            rule: string;
+            /** Confirmed */
+            confirmed: number;
+            /** Dismissed */
+            dismissed: number;
+            /** Needs Info */
+            needs_info: number;
+            /**
+             * Precision
+             * @description (confirmed + 1) / (confirmed + dismissed + 2), Beta(1,1) prior
+             */
+            precision: number;
+            /**
+             * Interval
+             * @description 90% credible interval
+             */
+            interval: number[];
+            /**
+             * Weight
+             * @description max(weight_floor, precision)
+             */
+            weight: number;
         };
         /** SeatLine */
         SeatLine: {
@@ -2794,6 +2957,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetworkOut"];
+                };
+            };
+        };
+    };
+    review_flag_v1_flags__flag_key__review_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "idempotency-key"?: string | null;
+            };
+            path: {
+                flag_key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlagReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlagReviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_performance_v1_rules_performance_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulePerformance"];
                 };
             };
         };

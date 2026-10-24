@@ -2,7 +2,12 @@
 rules / DQS in anomaly.py. Regulators see every institution; an institution sees only its own."""
 from collections import defaultdict
 
+import psycopg
+from fastapi import HTTPException
+from psycopg.types.json import Jsonb
+
 from . import anomaly
+from .auth import audit
 from .ingest import current_year
 
 
@@ -133,9 +138,14 @@ def dqs_inputs(conn, institution_id: str, year: str, flag_count: int, updates: i
                       "AND c.category_code NOT LIKE '%%:%%'", institution_id, year),
         "late_rows": one("SELECT coalesce(sum(f.rows), 0) n FROM batch_features f JOIN upload_batches b ON b.id = f.batch_id "
                          "WHERE b.institution_id = %s AND f.minutes_before_deadline <= 1440", institution_id),
+        # A4 fairness: an open case counts only against institutions whose enrolment was NOT submitted first
+        # (lowest enrolment id = earliest upload, observed by the platform, unlike the self-declared admission date)
         "open_cases": one("SELECT count(DISTINCT c.id) n FROM duplicate_cases c JOIN enrolments e ON e.id = ANY(c.enrolment_ids) "
                           "JOIN programmes p ON p.id = e.programme_id WHERE p.institution_id = %s "
-                          "AND c.status IN ('flagged','under_investigation')", institution_id),
+                          "AND c.status IN ('flagged','under_investigation') AND NOT EXISTS ("
+                          "SELECT 1 FROM enrolments f JOIN programmes fp ON fp.id = f.programme_id "
+                          "WHERE f.id = (SELECT min(x) FROM unnest(c.enrolment_ids) x) AND fp.institution_id = %s)",
+                          institution_id, institution_id),
         "flags": flag_count, "updates": updates,
         "created": one("SELECT count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id WHERE p.institution_id = %s",
                        institution_id),
@@ -155,10 +165,67 @@ def institution_view(conn, institution_id: str) -> dict:
     return {"institution_id": institution_id, "dqs": anomaly.dqs(m) if m else None, "flags": fl}
 
 
+def reviews(conn) -> list[dict]:
+    return conn.execute("SELECT * FROM flag_reviews ORDER BY reviewed_at, id").fetchall()  # RLS: regulators only
+
+
+def annotate(flag_list: list[dict], review_rows: list[dict], year: str) -> list[dict]:
+    """A4 (regulators): stable key, latest review, rule weight, severity, and whether a dismissal still hides it."""
+    latest = anomaly.feedback.latest_per_flag(review_rows)
+    weights = anomaly.feedback.rule_weights(review_rows)
+    out = []
+    for f in flag_list:
+        key = anomaly.feedback.flag_key(f, year)
+        r = latest.get(key)
+        out.append({**f, "flag_key": key, "weight": weights.get(f["type"]), "severity": round(anomaly.feedback.severity(f), 3),
+                    "review": {k: r[k] for k in ("decision", "reason", "reviewer", "reviewed_at")} if r else None,
+                    "suppressed": anomaly.feedback.suppressed(f, r)})
+    return out
+
+
+def regulator_flags(conn) -> list[dict]:
+    year = current_year(conn)["code"]
+    return annotate(flags(conn, regulator=True), reviews(conn), year)
+
+
+def review_flag(conn, user: dict, key: str, decision: str, reason: str, idem_key: str | None, request_hash: str, request=None):
+    if idem_key:
+        prev = conn.execute("SELECT * FROM flag_reviews WHERE reviewer = %s AND idempotency_key = %s", (user["id"], idem_key)).fetchone()
+        if prev:
+            if prev["request_hash"] != request_hash:
+                raise HTTPException(422, "Idempotency-Key was already used with a different request body")
+            return prev, True
+    year = current_year(conn)["code"]
+    f = next((x for x in flags(conn, regulator=True) if anomaly.feedback.flag_key(x, year) == key), None)
+    if f is None:
+        raise HTTPException(404, "No current flag with this key (it may have been resolved by new data)")
+    try:
+        row = conn.execute("INSERT INTO flag_reviews (flag_key, rule, institution_id, academic_year, decision, reason, evidence_snapshot, "
+                           "reviewer, idempotency_key, request_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *",
+                           (key, f["type"], f["institution_id"], year, decision, reason, Jsonb(f["evidence"]), user["id"],
+                            idem_key, request_hash)).fetchone()
+    except psycopg.errors.UniqueViolation:  # a concurrent request with the same Idempotency-Key won: replay it (or 422)
+        conn.rollback()
+        return review_flag(conn, user, key, decision, reason, idem_key, request_hash, request)
+    # free-text reason stays in flag_reviews (regulators only), not in the audit log
+    audit(conn, user, f"flag.{decision}", "flag", key, reason=f"{f['type']} at {f['institution_id']}", request=request)
+    conn.commit()
+    return row, False
+
+
+def rules_performance(conn) -> dict:
+    perf = anomaly.feedback.rule_performance(reviews(conn))
+    return {**perf, "weight_floor": anomaly.feedback.WEIGHT_FLOOR, "flag_dqs_points": anomaly.feedback.FLAG_DQS_POINTS,
+            "note": "Precision is learned only from reviewed flags, so it leans toward flags that already rank high. Recall can't "
+                    "be learned from reviews (missed cases are never reviewed); it comes only from the synthetic evaluation. "
+                    "No rule can be switched off: every weight stays at or above the floor."}
+
+
 def inspection_queue(conn) -> list[dict]:
     """Regulator connection: every institution, ranked by risk = (100 - DQS) x active enrolments."""
     year = current_year(conn)["code"]
-    all_flags = flags(conn, regulator=True)
+    review_rows = reviews(conn)
+    all_flags = [f for f in annotate(flags(conn, regulator=True), review_rows, year) if not f["suppressed"]]  # dismissed: hidden
     updates = {r["institution_id"]: r["n"] for r in conn.execute(
         "SELECT institution_id, count(*) n FROM ledger_entries WHERE event_type = 'enrolment.updated' GROUP BY 1")}
     entries = []
@@ -168,7 +235,7 @@ def inspection_queue(conn) -> list[dict]:
         m = dqs_inputs(conn, i["id"], year, len(own), updates.get(i["id"], 0))
         entries.append({"institution_id": i["id"], "name": i["name"], "state": i["state"], "status": i["status"],
                         "active": m["active"] if m else 0, "dqs": anomaly.dqs(m) if m else None, "flags": fl})
-    ranked = anomaly.inspection_queue(entries)
+    ranked = anomaly.inspection_queue(entries, anomaly.feedback.rule_weights(review_rows))
     for n, e in enumerate(ranked, start=1):
         e["rank"] = n
     return ranked

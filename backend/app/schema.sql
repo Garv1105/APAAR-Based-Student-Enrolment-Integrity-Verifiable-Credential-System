@@ -331,3 +331,21 @@ CREATE TABLE IF NOT EXISTS webauthn_challenges (
   expires_at  timestamptz NOT NULL,
   used_at     timestamptz
 );
+
+-- A4 inspector feedback: one row per review; the latest review per flag_key counts.
+CREATE TABLE IF NOT EXISTS flag_reviews (
+  id                bigserial PRIMARY KEY,
+  flag_key          text NOT NULL,
+  rule              text NOT NULL,
+  institution_id    text NOT NULL,
+  academic_year     text NOT NULL,
+  decision          text NOT NULL CHECK (decision IN ('confirmed','dismissed','needs_info')),
+  reason            text NOT NULL CHECK (length(reason) >= 10),
+  evidence_snapshot jsonb NOT NULL,             -- the numbers the inspector saw
+  reviewer          text NOT NULL,
+  idempotency_key   text,
+  request_hash      text,
+  reviewed_at       timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (reviewer, idempotency_key)
+);
+CREATE INDEX IF NOT EXISTS flag_reviews_key_idx ON flag_reviews (flag_key);

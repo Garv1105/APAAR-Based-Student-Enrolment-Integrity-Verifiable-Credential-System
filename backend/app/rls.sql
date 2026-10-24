@@ -39,6 +39,7 @@ GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, s
   duplicate_cases, anomaly_flags, consents TO app_user;
 GRANT SELECT, INSERT, UPDATE ON webhook_endpoints TO app_user;
 GRANT SELECT ON passkeys TO app_user;
+GRANT SELECT, INSERT ON flag_reviews TO app_user;
 GRANT UPDATE (sign_count, last_used_at) ON passkeys TO app_user;  -- insert/revoke only via register_passkey / revoke_own_passkey
 -- activation_codes and webauthn_challenges: no grants, functions only
 GRANT SELECT, UPDATE ON webhook_deliveries TO app_user;   -- inserts only via enqueue_event() / enqueue_case_event()
@@ -123,6 +124,12 @@ CREATE POLICY upd ON passkeys FOR UPDATE USING (student_id = app_student() AND k
   WITH CHECK (student_id = app_student() AND kind = app_role());
 ALTER TABLE activation_codes ENABLE ROW LEVEL SECURITY; ALTER TABLE activation_codes FORCE ROW LEVEL SECURITY;
 ALTER TABLE webauthn_challenges ENABLE ROW LEVEL SECURITY; ALTER TABLE webauthn_challenges FORCE ROW LEVEL SECURITY;
+
+-- flag_reviews (A4): AICTE officers record reviews as themselves; regulators read; institutions see nothing.
+ALTER TABLE flag_reviews ENABLE ROW LEVEL SECURITY; ALTER TABLE flag_reviews FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS sel ON flag_reviews; DROP POLICY IF EXISTS ins ON flag_reviews;
+CREATE POLICY sel ON flag_reviews FOR SELECT USING (app_is_regulator());
+CREATE POLICY ins ON flag_reviews FOR INSERT WITH CHECK (app_role() = 'aicte_officer' AND reviewer = current_setting('app.user_id', true));
 
 -- anomaly_flags (incl. E501)
 ALTER TABLE anomaly_flags ENABLE ROW LEVEL SECURITY; ALTER TABLE anomaly_flags FORCE ROW LEVEL SECURITY;

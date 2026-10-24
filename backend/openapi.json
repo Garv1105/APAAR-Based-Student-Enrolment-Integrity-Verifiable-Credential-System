@@ -702,6 +702,101 @@
     ]
    }
   },
+  "/v1/flags/{flag_key}/review": {
+   "post": {
+    "summary": "Review Flag",
+    "description": "AICTE officer confirms, dismisses or asks for more info on a flag, with a written reason (audited). Accepts Idempotency-Key.",
+    "operationId": "review_flag_v1_flags__flag_key__review_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "flag_key",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Flag Key"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FlagReviewIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/FlagReviewOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/rules/performance": {
+   "get": {
+    "summary": "Rules Performance",
+    "description": "A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.",
+    "operationId": "rules_performance_v1_rules_performance_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/RulePerformance"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/anomalies/peer-status": {
    "get": {
     "summary": "Anomalies Peer Status",
@@ -2730,6 +2825,61 @@
       "type": "string",
       "title": "Label",
       "description": "always: risk indicator for review, not proof of misconduct"
+     },
+     "flag_key": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flag Key",
+      "description": "A4: stable identity of the flag (regulator views)"
+     },
+     "weight": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Weight",
+      "description": "A4: current weight of this rule in the inspection queue"
+     },
+     "severity": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Severity",
+      "description": "A4: severity mapped to 0..1, comparable across rules"
+     },
+     "review": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Review",
+      "description": "A4: latest inspector review (decision, reason, reviewer, reviewed_at)"
+     },
+     "suppressed": {
+      "type": "boolean",
+      "title": "Suppressed",
+      "description": "A4: dismissed and the primary evidence hasn't changed by more than 20%",
+      "default": false
      }
     },
     "type": "object",
@@ -3656,6 +3806,86 @@
     ],
     "title": "ExcessRow"
    },
+   "FlagReviewIn": {
+    "properties": {
+     "decision": {
+      "type": "string",
+      "enum": [
+       "confirmed",
+       "dismissed",
+       "needs_info"
+      ],
+      "title": "Decision"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "written reason without IDs, phone numbers or dates; stored, not audit-logged"
+     }
+    },
+    "type": "object",
+    "required": [
+     "decision",
+     "reason"
+    ],
+    "title": "FlagReviewIn"
+   },
+   "FlagReviewOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "flag_key": {
+      "type": "string",
+      "title": "Flag Key"
+     },
+     "rule": {
+      "type": "string",
+      "title": "Rule"
+     },
+     "institution_id": {
+      "type": "string",
+      "title": "Institution Id"
+     },
+     "decision": {
+      "type": "string",
+      "title": "Decision"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     },
+     "reviewer": {
+      "type": "string",
+      "title": "Reviewer"
+     },
+     "reviewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Reviewed At"
+     },
+     "replayed": {
+      "type": "boolean",
+      "title": "Replayed",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "flag_key",
+     "rule",
+     "institution_id",
+     "decision",
+     "reason",
+     "reviewer",
+     "reviewed_at"
+    ],
+    "title": "FlagReviewOut"
+   },
    "HTTPValidationError": {
     "properties": {
      "detail": {
@@ -3715,7 +3945,19 @@
        }
       ],
       "title": "Risk",
-      "description": "(100 - DQS) x active enrolments; null = not submitted (listed first)"
+      "description": "active x ((100 - DQS) + flag_points); null = not submitted (listed first)"
+     },
+     "flag_points": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Flag Points",
+      "description": "sum of weight(rule) x severity x 10 over visible flags, in DQS points"
      },
      "why": {
       "items": {
@@ -4451,6 +4693,122 @@
      "verificationMethod"
     ],
     "title": "RegistryIssuer"
+   },
+   "ReviewerRow": {
+    "properties": {
+     "reviewer": {
+      "type": "string",
+      "title": "Reviewer"
+     },
+     "reviews": {
+      "type": "integer",
+      "title": "Reviews"
+     },
+     "dismissed": {
+      "type": "integer",
+      "title": "Dismissed"
+     },
+     "dismissal_rate": {
+      "type": "number",
+      "title": "Dismissal Rate"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reviewer",
+     "reviews",
+     "dismissed",
+     "dismissal_rate"
+    ],
+    "title": "ReviewerRow"
+   },
+   "RulePerformance": {
+    "properties": {
+     "rules": {
+      "items": {
+       "$ref": "#/components/schemas/RulePerformanceRow"
+      },
+      "type": "array",
+      "title": "Rules"
+     },
+     "reviewers": {
+      "items": {
+       "$ref": "#/components/schemas/ReviewerRow"
+      },
+      "type": "array",
+      "title": "Reviewers"
+     },
+     "weight_floor": {
+      "type": "number",
+      "title": "Weight Floor"
+     },
+     "flag_dqs_points": {
+      "type": "number",
+      "title": "Flag Dqs Points"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rules",
+     "reviewers",
+     "weight_floor",
+     "flag_dqs_points",
+     "note"
+    ],
+    "title": "RulePerformance"
+   },
+   "RulePerformanceRow": {
+    "properties": {
+     "rule": {
+      "type": "string",
+      "title": "Rule"
+     },
+     "confirmed": {
+      "type": "integer",
+      "title": "Confirmed"
+     },
+     "dismissed": {
+      "type": "integer",
+      "title": "Dismissed"
+     },
+     "needs_info": {
+      "type": "integer",
+      "title": "Needs Info"
+     },
+     "precision": {
+      "type": "number",
+      "title": "Precision",
+      "description": "(confirmed + 1) / (confirmed + dismissed + 2), Beta(1,1) prior"
+     },
+     "interval": {
+      "items": {
+       "type": "number"
+      },
+      "type": "array",
+      "title": "Interval",
+      "description": "90% credible interval"
+     },
+     "weight": {
+      "type": "number",
+      "title": "Weight",
+      "description": "max(weight_floor, precision)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "rule",
+     "confirmed",
+     "dismissed",
+     "needs_info",
+     "precision",
+     "interval",
+     "weight"
+    ],
+    "title": "RulePerformanceRow"
    },
    "SeatLine": {
     "properties": {
