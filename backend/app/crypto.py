@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 KEY_FILE = Path(os.environ.get("APAAR_KEY_FILE", Path(__file__).resolve().parent.parent / ".keys.json"))
+KEYS_ENV = "APAAR_KEYS_JSON"  # serverless: every instance reads the same keys from the environment, read-only
 _SYMMETRIC = ("k_enc", "k_apaar_bi", "k_dob_bi", "k_name_bi")  # separate keys (PRD §8 rule 2)
 _keys: dict | None = None
 
@@ -27,7 +28,9 @@ _keys: dict | None = None
 def _load() -> dict:
     global _keys
     if _keys is None:
-        if KEY_FILE.exists():
+        if os.environ.get(KEYS_ENV):
+            _keys = json.loads(os.environ[KEYS_ENV])
+        elif KEY_FILE.exists():
             _keys = json.loads(KEY_FILE.read_text())
         else:
             _keys = {k: os.urandom(32).hex() for k in _SYMMETRIC}
@@ -40,9 +43,16 @@ def _save() -> None:
     KEY_FILE.write_text(json.dumps(_keys, indent=1))
 
 
+def _missing(name: str) -> None:
+    """With keys from the environment a new key would exist on one instance only: fail loudly instead."""
+    if os.environ.get(KEYS_ENV):
+        raise RuntimeError(f"key '{name}' is missing from {KEYS_ENV}; regenerate it with tools/deploy_keys.py")
+
+
 def _key(name: str) -> bytes:
     keys = _load()
     if name not in keys:  # e.g. 'k_jwt', 'k_otp' added after first run
+        _missing(name)
         keys[name] = os.urandom(32).hex()
         _save()
     return bytes.fromhex(keys[name])
@@ -126,6 +136,7 @@ def signing_key(name: str) -> Ed25519PrivateKey:
     """Named Ed25519 key (issuer DIDs, 'aicte-ledger'). Created on first use."""
     keys = _load()
     if name not in keys["signing"]:
+        _missing(name)
         keys["signing"][name] = os.urandom(32).hex()
         _save()
     return Ed25519PrivateKey.from_private_bytes(bytes.fromhex(keys["signing"][name]))

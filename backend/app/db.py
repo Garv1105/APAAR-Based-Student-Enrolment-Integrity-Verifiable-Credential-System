@@ -30,7 +30,9 @@ def _env(name: str) -> str | None:
 
 
 def database_url() -> str:
-    url = _env("DATABASE_URL")
+    # A transaction pooler (Neon's DATABASE_URL) would drop the per-connection RLS settings app_connect() makes:
+    # always use the direct connection when the platform provides one.
+    url = _env("DATABASE_URL_UNPOOLED") or _env("DATABASE_URL")
     if not url:
         raise RuntimeError("DATABASE_URL not set (env or backend/.env)")
     # Tolerate unencoded '@' ':' etc. in the password: host part starts after the LAST '@'.
