@@ -18,6 +18,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - Reissue cooldown (24 h) and a student notice; reissue count on the AICTE dashboard.
   - The MOCK DOB/OTP path exists only behind `DEMO_MODE`.
 - **W1 webhooks + ERP connector (Req 7):** Standard Webhooks signing; outbox with retries and backoff; delivery log; redeliver; secret rotation (24 h overlap); max 5 endpoints; SSRF guard that pins the validated IP (Host + SNI); `tools/erp_connector/` (YAML mapping, file-hash Idempotency-Key, verifying receiver).
+- **A0 anomaly package:** `backend/app/anomaly/` (`rules.py` = the five D3 rules unchanged, `stats.py` shared helpers); same public interface. Spec: `docs/ANOMALY_V2_SPEC.md`.
 - **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
 **Decisions:**
