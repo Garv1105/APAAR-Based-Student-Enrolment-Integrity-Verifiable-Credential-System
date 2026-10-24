@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { AlertCircle, AlertTriangle, ArrowDownToLine, FileSpreadsheet, ShieldAlert } from "lucide-react";
+import { AlertCircle, ArrowDownToLine, FileSpreadsheet, Inbox, ShieldAlert } from "lucide-react";
 import { ApiError, download, loadSession } from "./api/client";
 
 export const go = (path: string) => { window.location.hash = path; };
@@ -10,39 +10,28 @@ export const CATEGORY_LABEL: Record<string, string> = {
   "SN_FN_OCI_CIWG:CIWG": "of which CIWG (⅓ of supernumerary)",
 };
 
-/** Smooth animated counter for numerical KPI values */
-export function AnimatedCounter({ value, duration = 0.5 }: { value: number; duration?: number }) {
-  const [displayValue, setDisplayValue] = useState(value);
-  const prevValue = useRef(value);
+const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+/** Counts up to a new value; jumps straight there when the user prefers reduced motion. */
+export function AnimatedCounter({ value, duration = 0.6 }: { value: number; duration?: number }) {
+  const [shown, setShown] = useState(value);
+  const prev = useRef(value);
   useEffect(() => {
-    let startTime: number | null = null;
-    const startVal = prevValue.current;
-    const endVal = value;
-    prevValue.current = value;
-
-    if (startVal === endVal) {
-      setDisplayValue(endVal);
-      return;
-    }
-
-    let animationFrameId: number;
-    const step = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const progress = Math.min((timestamp - startTime) / (duration * 1000), 1);
-      // easeOutCubic
-      const ease = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(startVal + (endVal - startVal) * ease);
-      setDisplayValue(current);
-      if (progress < 1) {
-        animationFrameId = requestAnimationFrame(step);
-      }
+    const from = prev.current;
+    prev.current = value;
+    if (from === value || reducedMotion()) { setShown(value); return; }
+    let start: number | null = null;
+    let raf = 0;
+    const step = (t: number) => {
+      start ??= t;
+      const p = Math.min((t - start) / (duration * 1000), 1);
+      setShown(Math.round(from + (value - from) * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) raf = requestAnimationFrame(step);
     };
-    animationFrameId = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(animationFrameId);
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [value, duration]);
-
-  return <span className="tabular-nums font-bold">{displayValue.toLocaleString()}</span>;
+  return <span className="tabular-nums">{shown.toLocaleString()}</span>;
 }
 
 /** Fetch now and every `ms` while the tab is visible ("real-time" by polling). */
@@ -73,147 +62,166 @@ export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
   return { data, error, updatedAt, refresh };
 }
 
-export function Card({ title, actions, children, className = "" }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string }) {
+/** Page heading: small gold eyebrow, serif title, muted meta line, actions on the right. */
+export function PageHeader({ eyebrow, title, meta, actions }: { eyebrow?: ReactNode; title: ReactNode; meta?: ReactNode; actions?: ReactNode }) {
   return (
-    <section className={`min-w-0 rounded-2xl border border-slate-200/90 bg-white shadow-premium transition-all duration-200 ${className}`}>
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        {eyebrow && <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold">{eyebrow}</p>}
+        <h1 className="mt-2 font-display text-[36px] font-normal leading-[1.1] text-ink sm:text-[44px]">{title}</h1>
+        {meta && <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-mute">{meta}</div>}
+      </div>
+      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+    </header>
+  );
+}
+
+export function Card({ title, actions, children, className = "", id, icon, bodyClassName = "p-5" }: {
+  title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; id?: string; icon?: ReactNode; bodyClassName?: string;
+}) {
+  return (
+    <section id={id} className={`min-w-0 scroll-mt-28 rounded-xl border border-line bg-surface shadow-premium ${className}`}>
       {(title || actions) && (
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-6 py-4 rounded-t-2xl">
-          <div className="text-sm font-bold tracking-tight text-gov-900">{title}</div>
-          {actions && <div className="flex items-center gap-2">{actions}</div>}
+        <header className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-3">
+          <h2 className="flex items-center gap-2 text-[13px] font-semibold tracking-tight text-ink">
+            {icon && <span className="text-gold [&>svg]:h-4 [&>svg]:w-4" aria-hidden>{icon}</span>}
+            {title}
+          </h2>
+          {actions && <div className="flex flex-wrap items-center gap-2 text-xs text-mute">{actions}</div>}
         </header>
       )}
-      <div className="p-6">{children}</div>
+      <div className={bodyClassName}>{children}</div>
     </section>
   );
 }
 
 const TONES = {
-  neutral: "bg-slate-100 text-slate-700 border-slate-200",
+  neutral: "bg-slate-100 text-slate-600 border-slate-200",
   error: "bg-critical-bg text-critical-text border-critical-border",
   warning: "bg-warning-bg text-warning-text border-warning-border",
   flag: "bg-flag-bg text-flag-text border-flag-border",
   ok: "bg-success-bg text-success-text border-success-border",
-  brand: "bg-accent-50 text-accent-700 border-accent-200",
+  brand: "bg-accent-50 text-accent-800 border-accent-300",
 } as const;
 export type Tone = keyof typeof TONES;
+const DOT = { neutral: "bg-slate-400", error: "bg-critical", warning: "bg-warning", flag: "bg-flag", ok: "bg-success", brand: "bg-gold" } as const;
+export const TONE_TEXT = { neutral: "text-ink", error: "text-critical-text", warning: "text-warning-text", flag: "text-flag-text", ok: "text-success-text", brand: "text-champagne" } as const;
 
 export function Badge({ tone = "neutral", children, dot = false }: { tone?: Tone; children: ReactNode; dot?: boolean }) {
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border ${TONES[tone]}`}>
-      {dot && (
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            tone === "ok" ? "bg-success" : tone === "error" ? "bg-critical" : tone === "warning" ? "bg-warning" : tone === "flag" ? "bg-flag" : "bg-slate-400"
-          }`}
-          aria-hidden="true"
-        />
-      )}
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium ${TONES[tone]}`}>
+      {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOT[tone]}`} aria-hidden="true" />}
       {children}
     </span>
   );
 }
 
-export function Stat({
-  label,
-  value,
-  tone = "neutral",
-  hint,
-  icon,
-}: {
-  label: string;
-  value: ReactNode;
-  tone?: Tone;
-  hint?: string;
-  icon?: ReactNode;
+/** KPI tile: label, large number, optional visual (ring, spark bars) on the right and a quiet footnote. */
+export function Stat({ label, value, tone = "neutral", hint, icon, visual }: {
+  label: string; value: ReactNode; tone?: Tone; hint?: ReactNode; icon?: ReactNode; visual?: ReactNode;
 }) {
-  const isNumber = typeof value === "number";
-  const colorMap = {
-    neutral: "text-gov-900",
-    error: "text-critical",
-    warning: "text-warning",
-    flag: "text-flag",
-    ok: "text-success",
-    brand: "text-accent-600",
-  };
-
-  const iconBgMap = {
-    neutral: "bg-slate-100 text-slate-600",
-    error: "bg-critical-bg text-critical",
-    warning: "bg-warning-bg text-warning",
-    flag: "bg-flag-bg text-flag",
-    ok: "bg-success-bg text-success",
-    brand: "bg-accent-50 text-accent-600",
-  };
-
   return (
-    <div
-      className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-premium transition-all duration-200 hover:border-slate-300 hover:shadow-premium-hover"
-      title={hint}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</div>
-        {icon && <div className={`grid h-8 w-8 place-items-center rounded-xl p-1.5 ${iconBgMap[tone]}`}>{icon}</div>}
-      </div>
-      <div className="mt-3">
-        <div className={`text-2xl font-bold tracking-tight ${colorMap[tone]}`}>
-          {isNumber ? <AnimatedCounter value={value} /> : value}
+    <div className="flex min-w-0 items-center justify-between gap-4 rounded-xl border border-line bg-surface p-5 shadow-premium">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-[12px] font-medium text-mute">
+          {icon && <span className={`grid h-7 w-7 place-items-center rounded-lg bg-raised [&>svg]:h-3.5 [&>svg]:w-3.5 ${tone === "neutral" ? "text-gold" : TONE_TEXT[tone]}`} aria-hidden>{icon}</span>}
+          {label}
         </div>
-        {hint && (
-          <div className="mt-1 flex items-center gap-1 text-xs text-slate-500 font-medium">
-            <span>{hint}</span>
-          </div>
-        )}
+        <div className={`mt-3 text-[30px] font-semibold leading-none tracking-tight tabular-nums ${TONE_TEXT[tone]}`}>
+          {typeof value === "number" ? <AnimatedCounter value={value} /> : value}
+        </div>
+        {hint && <div className="mt-2 text-xs text-mute">{hint}</div>}
       </div>
+      {visual && <div className="shrink-0">{visual}</div>}
     </div>
+  );
+}
+
+/** Radial progress (0..1). Gold by default; pass a status colour for semantic use. */
+export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)", children, label }: {
+  value: number; size?: number; stroke?: number; color?: string; children?: ReactNode; label: string;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(1, value));
+  return (
+    <div className="relative grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={label}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--color-line)" strokeWidth={stroke} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - v)} style={{ transition: "stroke-dashoffset 700ms cubic-bezier(.2,.8,.2,1)" }} />
+      </svg>
+      {children && <div className="absolute inset-0 grid place-items-center text-center">{children}</div>}
+    </div>
+  );
+}
+
+/** Thin horizontal meter (0..1). */
+export function Meter({ value, color = "bg-gold", className = "", label }: { value: number; color?: string; className?: string; label?: string }) {
+  return (
+    <div className={`h-1.5 overflow-hidden rounded-full bg-slate-100 ${className}`} role={label ? "meter" : undefined}
+      aria-label={label} aria-valuemin={label ? 0 : undefined} aria-valuemax={label ? 100 : undefined} aria-valuenow={label ? Math.round(value * 100) : undefined}>
+      <div className={`h-full rounded-full ${color} transition-[width] duration-700 ease-out`} style={{ width: `${Math.max(0, Math.min(1, value)) * 100}%` }} />
+    </div>
+  );
+}
+
+/** Tiny bar sparkline for a short series of real values (e.g. per-batch counts). */
+export function SparkBars({ values, color = "var(--color-gold)", label }: { values: number[]; color?: string; label: string }) {
+  if (values.length < 2) return null;
+  const max = Math.max(...values, 1);
+  const w = 6, gap = 3, h = 36;
+  return (
+    <svg width={values.length * (w + gap) - gap} height={h} role="img" aria-label={label}>
+      {values.map((v, i) => {
+        const bh = Math.max(2, (v / max) * h);
+        return <rect key={i} x={i * (w + gap)} y={h - bh} width={w} height={bh} rx={1.5} fill={color} opacity={0.35 + 0.65 * ((i + 1) / values.length)} />;
+      })}
+    </svg>
   );
 }
 
 export function ErrorNote({ children }: { children: ReactNode }) {
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-xl border border-critical-border bg-critical-bg p-4 text-sm text-critical-text">
-      <AlertCircle className="h-5 w-5 shrink-0 text-critical mt-0.5" aria-hidden="true" />
-      <div className="font-medium">{children}</div>
+    <div role="alert" className="flex items-start gap-3 rounded-lg border border-critical-border bg-critical-bg px-4 py-3 text-sm text-critical-text">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+      <div>{children}</div>
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center py-10 text-center">
-      <div className="rounded-full bg-slate-100 p-3 text-slate-400 mb-2">
-        <AlertTriangle className="h-5 w-5" />
-      </div>
-      <p className="text-sm font-medium text-slate-500 max-w-sm">{children}</p>
+    <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+      <Inbox className="h-5 w-5 text-slate-400" aria-hidden />
+      <p className="max-w-sm text-sm text-mute">{children}</p>
     </div>
   );
 }
 
 export function Loading() {
   return (
-    <div className="flex flex-col items-center justify-center py-12 text-center" aria-live="polite">
-      <div className="h-8 w-8 animate-spin rounded-full border-3 border-accent-600 border-t-transparent" />
-      <p className="mt-3 text-xs font-medium text-slate-500 tracking-wide uppercase">Loading official data…</p>
+    <div className="space-y-4" aria-live="polite" aria-busy="true">
+      <span className="sr-only">Loading…</span>
+      <div className="h-10 w-72 max-w-full animate-pulse rounded-lg bg-slate-100" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-xl bg-slate-50 ring-1 ring-line" />)}
+      </div>
+      <div className="h-64 animate-pulse rounded-xl bg-slate-50 ring-1 ring-line" />
     </div>
   );
 }
 
-export function Button({
-  variant = "primary",
-  className = "",
-  ...p
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
+export function Button({ variant = "primary", className = "", ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "ghost" | "danger" }) {
   const v = {
-    primary: "bg-accent-600 text-white hover:bg-accent-700 active:bg-accent-800 shadow-sm hover:shadow disabled:bg-slate-300 disabled:shadow-none",
-    secondary: "border border-slate-300/90 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-xs disabled:text-slate-400 disabled:border-slate-200",
-    ghost: "text-accent-600 hover:bg-accent-50 active:bg-accent-100 disabled:text-slate-400",
-    danger: "bg-critical text-white hover:bg-critical-hover shadow-sm disabled:bg-slate-300",
+    primary: "bg-gold text-[#14110a] hover:bg-[#e0bd4a] disabled:bg-slate-200 disabled:text-slate-500",
+    secondary: "border border-slate-300 bg-transparent text-slate-800 hover:border-accent-400 hover:text-ink disabled:text-slate-400",
+    ghost: "text-accent-700 hover:bg-accent-50 hover:text-accent-900 disabled:text-slate-400",
+    danger: "border border-critical-border bg-critical-bg text-critical-text hover:bg-critical/20 disabled:opacity-50",
   }[variant];
-
   return (
-    <button
-      {...p}
-      className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-150 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60 cursor-pointer ${v} ${className}`}
-    />
+    <button {...p}
+      className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-2 text-[13px] font-medium transition-colors duration-150 disabled:cursor-not-allowed ${v} ${className}`} />
   );
 }
 
@@ -224,123 +232,69 @@ export function fmtTime(iso: string | null | undefined) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/** Live polling indicator. Shows the time of the last successful refresh. */
 export function Updated({ at }: { at: Date | null }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-xs" aria-live="polite">
-      <span className="relative flex h-2 w-2">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
-      </span>
-      <span>{at ? `Live sync · ${at.toLocaleTimeString()}` : "Connecting…"}</span>
-    </div>
+    <span className="inline-flex items-center gap-2 rounded-full border border-line bg-raised px-3 py-1 text-[11px] text-mute" aria-live="polite">
+      <span className={`h-1.5 w-1.5 rounded-full ${at ? "bg-success" : "bg-slate-400"}`} aria-hidden />
+      {at ? <>Live · <span className="tabular-nums">{at.toLocaleTimeString()}</span></> : "Connecting…"}
+    </span>
   );
 }
 
-/** Req 9 report downloads. */
-export function ReportsCard({ institutions }: { institutions?: { id: string; name: string }[] }) {
+/** Req 9 report downloads. `institutions` (AICTE view) enables the per-institution accreditation pack picker. */
+export function ReportsCard({ institutions, id }: { institutions?: { id: string; name: string }[]; id?: string }) {
   const [inst, setInst] = useState(institutions?.[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const get = async (kind: string, params = "") => {
     setError(null);
-    try {
-      await download(`/v1/reports/${kind}.csv${params}`, `${kind}.csv`);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.text : "Download failed");
-    }
+    try { await download(`/v1/reports/${kind}.csv${params}`, `${kind}.csv`); } catch (e) { setError(e instanceof ApiError ? e.text : "Download failed"); }
   };
-
+  const item = (label: string, onClick: () => void, icon = <ArrowDownToLine className="h-3.5 w-3.5" />) => (
+    <Button variant="secondary" onClick={onClick}>{icon}{label}</Button>
+  );
   return (
-    <Card
-      title={
-        <div className="flex items-center gap-2">
-          <FileSpreadsheet className="h-4 w-4 text-accent-600" />
-          <span>Statutory Compliance Reports (CSV)</span>
-        </div>
-      }
-      actions={<span className="text-xs text-slate-500 font-medium">Immutable audit export · Formula injection safe</span>}
-    >
-      <div className="flex flex-wrap items-center gap-2.5">
-        {institutions ? (
-          <>
-            <Button variant="secondary" onClick={() => get("state-summary")}>
-              <ArrowDownToLine className="h-3.5 w-3.5" />
-              <span>State summary</span>
-            </Button>
-            <Button variant="secondary" onClick={() => get("category-utilisation")}>
-              <ArrowDownToLine className="h-3.5 w-3.5" />
-              <span>Category quota utilisation</span>
-            </Button>
-            <Button variant="secondary" onClick={() => get("excess-case-file")}>
-              <ShieldAlert className="h-3.5 w-3.5 text-critical" />
-              <span>Excess admission case file</span>
-            </Button>
-            <span className="mx-2 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
-            <div className="flex items-center gap-2">
-              <label htmlFor="inst-select" className="sr-only">Institution</label>
-              <select
-                id="inst-select"
-                value={inst}
-                onChange={(e) => setInst(e.target.value)}
-                className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gov-900 shadow-xs focus:border-accent-600 focus:ring-1 focus:ring-accent-600"
-              >
-                {institutions.map((i) => (
-                  <option key={i.id} value={i.id}>{i.name}</option>
-                ))}
-              </select>
-              <Button variant="primary" disabled={!inst} onClick={() => get("accreditation", `?institution_id=${encodeURIComponent(inst)}`)}>
-                <ArrowDownToLine className="h-3.5 w-3.5" />
-                <span>Accreditation pack</span>
-              </Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <Button variant="secondary" onClick={() => get("accreditation")}>
-              <ArrowDownToLine className="h-3.5 w-3.5" />
-              <span>Accreditation pack</span>
-            </Button>
-            <Button variant="secondary" onClick={() => get("category-utilisation")}>
-              <ArrowDownToLine className="h-3.5 w-3.5" />
-              <span>Category quota utilisation</span>
-            </Button>
-          </>
-        )}
+    <Card id={id} title="Reports" icon={<FileSpreadsheet />} actions={<span>CSV · aggregates only · formula-safe · every export is audited</span>}>
+      <div className="flex flex-wrap items-center gap-2">
+        {institutions ? (<>
+          {item("State summary", () => get("state-summary"))}
+          {item("Category-quota utilisation", () => get("category-utilisation"))}
+          {item("Excess-admission case file", () => get("excess-case-file"), <ShieldAlert className="h-3.5 w-3.5 text-critical-text" />)}
+          <span className="mx-1 hidden h-6 w-px bg-slate-200 sm:block" aria-hidden="true" />
+          <label htmlFor="inst-select" className="sr-only">Institution</label>
+          <select id="inst-select" value={inst} onChange={(e) => setInst(e.target.value)}
+            className="rounded-lg border border-slate-300 bg-surface px-3 py-2 text-[13px] text-ink focus:border-gold focus:outline-none">
+            {institutions.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+          <Button disabled={!inst} onClick={() => get("accreditation", `?institution_id=${encodeURIComponent(inst)}`)}>
+            <ArrowDownToLine className="h-3.5 w-3.5" />Accreditation pack
+          </Button>
+        </>) : (<>
+          {item("Accreditation pack", () => get("accreditation"))}
+          {item("Category-quota utilisation", () => get("category-utilisation"))}
+        </>)}
       </div>
-      {error && (
-        <div className="mt-4">
-          <ErrorNote>{error}</ErrorNote>
-        </div>
-      )}
+      {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
     </Card>
   );
 }
 
-/** Structured data table with responsive horizontal scroll and modern GovTech styling. */
+/** Data table: quiet uppercase header, hairline rows, horizontal scroll on narrow screens. */
 export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
-    <div className="-mx-6 -my-2 overflow-x-auto">
-      <div className="inline-block min-w-full align-middle">
-        <table className="min-w-full divide-y divide-slate-200 text-sm">
-          <thead>
-            <tr className="bg-slate-50/70 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              {head.map((h, i) => (
-                <th key={i} scope="col" className="whitespace-nowrap px-6 py-3">
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">{children}</tbody>
-        </table>
-      </div>
+    <div className="-mx-5 overflow-x-auto">
+      <table className="min-w-full text-[13px]">
+        <thead>
+          <tr className="border-y border-line text-left text-[10.5px] font-semibold uppercase tracking-[0.08em] text-slate-400">
+            {head.map((h, i) => <th key={i} scope="col" className="whitespace-nowrap px-4 py-2.5 font-semibold first:pl-5 last:pr-5">{h}</th>)}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">{children}</tbody>
+      </table>
     </div>
   );
 }
 
 export function Td({ children, className = "", wrap = false }: { children: ReactNode; className?: string; wrap?: boolean }) {
-  return (
-    <td className={`${wrap ? "whitespace-normal" : "whitespace-nowrap"} px-6 py-3.5 text-slate-700 font-medium ${className}`}>
-      {children}
-    </td>
-  );
+  return <td className={`${wrap ? "whitespace-normal" : "whitespace-nowrap"} px-4 py-3 text-slate-700 first:pl-5 last:pr-5 ${className}`}>{children}</td>;
 }

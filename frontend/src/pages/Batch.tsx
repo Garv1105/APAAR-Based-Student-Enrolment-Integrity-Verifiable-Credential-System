@@ -10,7 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { ApiError, download, getJson, type S } from "../api/client";
-import { Badge, Button, Card, Empty, ErrorNote, fmtTime, go, Loading, SEVERITY_TONE, Stat, Table, Td } from "../ui";
+import { Badge, Button, Card, Empty, ErrorNote, fmtTime, go, Loading, PageHeader, SEVERITY_TONE, Stat, Table, Td } from "../ui";
 
 type Sev = "all" | "error" | "warning" | "flag";
 
@@ -47,36 +47,18 @@ export default function BatchDetail({ id }: { id: number }) {
   if (!batch) return <Loading />;
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
-        <div>
-          <button
-            onClick={() => go("/inst")}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-accent-700 hover:text-accent-800 transition-colors cursor-pointer mb-2"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            <span>Back to Institution Dashboard</span>
-          </button>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-gov-900 sm:text-3xl">Batch #{batch.batch_id}</h1>
-            <span className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700 border border-slate-200">
-              {batch.channel === "portal_csv" ? "CSV Portal Ingestion" : "REST API"}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
-            Submitted {fmtTime(batch.created_at)} · Validated across APAAR registry and AICTE intake sanctions
-          </p>
-        </div>
-
-        <Button
-          variant="secondary"
-          onClick={() => download(`/v1/batches/${id}/report.csv`, `batch-${id}-issues.csv`)}
-        >
-          <ArrowDownToLine className="h-4 w-4 text-accent-600" />
-          <span>Export Error Report (CSV)</span>
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={<button onClick={() => go("/inst")} className="inline-flex items-center gap-1.5 hover:text-champagne"><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Institution dashboard</button>}
+        title={`Batch #${batch.batch_id}`}
+        meta={<>
+          <span>Uploaded {fmtTime(batch.created_at)}</span><span aria-hidden className="text-slate-300">·</span>
+          <span>{batch.channel === "portal_csv" ? "CSV upload" : "API"}</span><span aria-hidden className="text-slate-300">·</span>
+          <span>Checked against the APAAR registry (MOCK) and AICTE intake</span>
+        </>}
+        actions={<Button variant="secondary" onClick={() => download(`/v1/batches/${id}/report.csv`, `batch-${id}-issues.csv`)}>
+          <ArrowDownToLine className="h-4 w-4" aria-hidden />Error report (CSV)</Button>}
+      />
 
       {/* KPI Breakdown */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -121,7 +103,7 @@ export default function BatchDetail({ id }: { id: number }) {
         title={
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-accent-600" />
-            <span>Row-Level Validation Telemetry</span>
+            <span>Row-level issues</span>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
               {issues.length} total events
             </span>
@@ -136,7 +118,7 @@ export default function BatchDetail({ id }: { id: number }) {
                 aria-pressed={sev === s}
                 className={`rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
                   sev === s
-                    ? "bg-gov-900 text-white shadow-xs"
+                    ? "bg-gold/15 text-champagne ring-1 ring-gold/40"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >

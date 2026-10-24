@@ -178,3 +178,95 @@ body {
 .animate-streak {
   animation: streakGlow 4s ease-in-out infinite;
 }
+
+/* ===================================================================
+   Signed-in app theme: deep charcoal + restrained gold.
+   Scoped to .theme-gold (set by AppLayout) so the landing page keeps
+   its blue/violet look. Every Tailwind colour utility reads a CSS
+   variable, so remapping the scales here re-themes all pages at once:
+   slate/gov are inverted (low = dark surfaces, high = light text),
+   accent becomes gold, status colours become muted dark-mode tints.
+   =================================================================== */
+@theme {
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --color-canvas: #0b0f14;
+  --color-surface: #111820;
+  --color-raised: #161f29;
+  --color-line: #222c37;
+  --color-gold: #d4af37;
+  --color-champagne: #f7e08a;
+  --color-ink: #f5f5f5;
+  --color-mute: #9ca3af;
+}
+
+.theme-gold {
+  color-scheme: dark;
+  --color-white: #111820;          /* bg-white → surface; text-white is overridden below */
+
+  --color-slate-50: #0f151c;  --color-slate-100: #161e28; --color-slate-200: #222c37;
+  --color-slate-300: #2f3a46; --color-slate-400: #6b7480; --color-slate-500: #9ca3af;
+  --color-slate-600: #aeb4bd; --color-slate-700: #c9cdd3; --color-slate-800: #e2e4e7;
+  --color-slate-900: #f5f5f5; --color-slate-950: #ffffff;
+
+  --color-gov-50: #0f151c;  --color-gov-100: #161e28; --color-gov-200: #222c37;
+  --color-gov-300: #2f3a46; --color-gov-400: #6b7480; --color-gov-500: #9ca3af;
+  --color-gov-600: #aeb4bd; --color-gov-700: #c9cdd3; --color-gov-800: #e2e4e7;
+  --color-gov-900: #f5f5f5; --color-gov-950: #0b0f14;
+
+  --color-accent-50: #19160d;  --color-accent-100: #221d10; --color-accent-200: #3a3117;
+  --color-accent-300: #5c4b1d; --color-accent-400: #a98a2d; --color-accent-500: #c4a032;
+  --color-accent-600: #d4af37; --color-accent-700: #e3c45c; --color-accent-800: #eed47b;
+  --color-accent-900: #f7e08a; --color-accent-950: #fbf0c6;
+  --color-brand-50: #19160d; --color-brand-100: #221d10; --color-brand-600: #d4af37;
+  --color-brand-700: #e3c45c; --color-brand-900: #f5f5f5;
+
+  --color-success: #3fb68b; --color-success-hover: #2f9c74; --color-success-text: #86dcb9;
+  --color-success-bg: rgb(63 182 139 / 0.1); --color-success-border: rgb(63 182 139 / 0.3);
+  --color-critical: #e5534b; --color-critical-hover: #cc423b; --color-critical-text: #f39a94;
+  --color-critical-bg: rgb(229 83 75 / 0.1); --color-critical-border: rgb(229 83 75 / 0.32);
+  --color-warning: #e8913a; --color-warning-hover: #cf7c2a; --color-warning-text: #f4bb80;
+  --color-warning-bg: rgb(232 145 58 / 0.1); --color-warning-border: rgb(232 145 58 / 0.32);
+  --color-flag: #8f9cf3; --color-flag-hover: #7884e0; --color-flag-text: #bcc4fa;
+  --color-flag-bg: rgb(143 156 243 / 0.1); --color-flag-border: rgb(143 156 243 / 0.3);
+  --color-ok: #3fb68b; --color-ok-bg: rgb(63 182 139 / 0.1);
+  --color-err: #e5534b; --color-err-bg: rgb(229 83 75 / 0.1);
+  --color-warn: #e8913a; --color-warn-bg: rgb(232 145 58 / 0.1);
+  --color-amber-500: #e8913a;
+
+  --shadow-premium: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-premium-hover: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 12px 28px -12px rgb(0 0 0 / 0.7);
+  --shadow-premium-lg: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 20px 40px -16px rgb(0 0 0 / 0.75);
+
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+}
+/* --color-white is the surface colour here, so restore white text explicitly */
+.theme-gold .text-white { color: #f5f5f5; }
+.theme-gold ::selection { background: rgb(212 175 55 / 0.35); color: #fff; }
+.theme-gold :focus-visible { outline-color: var(--color-gold); }
+.theme-gold ::-webkit-scrollbar-track { background: #0f151c; }
+.theme-gold ::-webkit-scrollbar-thumb { background: #2f3a46; }
+.theme-gold input, .theme-gold select, .theme-gold textarea { color: var(--color-ink); }
+.theme-gold input::placeholder, .theme-gold textarea::placeholder { color: #6b7480; }
+
+/* Hairline gold rule used for section headers and the active nav item */
+.gold-rule { background: linear-gradient(90deg, rgb(212 175 55 / 0.55), rgb(212 175 55 / 0)); height: 1px; }
+
+/* Print: certificates and reports print on paper, not on charcoal */
+@media print {
+  .theme-gold { background: #fff; color: #111; }
+  .no-print { display: none !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Map arcs draw in once (disabled by the reduced-motion rule above) */
+@keyframes arcDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.map-arc { stroke-dashoffset: 0; animation: arcDraw 1.4s cubic-bezier(.4,0,.2,1) both; }

@@ -10,7 +10,7 @@ import Login from "./pages/Login";
 import RegistrarHome from "./pages/Registrar";
 import StudentHome from "./pages/Student";
 import VerifierHome from "./pages/Verifier";
-import { go } from "./ui";
+import { go, PageHeader } from "./ui";
 
 /** Tiny hash router: #/inst, #/inst/batch/12, #/aicte. */
 function useHash() {
@@ -41,7 +41,7 @@ const ROLE_LABEL: Record<Role, string> = {
   auditor: "National Auditor (Read-only)",
   verifier: "Credential Verifier",
   university_registrar: "University Registrar",
-  student: "Student Beneficiary",
+  student: "Student",
   guardian: "Guardian",
 };
 
@@ -80,7 +80,13 @@ export default function App() {
   if (cert && ["student", "guardian", "institution_admin", "university_registrar"].includes(r)) {
     page = <Certificate id={decodeURIComponent(cert[1])} />;
   } else if (hash === "/verify" && CAN_VERIFY.includes(r)) {
-    page = <VerifyTool allowForgedDemo={r === "aicte_officer" || r === "auditor"} />;
+    page = (
+      <div className="space-y-6">
+        <PageHeader eyebrow="Verification" title="Verify a credential"
+          meta={<span>Paste a credential or the certificate QR text. Checked online against the trust registry (MOCK) and status lists.</span>} />
+        <VerifyTool allowForgedDemo={r === "aicte_officer" || r === "auditor"} />
+      </div>
+    );
   } else if (r === "institution_admin" && batch) {
     page = <BatchDetail id={Number(batch[1])} />;
   } else if (r === "institution_admin") {
@@ -102,6 +108,7 @@ export default function App() {
       onLogout={logout}
       canVerify={CAN_VERIFY.includes(session.role)}
       currentHash={hash}
+      home={HOME[session.role]}
     >
       {page}
     </AppLayout>

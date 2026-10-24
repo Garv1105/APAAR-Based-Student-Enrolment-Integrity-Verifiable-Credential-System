@@ -18,11 +18,11 @@ type VerifyOut = S["VerifyOut"];
 type Result = VerifyOut["result"];
 
 const RESULT: Record<Result, { tone: Tone; label: string; help: string }> = {
-  VALID: { tone: "ok", label: "Cryptographically Valid", help: "Signed by an approved institution in the AICTE trust registry, intact, active, and not revoked." },
+  VALID: { tone: "ok", label: "Valid", help: "Signed by a registered issuer, unchanged, in date and not revoked." },
   REVOKED: { tone: "error", label: "Revoked by Issuer", help: "The issuing institution revoked this credential (e.g. candidate withdrawal, academic penalty, or consent revocation)." },
   SUSPENDED: { tone: "warning", label: "Temporarily Suspended", help: "Temporarily placed on administrative hold by the issuer pending review." },
-  UNTRUSTED_ISSUER: { tone: "error", label: "Untrusted / Unapproved Issuer", help: "The signing authority is not active in the national AICTE trust registry." },
-  TAMPERED: { tone: "error", label: "Cryptographic Tampering Detected", help: "EdDSA signature verification failed: payload contents were altered after issuance." },
+  UNTRUSTED_ISSUER: { tone: "error", label: "Untrusted issuer", help: "The issuer is not in the AICTE trust registry (MOCK), or wasn't approved when this was issued." },
+  TAMPERED: { tone: "error", label: "Tampered", help: "The signature doesn't match: the content was changed after signing." },
   EXPIRED: { tone: "warning", label: "Validity Period Expired", help: "The credential has passed its expiration timestamp (validUntil)." },
   MALFORMED: { tone: "error", label: "Malformed Credential Payload", help: "Payload does not conform to the W3C Verifiable Credential standard format." },
 };
@@ -30,7 +30,7 @@ const RESULT: Record<Result, { tone: Tone; label: string; help: string }> = {
 const CHECK_LABEL: Record<keyof VerifyOut["checks"], string> = {
   well_formed: "Conforms to W3C Verifiable Credential schema",
   issuer_trusted: "Issuer active in AICTE national trust registry",
-  signature_valid: "Cryptographic Ed25519 signature verified (eddsa-jcs-2022)",
+  signature_valid: "Signature valid (eddsa-jcs-2022)",
   within_validity: "Timestamp within valid period (validFrom - validUntil)",
   not_revoked: "StatusList2021 check: Not revoked",
   not_suspended: "StatusList2021 check: Not suspended",
@@ -161,9 +161,9 @@ export function VerifyResultView({ out }: { out: VerifyOut }) {
 export function CredentialCard({ c, actions }: { c: S["CredentialOut"]; actions?: React.ReactNode }) {
   const vc = c.credential as { issuer?: { name?: string }; validUntil?: string; credentialSubject?: Record<string, unknown> };
   const label = {
-    EnrolmentCredential: "APAAR Enrolment Credential",
-    DegreeCredential: "AICTE University Degree Credential",
-    VerificationCredential: "Verification Credential (Consent-Scoped)",
+    EnrolmentCredential: "Enrolment credential",
+    DegreeCredential: "Degree credential",
+    VerificationCredential: "Verification credential (consent-scoped)",
   }[c.type];
 
   return (
@@ -257,10 +257,10 @@ export function VerifyTool({ allowForgedDemo = false }: { allowForgedDemo?: bool
       title={
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4 text-accent-600" />
-          <span>W3C Verifiable Credential Validation Console</span>
+          <span>Verify a credential</span>
         </div>
       }
-      actions={<span className="text-xs text-slate-500 font-medium">Real-time status list check & trust registry audit</span>}
+      actions={<span className="text-xs text-slate-500 font-medium">Online check against the trust registry (MOCK) and status lists</span>}
     >
       <div className="space-y-3">
         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600" htmlFor="vc-input">

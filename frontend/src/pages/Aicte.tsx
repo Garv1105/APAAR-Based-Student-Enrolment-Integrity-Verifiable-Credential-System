@@ -1,280 +1,173 @@
 import { useState } from "react";
 import {
-  AlertOctagon,
-  Building2,
-  CheckCircle2,
-  Clock,
-  Copy,
-  FileCheck2,
-  Layers,
-  PieChart,
-  ShieldAlert,
-  ShieldCheck,
-  TrendingUp,
-  Users,
+  AlertOctagon, Building2, CalendarClock, CheckCircle2, FileText, Fingerprint, Landmark, Link2, Map as MapIcon, PieChart, ShieldAlert, Users,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ApiError, getJson, sendJson, type Role, type S } from "../api/client";
 import { CaseQueueCard } from "../cases";
+import GoldIndiaMap from "../components/GoldIndiaMap";
 import { InspectionQueueCard } from "../risk";
-import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, ReportsCard, Stat, Table, Td, Updated, usePoll } from "../ui";
+import {
+  Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, Meter, PageHeader, ReportsCard, Ring, Stat, Table, Td, Updated, usePoll,
+} from "../ui";
+
+const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 
 export default function AicteHome({ role }: { role: Role }) {
   const { data, error, updatedAt, refresh } = usePoll(() => getJson<S["AicteDashboard"]>("/v1/dashboard/aicte"));
-
   if (error && !data) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <Loading />;
   const t = data.totals;
-  const fill = t.approved_intake ? Math.round((100 * t.active_enrolments) / t.approved_intake) : 0;
+  const fill = pct(t.active_enrolments, t.approved_intake);
+  const excessStates = new Set(data.excess_ranking.map((r) => r.state));
+  const mapStates = data.by_state.map((s) => ({ state: s.state, filled: s.filled, approved: s.approved, excess: excessStates.has(s.state) }));
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Dashboard Header Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent-700">
-            <span>Regulator Workspace</span>
-            <span>·</span>
-            <span>National Dashboard</span>
-          </div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-gov-900 sm:text-3xl">National Monitoring & Allocation</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Real-time student seat audit across AICTE-approved institutions · Ground-truth enrolment data, not declared totals
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Updated at={updatedAt} />
-          <Button variant="secondary" onClick={() => refresh()}>
-            Refresh
-          </Button>
-        </div>
-      </div>
-
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={role === "auditor" ? "National monitoring · read-only" : "National monitoring"}
+        title="Seat integrity across institutions"
+        meta={<>
+          <span>{t.institutions} institutions · {data.by_state.length} states</span>
+          <span aria-hidden className="text-slate-300">·</span>
+          <span>Student-level data, not declared totals</span>
+          <span aria-hidden className="text-slate-300">·</span>
+          <span>Approval registry <Badge tone="warning">MOCK</Badge></span>
+        </>}
+        actions={<Updated at={updatedAt} />}
+      />
       {error && <ErrorNote>{error}</ErrorNote>}
 
-      {/* KPI Stat Cards with Icons & Semantic Colors */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        <Stat
-          label="Institutions"
-          value={t.institutions}
-          tone="neutral"
-          icon={<Building2 className="h-4 w-4" />}
-          hint="Approved entities"
-        />
-        <Stat
-          label="Approved Intake"
-          value={t.approved_intake}
-          tone="neutral"
-          icon={<Layers className="h-4 w-4" />}
-          hint="AICTE sanction limit"
-        />
-        <Stat
-          label="Active Enrolments"
-          value={t.active_enrolments}
-          tone="ok"
-          icon={<Users className="h-4 w-4" />}
-          hint={`${fill}% of approved intake`}
-        />
-        <Stat
-          label="Seats Over Cap"
-          value={t.excess_seats}
-          tone={t.excess_seats > 0 ? "error" : "ok"}
-          icon={<ShieldAlert className="h-4 w-4" />}
-          hint={t.excess_seats > 0 ? "Immediate review req." : "Zero violation"}
-        />
-        <Stat
-          label="Open Duplicates"
-          value={data.open_cases}
-          tone={data.open_cases > 0 ? "flag" : "ok"}
-          icon={<Copy className="h-4 w-4" />}
-          hint={data.open_cases > 0 ? "Cross-institution flags" : "Clean registry"}
-        />
-        <Stat
-          label="Post-Deadline Edits"
-          value={t.post_deadline_mutations}
-          tone={t.post_deadline_mutations > 0 ? "warning" : "ok"}
-          icon={<Clock className="h-4 w-4" />}
-          hint="Rule E501 audit flags"
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+        <Stat label="Institutions" value={t.institutions} icon={<Building2 />} hint={`${t.batches} upload batches`} />
+        <Stat label="Approved intake" value={t.approved_intake} icon={<Landmark />} hint="AICTE registry (MOCK)" />
+        <Stat label="Active enrolments" value={t.active_enrolments} icon={<Users />} hint={`${fill}% of approved intake`}
+          visual={<Ring value={t.approved_intake ? t.active_enrolments / t.approved_intake : 0} size={52} stroke={4} label={`${fill}% of intake filled`}>
+            <span className="text-[11px] font-semibold text-champagne">{fill}%</span></Ring>} />
+        <Stat label="Seats over cap" value={t.excess_seats} tone={t.excess_seats ? "error" : "ok"} icon={<AlertOctagon />} hint="Intake or category quota" />
+        <Stat label="Open duplicate cases" value={data.open_cases} tone={data.open_cases ? "flag" : "ok"} icon={<Fingerprint />} hint="Same APAAR, more than one seat" />
+        <Stat label="Post-deadline changes" value={t.post_deadline_mutations} tone={t.post_deadline_mutations ? "warning" : "ok"} icon={<CalendarClock />} hint="E501 · after the cut-off" />
       </div>
 
-      {/* State Fill & Cryptographic Ledger Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card
-          title={
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-accent-600" />
-              <span>Intake vs Filled by State</span>
-            </div>
-          }
-          className="lg:col-span-2"
-          actions={<span className="text-xs text-slate-500 font-medium">Approved quota vs active students</span>}
-        >
-          {data.by_state.length === 0 ? (
-            <Empty>No state-level data available.</Empty>
-          ) : (
-            <div
-              className="h-80 w-full"
-              role="img"
-              aria-label={`Approved intake vs filled by state: ${data.by_state.map((s) => `${s.state} ${s.filled} of ${s.approved}`).join("; ")}`}
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.by_state} margin={{ top: 12, right: 12, left: -16, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="state" tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} />
-                  <YAxis tick={{ fontSize: 12, fill: "#64748b" }} allowDecimals={false} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "#0f172a",
-                      color: "#ffffff",
-                      borderRadius: "0.75rem",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      fontSize: "12px",
-                      boxShadow: "0 10px 25px -3px rgba(0, 0, 0, 0.3)",
-                    }}
-                    formatter={(v, n) => [v, n === "approved" ? "Approved intake" : "Filled (active)"]}
-                  />
-                  <Legend
-                    verticalAlign="top"
-                    align="right"
-                    iconType="circle"
-                    formatter={(v) => (
-                      <span className="text-xs font-semibold text-slate-600">
-                        {v === "approved" ? "Approved Intake" : "Filled (Active)"}
-                      </span>
-                    )}
-                  />
-                  <Bar dataKey="approved" fill="#cbd5e1" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-                  <Bar dataKey="filled" fill="#4f46e5" radius={[6, 6, 0, 0]} isAnimationActive={false} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+      <div className="grid gap-4 xl:grid-cols-12">
+        <Card id="map" title="Reporting states" icon={<MapIcon />} className="xl:col-span-7"
+          actions={<span className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-gold" aria-hidden />Filled seats</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full border-2 border-critical" aria-hidden />Excess admissions</span>
+          </span>}>
+          {data.by_state.length === 0 ? <Empty>No institutions have reported yet.</Empty> : (
+            <div className="mx-auto max-w-[540px]"><GoldIndiaMap states={mapStates} /></div>
           )}
+          <p className="mt-2 text-[11px] text-slate-400">Nodes appear only for states with approved institutions in this prototype. Node size follows filled seats.</p>
         </Card>
 
-        {/* Cryptographic Ledger Card */}
+        <div className="space-y-4 xl:col-span-5">
+        <Card title="Fill by state" icon={<PieChart />} actions={<span>Filled / approved intake</span>}>
+          {data.by_state.length === 0 ? <Empty>No data.</Empty> : (
+            <ul className="space-y-4">
+              {[...data.by_state].sort((a, b) => b.filled - a.filled).map((s) => {
+                const p = s.approved ? s.filled / s.approved : 0;
+                return (
+                  <li key={s.state}>
+                    <div className="flex items-baseline justify-between gap-3 text-[13px]">
+                      <span className="flex items-center gap-2 text-ink">{s.state}{excessStates.has(s.state) && <Badge tone="error">excess</Badge>}</span>
+                      <span className="tabular-nums text-slate-700">{s.filled.toLocaleString()} <span className="text-slate-400">/ {s.approved.toLocaleString()}</span>
+                        <span className="ml-3 inline-block w-11 text-right text-mute">{s.fill_pct == null ? "—" : `${Math.round(s.fill_pct)}%`}</span></span>
+                    </div>
+                    <Meter value={p} color={p > 1 ? "bg-critical" : "bg-gradient-to-r from-accent-500 to-accent-700"} className="mt-2" />
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="mt-6 grid grid-cols-3 gap-3 border-t border-line pt-4 text-center">
+            <Mini label="Approved" value={t.approved_intake} />
+            <Mini label="Filled" value={t.active_enrolments} />
+            <Mini label="Fill rate" value={`${fill}%`} gold />
+          </div>
+        </Card>
+        <CategoryMix mix={data.category_mix} total={t.active_enrolments} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-12">
+        <Card id="excess" title="Excess admissions" icon={<ShieldAlert />} className="xl:col-span-8"
+          actions={<><Badge tone={data.excess_ranking.length ? "error" : "ok"} dot>{data.excess_ranking.length}</Badge><span>Risk indicator for review, not proof of misconduct</span></>}>
+          {data.excess_ranking.length === 0 ? <Empty>No programme is over its approved intake or category cap.</Empty> : (
+            <Table head={["Institution", "State", "Programme", "Category", "Filled", "Cap", "Excess"]}>
+              {data.excess_ranking.map((r) => (
+                <tr key={`${r.programme_id}-${r.category_code}`} className="transition-colors hover:bg-white/[0.02]">
+                  <Td className="font-medium text-ink">{r.institution}</Td>
+                  <Td>{r.state}</Td>
+                  <Td wrap className="min-w-48">{r.name}</Td>
+                  <Td className="text-mute">{CATEGORY_LABEL[r.category_code] ?? r.category_code}</Td>
+                  <Td className="tabular-nums">{r.filled}</Td>
+                  <Td className="tabular-nums">{r.cap}</Td>
+                  <Td className="tabular-nums font-semibold text-critical-text">+{r.excess}</Td>
+                </tr>
+              ))}
+            </Table>
+          )}
+        </Card>
         <Ledger ok={data.ledger_ok} canSign={role === "aicte_officer"} onChange={refresh} />
       </div>
 
-      {/* Excess Admissions Highlight Table */}
-      <Card
-        title={
-          <div className="flex items-center gap-2.5">
-            <AlertOctagon className="h-4 w-4 text-critical" />
-            <span>Excess Admission Violations</span>
-            <Badge tone={data.excess_ranking.length ? "error" : "ok"} dot>
-              {data.excess_ranking.length} {data.excess_ranking.length === 1 ? "programme" : "programmes"}
-            </Badge>
-          </div>
-        }
-        actions={<span className="text-xs text-slate-500 font-medium">Statutory sanction breach indicator (E202)</span>}
-      >
-        {data.excess_ranking.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-center text-sm font-medium text-success">
-            <CheckCircle2 className="mr-2 h-5 w-5 text-success" />
-            <span>All programmes are operating strictly within sanctioned capacity limits.</span>
-          </div>
-        ) : (
-          <Table head={["Institution", "State", "Programme", "Category Quota", "Filled", "Cap", "Excess Seats"]}>
-            {data.excess_ranking.map((r) => (
-              <tr key={`${r.programme_id}-${r.category_code}`} className="transition-colors hover:bg-critical-bg/30">
-                <Td className="font-semibold text-gov-900">{r.institution}</Td>
-                <Td>{r.state}</Td>
-                <Td className="font-medium text-slate-700">{r.name}</Td>
-                <Td className="text-slate-600 text-xs">
-                  <span className="rounded bg-slate-100 px-2 py-0.5 font-medium">{CATEGORY_LABEL[r.category_code] ?? r.category_code}</span>
-                </Td>
-                <Td className="tabular-nums font-semibold">{r.filled}</Td>
-                <Td className="tabular-nums text-slate-500">{r.cap}</Td>
-                <Td className="tabular-nums font-bold text-critical">
-                  <span className="inline-flex items-center gap-1 rounded-md bg-critical-bg px-2 py-0.5 text-xs text-critical-text border border-critical-border">
-                    +{r.excess} seats over cap
-                  </span>
-                </Td>
-              </tr>
-            ))}
-          </Table>
-        )}
-      </Card>
+      <div id="cases" className="scroll-mt-28"><CaseQueueCard canResolve={role === "aicte_officer"} /></div>
 
-      {/* Category Mix & Compliance Grid */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Category Mix Breakdown */}
-        <Card
-          title={
-            <div className="flex items-center gap-2">
-              <PieChart className="h-4 w-4 text-accent-600" />
-              <span>Category Mix (Active Enrolments)</span>
-            </div>
-          }
-        >
-          <dl className="space-y-3 text-sm">
-            {(
-              [
-                ["Regular seats", data.category_mix.regular, "bg-accent-600"],
-                ["NRI quota", data.category_mix.nri, "bg-sky-500"],
-                ["OCI candidates", data.category_mix.oci, "bg-indigo-500"],
-                ["Foreign National (FN)", data.category_mix.fn, "bg-purple-500"],
-                ["CIWG reserved", data.category_mix.ciwg, "bg-amber-500"],
-                ["No APAAR (with reason)", data.category_mix.no_apaar, "bg-slate-400"],
-              ] as const
-            ).map(([k, v, color]) => (
-              <div key={k} className="flex flex-col gap-1 border-b border-slate-100 pb-2.5 last:border-0 last:pb-0">
-                <div className="flex justify-between items-center text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className={`h-2 w-2 rounded-full ${color}`} />
-                    <dt className="font-medium text-slate-700">{k}</dt>
-                  </div>
-                  <dd className="font-bold tabular-nums text-gov-900">{v.toLocaleString()}</dd>
-                </div>
-              </div>
-            ))}
-          </dl>
-        </Card>
+      <div id="inspection" className="scroll-mt-28"><InspectionQueueCard /></div>
 
-        {/* Upload Compliance Table */}
-        <Card
-          title={
-            <div className="flex items-center gap-2">
-              <FileCheck2 className="h-4 w-4 text-accent-600" />
-              <span>Institutional Compliance Status</span>
-            </div>
-          }
-          className="lg:col-span-2"
-        >
-          <Table head={["Institution", "State", "Approval Status", "Submitted Batches", "Last Upload Activity", "Code reissues"]}>
+      <div>
+        <Card id="compliance" title="Upload compliance" icon={<FileText />}>
+          <Table head={["Institution", "State", "Approval", "Batches", "Last upload", "Code reissues"]}>
             {data.upload_compliance.map((c) => (
-              <tr key={c.id} className="transition-colors hover:bg-slate-50/70">
-                <Td className="font-semibold text-gov-900">{c.name}</Td>
+              <tr key={c.id} className="transition-colors hover:bg-white/[0.02]">
+                <Td className="font-medium text-ink">{c.name}</Td>
                 <Td>{c.state}</Td>
-                <Td>
-                  <Badge tone={c.status === "approved" ? "ok" : "error"} dot>
-                    {c.status.toUpperCase()}
-                  </Badge>
-                </Td>
-                <Td className="tabular-nums font-semibold">{c.batches}</Td>
-                <Td>
-                  {c.batches ? (
-                    <span className="text-xs text-slate-600">{fmtTime(c.last_upload)}</span>
-                  ) : (
-                    <Badge tone="warning">Not submitted</Badge>
-                  )}
-                </Td>
-                <Td className="tabular-nums">{c.activation_reissues ? <Badge tone="warning">{c.activation_reissues}</Badge> : 0}</Td>
+                <Td><Badge tone={c.status === "approved" ? "ok" : "error"} dot>{c.status}</Badge></Td>
+                <Td className="tabular-nums">{c.batches}</Td>
+                <Td>{c.batches ? <span className="text-mute">{fmtTime(c.last_upload)}</span> : <Badge tone="warning">not submitted</Badge>}</Td>
+                <Td className="tabular-nums">{c.activation_reissues ? <Badge tone="warning">{c.activation_reissues}</Badge> : <span className="text-slate-400">0</span>}</Td>
               </tr>
             ))}
           </Table>
+          <p className="mt-3 text-[11px] text-slate-400">Code reissues: passkey activation codes an institution re-issued. A spike can signal impersonation.</p>
         </Card>
       </div>
 
-      <CaseQueueCard canResolve={role === "aicte_officer"} />
-
-      {/* Risk-based Inspection Queue (D3) */}
-      <InspectionQueueCard />
-
-      {/* Statutory CSV Reports */}
-      <ReportsCard institutions={data.upload_compliance.map((c) => ({ id: c.id, name: c.name }))} />
+      <ReportsCard id="reports" institutions={data.upload_compliance.map((c) => ({ id: c.id, name: c.name }))} />
     </div>
+  );
+}
+
+function Mini({ label, value, gold = false }: { label: string; value: number | string; gold?: boolean }) {
+  return (
+    <div>
+      <div className={`text-lg font-semibold tabular-nums ${gold ? "text-gold" : "text-ink"}`}>{typeof value === "number" ? value.toLocaleString() : value}</div>
+      <div className="text-[11px] text-mute">{label}</div>
+    </div>
+  );
+}
+
+function CategoryMix({ mix, total }: { mix: S["CategoryMix"]; total: number }) {
+  const rows = [
+    ["Regular seats", mix.regular], ["NRI", mix.nri], ["OCI", mix.oci], ["Foreign national (FN)", mix.fn], ["CIWG", mix.ciwg],
+  ] as const;
+  return (
+    <Card title="Category mix" icon={<PieChart />} actions={<span>Active enrolments</span>}>
+      <ul className="space-y-3">
+        {rows.map(([k, v]) => (
+          <li key={k}>
+            <div className="flex justify-between text-[13px]"><span className="text-slate-700">{k}</span>
+              <span className="tabular-nums text-ink">{v.toLocaleString()} <span className="text-mute">({pct(v, total)}%)</span></span></div>
+            <Meter value={total ? v / total : 0} className="mt-1.5" />
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex items-center justify-between rounded-lg border border-warning-border bg-warning-bg px-3 py-2.5 text-[13px]">
+        <span className="text-warning-text">Without APAAR (with reason code)</span>
+        <span className="tabular-nums font-semibold text-warning-text">{mix.no_apaar.toLocaleString()}</span>
+      </div>
+      <p className="mt-2 text-[11px] text-slate-400">Counted toward intake like every other accepted row.</p>
+    </Card>
   );
 }
 
@@ -287,83 +180,29 @@ function Ledger({ ok, canSign, onChange }: { ok: boolean; canSign: boolean; onCh
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError(null);
-    try {
-      await fn();
-      onChange();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.text : "Cannot reach the API.");
-    } finally {
-      setBusy(false);
-    }
+    try { await fn(); onChange(); } catch (e) { setError(e instanceof ApiError ? e.text : "Cannot reach the API."); } finally { setBusy(false); }
   }
 
   return (
-    <Card
-      title={
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-accent-600" />
-          <span>Seat Ledger Cryptographic Chain</span>
-        </div>
-      }
-    >
-      <div className="flex items-start gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-4">
-        <div
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl font-bold text-lg ${
-            ok ? "bg-success-bg text-success border border-success-border" : "bg-critical-bg text-critical border border-critical-border"
-          }`}
-          aria-hidden="true"
-        >
-          {ok ? "✓" : "!"}
-        </div>
+    <Card title="Seat ledger" icon={<Link2 />} className="xl:col-span-4">
+      <div className={`flex items-center gap-3 rounded-lg border p-4 ${ok ? "border-success-border bg-success-bg" : "border-critical-border bg-critical-bg"}`}>
+        {ok ? <CheckCircle2 className="h-6 w-6 shrink-0 text-success-text" aria-hidden /> : <ShieldAlert className="h-6 w-6 shrink-0 text-critical-text" aria-hidden />}
         <div>
-          <p className="text-sm font-bold text-gov-900">{ok ? "Cryptographically Consistent" : "Tampering Detected"}</p>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Hash-chained enrolment mutations with AICTE digital checkpoint signatures
-          </p>
+          <p className={`text-sm font-semibold ${ok ? "text-success-text" : "text-critical-text"}`}>{ok ? "Consistent" : "Tampering detected"}</p>
+          <p className="text-xs text-mute">Hash-chained enrolment events · AICTE-signed checkpoints</p>
         </div>
       </div>
-
-      <div className="mt-5 flex flex-wrap gap-2.5">
-        <Button variant="secondary" disabled={busy} onClick={() => run(async () => setReport(await getJson("/v1/ledger/verify")))}>
-          {busy ? "Verifying…" : "Verify chain now"}
-        </Button>
-        {canSign && (
-          <Button variant="primary" disabled={busy} onClick={() => run(async () => setCp(await sendJson("/v1/ledger/checkpoints", "POST")))}>
-            {busy ? "Signing…" : "Sign checkpoint"}
-          </Button>
-        )}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button variant="secondary" disabled={busy} onClick={() => run(async () => setReport(await getJson("/v1/ledger/verify")))}>Verify now</Button>
+        {canSign && <Button disabled={busy} onClick={() => run(async () => setCp(await sendJson("/v1/ledger/checkpoints", "POST")))}>Sign checkpoint</Button>}
       </div>
-
-      <div aria-live="polite" className="mt-4 space-y-2.5 text-xs">
+      <div aria-live="polite" className="mt-3 space-y-2 text-xs">
         {error && <ErrorNote>{error}</ErrorNote>}
-        {cp && (
-          <div className="rounded-xl border border-success-border bg-success-bg p-3 text-success-text">
-            <p className="font-semibold">
-              Checkpoint #{cp.id} signed at sequence #{cp.upto_seq}
-            </p>
-            <p className="mt-0.5 font-mono text-[11px] opacity-90">Root hash: {cp.root_hash.slice(0, 24)}…</p>
-          </div>
-        )}
+        {cp && <p className="text-success-text">Checkpoint #{cp.id} signed at entry {cp.upto_seq} · root <code className="text-mute">{cp.root_hash.slice(0, 16)}…</code></p>}
         {report && (
-          <div
-            className={`rounded-xl border p-3.5 ${
-              report.ok
-                ? "border-success-border bg-success-bg text-success-text"
-                : "border-critical-border bg-critical-bg text-critical-text"
-            }`}
-          >
-            <p className="font-bold">
-              {report.ok
-                ? `Verified ${report.entries} entries: hash chain, checkpoint roots, and live database match.`
-                : `${report.problems.length} integrity violation(s) discovered!`}
-            </p>
-            {!report.ok && (
-              <ul className="mt-2 list-disc space-y-1 pl-4 text-xs font-mono">
-                {report.problems.map((p) => (
-                  <li key={p}>{p}</li>
-                ))}
-              </ul>
-            )}
+          <div className={`rounded-lg border p-3 ${report.ok ? "border-success-border bg-success-bg text-success-text" : "border-critical-border bg-critical-bg text-critical-text"}`}>
+            <p className="font-medium">{report.ok ? `Verified ${report.entries} entries: chain, checkpoint and live rows match.` : `${report.problems.length} problem(s) found`}</p>
+            {!report.ok && <ul className="mt-1 list-disc pl-4">{report.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
           </div>
         )}
       </div>

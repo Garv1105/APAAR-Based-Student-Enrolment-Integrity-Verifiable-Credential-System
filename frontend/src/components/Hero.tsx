@@ -29,7 +29,7 @@ export default function Hero({ onOpenStudentModal }: HeroProps) {
 
         {/* Subtitle Paragraph */}
         <p className="max-w-xl text-base sm:text-lg leading-relaxed text-[#9fb0d0] font-normal">
-          APAAR Seat Integrity ensures transparent, tamper-proof and auditable
+          APAAR Seat Integrity ensures transparent, tamper-evident and auditable
           student data across Indian higher education.
         </p>
 

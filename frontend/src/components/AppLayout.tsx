@@ -1,7 +1,11 @@
-import React from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { CheckCircle2, FileCheck, LogOut, ShieldCheck, User } from "lucide-react";
-import type { Session } from "../api/client";
+import React, { useState } from "react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import {
+  AlertOctagon, BadgeCheck, BarChart3, ClipboardList, FileSpreadsheet, FileText, Fingerprint, GraduationCap, History,
+  Inbox, LayoutDashboard, LogOut, Map, ScrollText, Send, ShieldCheck, UploadCloud, Users, Wallet,
+} from "lucide-react";
+import type { Role, Session } from "../api/client";
+import { go } from "../ui";
 
 interface AppLayoutProps {
   session?: Session | null;
@@ -9,192 +13,187 @@ interface AppLayoutProps {
   onLogout?: () => void;
   canVerify?: boolean;
   currentHash?: string;
+  home?: string;
   children: React.ReactNode;
 }
 
-const ROLE_BADGE_STYLE: Record<string, string> = {
-  aicte_officer: "bg-indigo-500/20 text-indigo-300 border-indigo-500/40",
-  auditor: "bg-amber-500/20 text-amber-300 border-amber-500/40",
-  institution_admin: "bg-sky-500/20 text-sky-300 border-sky-500/40",
-  verifier: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
-  university_registrar: "bg-purple-500/20 text-purple-300 border-purple-500/40",
-  student: "bg-teal-500/20 text-teal-300 border-teal-500/40",
-};
+type Item = { label: string; icon: React.ElementType; section?: string; route?: string };
+type Group = { title?: string; items: Item[] };
 
-export default function AppLayout({
-  session,
-  roleLabel,
-  onLogout,
-  canVerify = false,
-  currentHash = "/",
-  children,
-}: AppLayoutProps) {
+/** Navigation per role. `section` scrolls to an element id on the role's home page; `route` changes page. */
+function navFor(role: Role, canVerify: boolean): Group[] {
+  const verify: Group[] = canVerify ? [{ title: "Verification", items: [{ label: "Verify a credential", icon: BadgeCheck, route: "/verify" }] }] : [];
+  switch (role) {
+    case "institution_admin":
+      return [{ items: [
+        { label: "Overview", icon: LayoutDashboard, section: "top" },
+        { label: "Upload & validate", icon: UploadCloud, section: "upload" },
+        { label: "Seat utilisation", icon: BarChart3, section: "seats" },
+        { label: "Data quality", icon: ShieldCheck, section: "quality" },
+        { label: "Upload batches", icon: History, section: "batches" },
+        { label: "Students & credentials", icon: GraduationCap, section: "students" },
+      ] }, ...verify];
+    case "aicte_officer":
+    case "auditor":
+      return [{ items: [
+        { label: "National overview", icon: LayoutDashboard, section: "top" },
+        { label: "State map", icon: Map, section: "map" },
+        { label: "Excess admissions", icon: AlertOctagon, section: "excess" },
+        { label: "Duplicate cases", icon: Users, section: "cases" },
+        { label: "Inspection queue", icon: ClipboardList, section: "inspection" },
+        { label: "Upload compliance", icon: FileText, section: "compliance" },
+        { label: "Reports", icon: FileSpreadsheet, section: "reports" },
+      ] }, ...verify];
+    case "verifier":
+      return [{ items: [
+        { label: "Request consent", icon: Send, section: "top" },
+        { label: "My requests", icon: Inbox, section: "requests" },
+        { label: "Verify a credential", icon: BadgeCheck, section: "verify-tool" },
+      ] }];
+    case "university_registrar":
+      return [{ items: [{ label: "Award degrees", icon: GraduationCap, section: "top" }] }, ...verify];
+    default:
+      return [{ items: [
+        { label: "My record", icon: LayoutDashboard, section: "top" },
+        { label: "Consent requests", icon: Fingerprint, section: "consents" },
+        { label: "Credential wallet", icon: Wallet, section: "wallet" },
+        { label: "Who accessed my data", icon: ScrollText, section: "access-log" },
+      ] }];
+  }
+}
+
+function scrollToSection(id: string) {
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (id === "top") window.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+  else document.getElementById(id)?.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+}
+
+function Brand() {
+  return (
+    <span className="flex items-center gap-3">
+      <span aria-hidden className="grid h-10 w-10 place-items-center rounded-full border border-gold/60 font-display text-xl leading-none text-gold">A</span>
+      <span className="leading-tight">
+        <span className="block text-[15px] font-semibold tracking-tight text-ink">APAAR Integrity</span>
+        <span className="block text-[11px] text-mute">Seat integrity &amp; credentials</span>
+      </span>
+    </span>
+  );
+}
+
+const PAGE_LABEL = (hash: string, home: string) =>
+  hash === home ? "Dashboard" : hash.startsWith("/inst/batch") ? "Batch detail" : hash === "/verify" ? "Verify a credential"
+    : hash.startsWith("/certificate") ? "Certificate" : "Dashboard";
+
+export default function AppLayout({ session, roleLabel, onLogout, canVerify = false, currentHash = "/", home = "/", children }: AppLayoutProps) {
+  const [active, setActive] = useState("top");
+
   if (!session) {
-    return (
-      <div className="min-h-screen bg-[#050816] text-white antialiased selection:bg-blue-600 selection:text-white">
-        {children}
-      </div>
-    );
+    return <div className="min-h-screen bg-[#050816] text-white antialiased selection:bg-blue-600 selection:text-white">{children}</div>;
   }
 
-  const roleStyle = session?.role ? (ROLE_BADGE_STYLE[session.role] ?? "bg-slate-700 text-slate-200 border-slate-600") : "";
+  const groups = navFor(session.role, canVerify);
+  const onHome = currentHash === home;
+  const isActive = (it: Item) => (it.route ? currentHash === it.route : onHome && active === it.section);
+  const open = (it: Item) => {
+    if (it.route) { go(it.route); return; }
+    setActive(it.section!);
+    if (onHome) scrollToSection(it.section!);
+    else { go(home); setTimeout(() => scrollToSection(it.section!), 300); }
+  };
+
+  const navButton = (it: Item, compact = false) => {
+    const on = isActive(it);
+    const Icon = it.icon;
+    return (
+      <button key={it.label} type="button" onClick={() => open(it)} aria-current={on ? "page" : undefined}
+        className={`group relative flex items-center gap-3 rounded-lg text-sm transition-colors duration-200 ${compact ? "shrink-0 px-3 py-1.5" : "w-full px-3 py-2"} ${on ? "bg-gold/[0.08] text-champagne" : "text-mute hover:bg-white/[0.03] hover:text-ink"}`}>
+        {!compact && <span aria-hidden className={`absolute left-0 top-1/2 h-5 w-[2px] -translate-y-1/2 rounded-full bg-gold transition-opacity duration-200 ${on ? "opacity-100" : "opacity-0"}`} />}
+        <Icon className={`h-4 w-4 shrink-0 ${on ? "text-gold" : "text-slate-400 group-hover:text-slate-600"}`} aria-hidden />
+        <span className="whitespace-nowrap">{it.label}</span>
+      </button>
+    );
+  };
+
+  const initials = session.display_name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900 antialiased selection:bg-accent-600 selection:text-white">
-      {/* Official Gov of India Tricolor Micro Accent */}
-      <div className="h-1 w-full bg-gradient-to-r from-orange-500 via-white to-emerald-600" aria-hidden="true" />
-
-      {/* Official Bilingual National Portal Bar */}
-      <div className="border-b border-slate-200 bg-white px-4 py-1.5 text-xs text-slate-700">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
-          <div className="flex items-center gap-2.5">
-            <span className="font-semibold text-slate-900 tracking-tight">भारत सरकार</span>
-            <span className="text-slate-300">|</span>
-            <span className="font-medium text-slate-600">Government of India</span>
-            <span className="hidden text-slate-300 md:inline">|</span>
-            <span className="hidden font-medium text-slate-600 md:inline">शिक्षा मंत्रालय · Ministry of Education</span>
-          </div>
-          <div className="flex items-center gap-2 text-[11px] font-semibold text-accent-700">
-            <span className="rounded bg-accent-50 px-2 py-0.5 border border-accent-200/60">
-              SIH26263 Prototype
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Synthetic Prototype Notice Banner */}
-      <div className="border-b border-amber-200/80 bg-amber-50/90 px-4 py-1.5 text-xs text-amber-900" role="note">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-2 sm:px-4">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-md bg-amber-200/80 px-1.5 py-0.2 text-[10px] font-bold uppercase tracking-wider text-amber-950">
-              Sandbox
-            </span>
-            <span className="font-medium text-amber-900/90">
-              Synthetic Demonstration Data · APAAR registry, AICTE sanction limit registry, OTP, and logins are MOCK simulations.
-            </span>
-          </div>
-          <span className="hidden font-mono text-[11px] text-amber-800/80 sm:inline-block">
-            DPDP Act 2023 Principles
-          </span>
-        </div>
-      </div>
-
-      {/* Persistent Dark Top Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-gov-950/95 text-white shadow-premium backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          {/* Brand & Portal Identity */}
-          <a
-            href={session ? "#/" : "#/"}
-            className="group flex items-center gap-3 transition-opacity hover:opacity-95"
-            title="Return to Dashboard Home"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-accent-600 to-indigo-800 text-white shadow-md ring-1 ring-white/20 transition-transform group-hover:scale-105">
-              <ShieldCheck className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold tracking-tight text-white sm:text-lg">
-                  APAAR SEAT INTEGRITY
-                </span>
-                <span className="rounded bg-accent-500/20 px-1.5 py-0.2 text-[10px] font-bold text-accent-300 ring-1 ring-accent-400/30">
-                  AICTE
-                </span>
+    <MotionConfig reducedMotion="user">
+      <div className="theme-gold min-h-screen antialiased lg:grid lg:grid-cols-[256px_minmax(0,1fr)]">
+        {/* Sidebar (desktop) */}
+        <aside className="no-print sticky top-0 hidden h-screen flex-col border-r border-line bg-[#0d1218] lg:flex">
+          <div className="px-5 pb-6 pt-6"><a href={`#${home}`} onClick={() => setActive("top")} aria-label="Dashboard home"><Brand /></a></div>
+          <nav aria-label="Main" className="flex-1 space-y-6 overflow-y-auto px-3">
+            {groups.map((g, i) => (
+              <div key={i}>
+                {g.title && <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{g.title}</p>}
+                <div className="space-y-0.5">{g.items.map((it) => navButton(it))}</div>
               </div>
-              <span className="block text-[11px] font-medium text-slate-400">
-                National Student Enrolment & Verifiable Credential Platform
-              </span>
-            </div>
-          </a>
-
-          {/* User Session & Role Controls */}
-          {session ? (
+            ))}
+          </nav>
+          <div className="space-y-3 border-t border-line p-4">
+            <p className="rounded-lg border border-warning-border bg-warning-bg px-3 py-2 text-[11px] leading-snug text-warning-text" role="note">
+              <span className="font-semibold">Prototype.</span> Synthetic data. APAAR registry, AICTE approval registry, OTP and logins are MOCK.
+            </p>
             <div className="flex items-center gap-3">
-              {/* Quick Verification Link */}
-              {canVerify && (
-                <a
-                  href="#/verify"
-                  className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
-                    currentHash === "/verify"
-                      ? "bg-accent-600 text-white shadow-xs"
-                      : "bg-white/10 text-slate-200 hover:bg-white/15 hover:text-white"
-                  }`}
-                >
-                  <FileCheck className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Verify Credential</span>
-                </a>
-              )}
-
-              {/* User Identity Chip */}
-              <div className="flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-1.5 shadow-inner">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent-600/30 text-accent-300">
-                  <User className="h-4 w-4" />
-                </div>
-                <div className="text-left leading-tight">
-                  <div className="text-xs font-bold text-white">{session.display_name}</div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`inline-block rounded px-1.5 py-0.2 text-[10px] font-semibold border ${roleStyle}`}>
-                      {roleLabel ?? session.role}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Explicit Sign Out Button */}
+              <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-raised text-xs font-semibold text-champagne ring-1 ring-gold/30">{initials}</span>
+              <span className="min-w-0 flex-1 leading-tight">
+                <span className="block truncate text-sm font-medium text-ink">{session.display_name}</span>
+                <span className="block truncate text-[11px] text-mute">{roleLabel}</span>
+              </span>
               {onLogout && (
-                <button
-                  onClick={onLogout}
-                  className="flex items-center gap-1.5 rounded-xl border border-slate-700/80 bg-slate-800/80 px-3 py-1.5 text-xs font-medium text-slate-300 transition-all hover:border-critical/60 hover:bg-critical/20 hover:text-critical-text focus:outline-none focus:ring-2 focus:ring-critical cursor-pointer"
-                  title="Sign out of current session"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Sign out</span>
+                <button type="button" onClick={onLogout} title="Sign out" aria-label="Sign out"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-mute transition-colors hover:bg-white/[0.04] hover:text-critical-text">
+                  <LogOut className="h-4 w-4" aria-hidden />
                 </button>
               )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <span className="rounded bg-white/10 px-2 py-0.5 text-[11px] font-medium text-slate-300">
-                National Academic Depository & W3C VC Node
+          </div>
+        </aside>
+
+        <div className="flex min-w-0 flex-col">
+          {/* Top bar: mobile shows brand + nav strip + MOCK note; desktop shows a thin context bar */}
+          <header className="no-print sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3 px-4 py-3 lg:hidden">
+              <a href={`#${home}`} aria-label="Dashboard home"><Brand /></a>
+              {onLogout && (
+                <button type="button" onClick={onLogout} className="flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs text-mute hover:text-ink">
+                  <LogOut className="h-3.5 w-3.5" aria-hidden /> Sign out
+                </button>
+              )}
+            </div>
+            <nav aria-label="Sections" className="flex gap-1 overflow-x-auto px-3 pb-2 lg:hidden">
+              {groups.flatMap((g) => g.items).map((it) => navButton(it, true))}
+            </nav>
+            <p className="border-t border-line px-4 py-1.5 text-[11px] text-warning-text lg:hidden" role="note">Prototype · synthetic data · registries, OTP and logins are MOCK</p>
+            <div className="hidden items-center justify-between gap-4 px-8 py-3 lg:flex">
+              <div className="flex items-center gap-2 text-xs text-mute">
+                <span>{roleLabel}</span>
+                <span className="text-slate-300" aria-hidden>/</span>
+                <span className="text-slate-700">{PAGE_LABEL(currentHash, home)}</span>
+              </div>
+              <span className="text-xs text-mute">
+                {new Date().toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
               </span>
             </div>
-          )}
-        </div>
-      </header>
+          </header>
 
-      {/* Main Content Area with Framer Motion Page Transition */}
-      <div className="flex-1">
-        <AnimatePresence mode="wait">
-          <motion.main
-            key={currentHash || "default"}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-            className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6"
-          >
-            {children}
-          </motion.main>
-        </AnimatePresence>
+          <AnimatePresence mode="wait">
+            <motion.main key={currentHash || "default"}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+              {children}
+            </motion.main>
+          </AnimatePresence>
+
+          <footer className="no-print border-t border-line px-4 py-5 text-[11px] text-slate-400 sm:px-8">
+            <div className="flex flex-col justify-between gap-2 sm:flex-row">
+              <span>Designed in line with the principles of the DPDP Act 2023 · not a compliance claim</span>
+              <span>SIH26263 prototype · W3C Verifiable Credentials (eddsa-jcs-2022) · hash-chained seat ledger</span>
+            </div>
+          </footer>
+        </div>
       </div>
-
-      {/* Enterprise GovTech Footer */}
-      <footer className="border-t border-slate-200 bg-white py-6 text-xs text-slate-500">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2 text-slate-600">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            <span className="font-semibold text-slate-700">
-              Architected in accordance with the Digital Personal Data Protection (DPDP) Act 2023
-            </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-slate-500 font-medium">
-            <span>W3C Verifiable Credentials (eddsa-jcs-2022)</span>
-            <span className="hidden sm:inline">·</span>
-            <span>Cryptographic Merkle/Hash Ledger</span>
-            <span className="hidden sm:inline">·</span>
-            <span>SIH26263 Prototype</span>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </MotionConfig>
   );
 }

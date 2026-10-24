@@ -9,24 +9,14 @@ import {
 } from "lucide-react";
 import { ApiError, getJson, sendJson, type S } from "../api/client";
 import { CertificateButton, CredentialCard } from "../credentials";
-import { Badge, Button, Card, Empty, ErrorNote } from "../ui";
+import { Badge, Button, Card, Empty, ErrorNote, PageHeader } from "../ui";
 
 /** University registrar: find a student at an affiliated institution and award the degree credential (Req 10). */
 export default function RegistrarHome() {
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="border-b border-slate-200/80 pb-5">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent-700">
-          <span>University Registrar Workspace</span>
-          <span>·</span>
-          <span>Statutory Degree Awarding Authority</span>
-        </div>
-        <h1 className="mt-1 text-2xl font-bold tracking-tight text-gov-900 sm:text-3xl">Award Verified Academic Degrees</h1>
-        <p className="mt-1 text-sm text-slate-500">
-          Search students across affiliated institutions · Verify completed enrolment milestones · Issue W3C Degree Credentials
-        </p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader eyebrow="University registrar" title="Award degrees"
+        meta={<span>Only students of affiliated institutions are visible. A degree needs a completed enrolment.</span>} />
 
       <EnrolmentLookup mode="registrar" />
     </div>

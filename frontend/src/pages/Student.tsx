@@ -42,13 +42,13 @@ export default function StudentHome() {
       {/* Student Profile & Digital APAAR ID Card */}
       <div className="grid gap-6 md:grid-cols-3">
         {/* APAAR identity summary */}
-        <div className="relative overflow-hidden rounded-3xl border border-slate-700 bg-gradient-to-br from-gov-950 via-slate-900 to-indigo-950 p-6 text-white shadow-premium-lg md:col-span-1 flex flex-col justify-between">
+        <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-[#1a1710] via-raised to-surface p-6 text-white ring-1 ring-gold/25 shadow-premium-lg md:col-span-1 flex flex-col justify-between">
           <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-accent-600/20 blur-2xl" />
 
           <div>
             <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="h-5 w-5 text-amber-400" />
+                <ShieldCheck className="h-5 w-5 text-gold" />
                 <span className="text-[11px] font-extrabold tracking-widest text-white uppercase">
                   APAAR ID
                 </span>
@@ -64,12 +64,12 @@ export default function StudentHome() {
                 {me.data.apaar_masked ?? me.data.provisional_id}
               </div>
               {me.data.provisional_id && !me.data.apaar_masked && (
-                <span className="text-[10px] text-amber-300 font-medium">Provisional ID: APAAR not linked</span>
+                <span className="text-[10px] text-warning-text font-medium">Provisional ID: APAAR not linked</span>
               )}
             </div>
           </div>
 
-          <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-300 font-medium">
+          <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-mute font-medium">
             <span>APAAR registry (MOCK)</span>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function StudentHome() {
         {/* Overview Header */}
         <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-white p-6 shadow-premium md:col-span-2">
           <div>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gov-900 sm:text-3xl">
+            <h1 className="mt-1 font-display text-[36px] font-normal leading-tight text-ink sm:text-[42px]">
               {me.data.viewer === "guardian" ? "Guardian view: student's academic record" : "My academic record"}
             </h1>
             <p className="mt-1 text-xs text-slate-500 font-medium leading-relaxed">
@@ -132,7 +132,7 @@ export default function StudentHome() {
       </Card>
 
       {/* Consent Requests Inbox */}
-      <Card
+      <Card id="consents"
         title={
           <div className="flex items-center gap-2.5">
             <Fingerprint className="h-4 w-4 text-accent-600" />
@@ -190,11 +190,11 @@ export default function StudentHome() {
       </Card>
 
       {/* Credential Wallet */}
-      <Card
+      <Card id="wallet"
         title={
           <div className="flex items-center gap-2">
             <Award className="h-4 w-4 text-accent-600" />
-            <span>My Digital Credentials Wallet</span>
+            <span>Credential wallet</span>
           </div>
         }
         actions={<span className="text-xs text-slate-500 font-medium">Signed W3C Verifiable Credentials · verified online</span>}
@@ -224,14 +224,14 @@ export default function StudentHome() {
       </Card>
 
       {/* Access Audit Log */}
-      <Card
+      <Card id="access-log"
         title={
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-accent-600" />
             <span>Who accessed my data</span>
           </div>
         }
-        actions={<span className="text-xs text-slate-500 font-medium">Immutable record of every read, verification, and export</span>}
+        actions={<span className="text-xs text-slate-500 font-medium">Every recorded read, export, verification and consent</span>}
       >
         {!log.data ? (
           <Loading />
@@ -303,8 +303,8 @@ function PendingConsent({ c, onDone }: { c: S["ConsentOut"]; onDone: () => void 
       </div>
 
       {demo && (
-        <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm">
-          <summary className="cursor-pointer text-xs font-medium text-amber-900">Demo fallback: approve with MOCK OTP (DEMO_MODE)</summary>
+        <details className="mt-3 rounded-lg border border-warning-border bg-warning-bg p-2 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-warning-text">Demo fallback: approve with MOCK OTP (DEMO_MODE)</summary>
           <div className="mt-2 flex flex-wrap items-end gap-3">
             <label className="text-sm"><span className="block text-xs text-slate-600">OTP (MOCK: 123456)</span>
               <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" /></label>
