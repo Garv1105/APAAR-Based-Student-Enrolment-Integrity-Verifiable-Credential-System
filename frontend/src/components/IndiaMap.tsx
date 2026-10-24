@@ -123,7 +123,7 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
         <g clipPath={`url(#clip-${u})`}>
           {STATE_PATHS.map((s) => {
             const v = values?.[s.name];
-            const shade = values ? (v === undefined ? 0 : 0.1 + 0.55 * Math.sqrt((v ?? 0) / max)) : 0;
+            const shade = values ? (v === undefined ? 0 : 0.06 + 0.36 * Math.sqrt((v ?? 0) / max)) : 0;
             return (
               <path key={s.name} d={s.d} fill={values ? p.state : "none"} fillOpacity={shade} stroke={p.state} strokeOpacity={values ? 0.35 : 0.2}
                 strokeWidth="0.6" strokeLinejoin="round" />

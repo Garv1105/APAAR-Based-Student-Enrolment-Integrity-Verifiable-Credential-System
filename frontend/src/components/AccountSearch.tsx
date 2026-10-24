@@ -6,10 +6,10 @@ export type Account = S["PublicAccount"];
 
 const STYLE = {
   public: {
-    input: "w-full rounded-2xl border border-white/[0.09] bg-black/25 py-3 pl-11 pr-10 text-[14.5px] text-white placeholder:text-[#5b6788] focus:border-[#7aa2ff]/60 focus:outline-none focus:ring-2 focus:ring-[#7aa2ff]/20",
-    icon: "text-[#6f7fa3]",
-    list: "border-white/[0.09] bg-[#0a1024]/95 shadow-[0_30px_60px_-24px_rgba(0,0,0,0.9)] backdrop-blur-2xl",
-    item: "text-white", active: "bg-white/[0.08]", meta: "text-[#8b9bbd]", empty: "text-[#8b9bbd]",
+    input: "w-full rounded-2xl border border-white/[0.09] bg-black/25 py-3 pl-11 pr-10 text-[14.5px] text-white placeholder:text-[#6b7280] focus:border-[#d4af37]/60 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/20",
+    icon: "text-[#8a909a]",
+    list: "border-white/[0.09] bg-[#11161d]/95 shadow-[0_30px_60px_-24px_rgba(0,0,0,0.9)] backdrop-blur-2xl",
+    item: "text-white", active: "bg-white/[0.08]", meta: "text-[#a3a9b3]", empty: "text-[#a3a9b3]",
   },
   app: {
     input: "w-full rounded-lg border border-line bg-surface py-2.5 pl-10 pr-9 text-[14px] text-ink placeholder:text-slate-400 focus:border-gold/60 focus:outline-none focus:ring-2 focus:ring-gold/20",
@@ -64,7 +64,7 @@ export default function AccountSearch({ kind, state, selected, onSelect, variant
 
   return (
     <div className="relative">
-      <label htmlFor={`${id}-input`} className={variant === "public" ? "mb-1.5 block px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b9bbd]" : "mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500"}>
+      <label htmlFor={`${id}-input`} className={variant === "public" ? "mb-1.5 block px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a3a9b3]" : "mb-1.5 block text-[12px] font-semibold uppercase tracking-[0.16em] text-slate-500"}>
         {label}
       </label>
       <div className="relative">

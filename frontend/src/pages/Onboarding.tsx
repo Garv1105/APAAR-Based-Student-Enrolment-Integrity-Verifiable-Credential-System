@@ -4,20 +4,20 @@ import { ApiError, sendJson, type S } from "../api/client";
 import AccountSearch, { type Account } from "../components/AccountSearch";
 import PasswordField from "../components/PasswordField";
 
-const input = "w-full rounded-2xl border border-white/[0.09] bg-black/25 px-4 py-3 text-[14.5px] text-white placeholder:text-[#5b6788] focus:border-[#7aa2ff]/60 focus:outline-none focus:ring-2 focus:ring-[#7aa2ff]/20";
-const lbl = "mb-1.5 block px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b9bbd]";
-const primary = "flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#3b6bff] via-[#4f63ff] to-[#6f5cff] py-3.5 font-manrope text-[15.5px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] transition-opacity hover:opacity-95 disabled:opacity-60";
+const input = "w-full rounded-2xl border border-white/[0.09] bg-black/25 px-4 py-3 text-[14.5px] text-white placeholder:text-[#6b7280] focus:border-[#d4af37]/60 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/20";
+const lbl = "mb-1.5 block px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a3a9b3]";
+const primary = "flex w-full items-center justify-center gap-2 rounded-2xl btn-gold py-3.5 font-manrope text-[15.5px] font-bold text-white transition-opacity hover:opacity-95 disabled:opacity-60";
 
 function Page({ eyebrow, title, intro, aside, children }: { eyebrow: string; title: string; intro: ReactNode; aside: ReactNode; children: ReactNode }) {
   return (
     <div className="mx-auto grid max-w-[1120px] grid-cols-1 items-start gap-10 py-6 lg:grid-cols-[minmax(0,1fr)_520px] lg:py-12">
       <section className="rise lg:pt-6">
-        <p className="text-[12px] font-semibold tracking-[0.14em] text-[#8ea8ff]">{eyebrow}</p>
+        <p className="text-[12px] font-semibold tracking-[0.14em] text-[#e3c05a]">{eyebrow}</p>
         <h1 className="mt-3 font-manrope text-[42px] font-extrabold leading-[1.04] tracking-[-0.035em] text-white">{title}</h1>
-        <div className="mt-4 max-w-[460px] text-[15.5px] leading-[1.7] text-[#a9b6d3]">{intro}</div>
-        <div className="mt-8 max-w-[460px] border-t border-white/[0.08] pt-6 text-[14px] leading-relaxed text-[#a9b6d3]">{aside}</div>
+        <div className="mt-4 max-w-[460px] text-[15.5px] leading-[1.7] text-[#b8bec8]">{intro}</div>
+        <div className="mt-8 max-w-[460px] border-t border-white/[0.08] pt-6 text-[14px] leading-relaxed text-[#b8bec8]">{aside}</div>
       </section>
-      <div className="rise relative w-full rounded-[28px] border border-white/[0.09] bg-[#0a1024]/60 p-6 shadow-[0_50px_100px_-40px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-7"
+      <div className="rise relative w-full rounded-[28px] border border-white/[0.09] bg-[#11161d]/60 p-6 shadow-[0_50px_100px_-40px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-7"
         style={{ ["--d" as string]: "120ms" }}>
         {children}
       </div>
@@ -35,7 +35,7 @@ function Done({ title, children }: { title: string; children: ReactNode }) {
     <div role="status" className="text-center">
       <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-300" aria-hidden />
       <h2 className="mt-4 font-manrope text-[22px] font-extrabold text-white">{title}</h2>
-      <div className="mt-2 text-[14px] leading-relaxed text-[#a9b6d3]">{children}</div>
+      <div className="mt-2 text-[14px] leading-relaxed text-[#b8bec8]">{children}</div>
     </div>
   );
 }
@@ -80,7 +80,7 @@ export function Activate() {
       intro="AICTE sends every approved institution, university and verifier a one-time activation code. Use it once to set your password; it expires after 7 days."
       aside={<ul className="space-y-3">
         <li>Lost the code or forgot your password? AICTE can issue a new code, which cancels the old one.</li>
-        <li>Students and guardians don't need this: they <a href="#/signin?as=student" className="font-semibold text-[#c3d2ff] underline decoration-white/20 underline-offset-2 hover:text-white">register a passkey</a> with the code from their institution.</li>
+        <li>Students and guardians don't need this: they <a href="#/signin?as=student" className="font-semibold text-[#f1d488] underline decoration-white/20 underline-offset-2 hover:text-white">register a passkey</a> with the code from their institution.</li>
       </ul>}>
       {done ? (
         <Done title="Account activated">
@@ -92,7 +92,7 @@ export function Activate() {
           <div role="radiogroup" aria-label="Account type" className="grid grid-cols-3 gap-1 rounded-2xl border border-white/[0.07] bg-black/25 p-1">
             {KINDS.map(([k, label]) => (
               <button key={k} type="button" role="radio" aria-checked={kind === k} onClick={() => { setKind(k); setAccount(null); setError(null); }}
-                className={`rounded-xl py-2.5 font-manrope text-[13px] font-semibold transition-colors ${kind === k ? "bg-white/[0.1] text-white" : "text-[#8b9bbd] hover:text-white"}`}>
+                className={`rounded-xl py-2.5 font-manrope text-[13px] font-semibold transition-colors ${kind === k ? "bg-white/[0.1] text-white" : "text-[#a3a9b3] hover:text-white"}`}>
                 {label}
               </button>
             ))}
@@ -155,8 +155,8 @@ export function RequestAccess() {
       {ref !== null ? (
         <Done title="Request received">
           <p>Reference <span className="font-mono text-white">#{ref}</span>. AICTE will review it and contact you at the email you gave.</p>
-          <p className="mt-3 text-[12px] text-[#7d8bab]">Prototype: no email is sent (MOCK). The reviewing officer sees the activation code on screen.</p>
-          <a href="#/" className="mt-6 inline-block text-[14px] font-semibold text-[#c3d2ff] underline decoration-white/20 underline-offset-2 hover:text-white">Back to home</a>
+          <p className="mt-3 text-[12px] text-[#8f959f]">Prototype: no email is sent (MOCK). The reviewing officer sees the activation code on screen.</p>
+          <a href="#/" className="mt-6 inline-block text-[14px] font-semibold text-[#f1d488] underline decoration-white/20 underline-offset-2 hover:text-white">Back to home</a>
         </Done>
       ) : (
         <form onSubmit={submit} className="space-y-4">
@@ -171,7 +171,7 @@ export function RequestAccess() {
           <div><label htmlFor="ra-purpose" className={lbl}>Why do you need to verify credentials?</label>
             <textarea id="ra-purpose" value={f.purpose} onChange={set("purpose")} required minLength={10} maxLength={500} rows={4}
               placeholder="e.g. We verify degrees of candidates before issuing offer letters." className={`${input} resize-y`} /></div>
-          <p className="text-[12px] text-[#7d8bab]">Your name and email are stored encrypted and seen only by AICTE reviewers.</p>
+          <p className="text-[12px] text-[#8f959f]">Your name and email are stored encrypted and seen only by AICTE reviewers.</p>
           {error && <Alert>{error}</Alert>}
           <button type="submit" disabled={busy} className={primary}>{busy ? "Sending…" : "Send request"}</button>
         </form>

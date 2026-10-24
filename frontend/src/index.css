@@ -344,3 +344,24 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
 .orbit { transform-box: fill-box; transform-origin: center; animation: orbit 24s linear infinite; }
 @keyframes scan { 0% { transform: translateY(-110%); } 100% { transform: translateY(110%); } }
 .scan { animation: scan 9s cubic-bezier(.45,0,.55,1) infinite; }
+
+/* ===================================================================
+   Public site (landing, sign-in, onboarding): charcoal + gold
+   =================================================================== */
+.btn-gold {
+  background: linear-gradient(180deg, #f6dc94 0%, #e3c05a 48%, #c99a3c 100%);
+  color: #14110a;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5), 0 14px 32px -14px rgb(212 175 55 / 0.75);
+  transition: filter 200ms ease, transform 300ms ease;
+}
+.btn-gold:hover { filter: brightness(1.07); }
+.btn-gold:disabled { filter: saturate(0.4) brightness(0.8); }
+.gold-text {
+  background: linear-gradient(180deg, #fbe7a1 0%, #e3c05a 45%, #b8892a 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+/* planet-edge horizon behind the hero (static) */
+.horizon {
+  border-radius: 9999px;
+  box-shadow: 0 -2px 0 0 rgb(240 205 110 / 0.35), 0 -40px 120px -10px rgb(212 175 55 / 0.28), inset 0 30px 80px -40px rgb(212 175 55 / 0.25);
+}

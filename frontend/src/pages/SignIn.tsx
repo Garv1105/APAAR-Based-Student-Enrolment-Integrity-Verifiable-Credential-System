@@ -23,8 +23,8 @@ const INTRO: Record<RoleKey, string> = {
   student: "Students and guardians sign in with a passkey: fingerprint, face or device PIN.",
 };
 
-const input = "w-full rounded-2xl border border-white/[0.09] bg-black/25 px-4 py-3 text-[14.5px] text-white placeholder:text-[#5b6788] focus:border-[#7aa2ff]/60 focus:outline-none focus:ring-2 focus:ring-[#7aa2ff]/20";
-const lbl = "mb-1.5 block px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8b9bbd]";
+const input = "w-full rounded-2xl border border-white/[0.09] bg-black/25 px-4 py-3 text-[14.5px] text-white placeholder:text-[#6b7280] focus:border-[#d4af37]/60 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/20";
+const lbl = "mb-1.5 block px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#a3a9b3]";
 
 export default function SignIn({ onLogin, demo, initialRole }: { onLogin: (s: Session) => void; demo: boolean; initialRole: string | null }) {
   const [role, setRole] = useState<RoleKey>(() => (ROLES.some((r) => r.key === initialRole) ? initialRole as RoleKey : "institution"));
@@ -62,23 +62,23 @@ export default function SignIn({ onLogin, demo, initialRole }: { onLogin: (s: Se
   return (
     <div className="mx-auto grid max-w-[1120px] grid-cols-1 items-start gap-10 py-6 lg:grid-cols-[minmax(0,1fr)_500px] lg:py-12">
       <section className="rise lg:pt-6">
-        <p className="text-[12px] font-semibold tracking-[0.14em] text-[#8ea8ff]">SIGN IN</p>
+        <p className="text-[12px] font-semibold tracking-[0.14em] text-[#e3c05a]">SIGN IN</p>
         <h1 className="mt-3 font-manrope text-[44px] font-extrabold leading-[1.02] tracking-[-0.035em] text-white">Welcome back.</h1>
-        <p className="mt-4 max-w-[440px] text-[15.5px] leading-[1.7] text-[#a9b6d3]">{INTRO[role]}</p>
-        <ul className="mt-8 max-w-[440px] space-y-3 border-t border-white/[0.08] pt-6 text-[14px] text-[#a9b6d3]">
-          <li>New institution, university or verifier account? <a href="#/activate" className="font-semibold text-[#c3d2ff] underline decoration-white/20 underline-offset-2 hover:text-white">Activate it with your AICTE code</a>.</li>
-          <li>Organisation that needs to verify credentials? <a href="#/request-access" className="font-semibold text-[#c3d2ff] underline decoration-white/20 underline-offset-2 hover:text-white">Request verifier access</a>.</li>
+        <p className="mt-4 max-w-[440px] text-[15.5px] leading-[1.7] text-[#b8bec8]">{INTRO[role]}</p>
+        <ul className="mt-8 max-w-[440px] space-y-3 border-t border-white/[0.08] pt-6 text-[14px] text-[#b8bec8]">
+          <li>New institution, university or verifier account? <a href="#/activate" className="font-semibold text-[#f1d488] underline decoration-white/20 underline-offset-2 hover:text-white">Activate it with your AICTE code</a>.</li>
+          <li>Organisation that needs to verify credentials? <a href="#/request-access" className="font-semibold text-[#f1d488] underline decoration-white/20 underline-offset-2 hover:text-white">Request verifier access</a>.</li>
           <li>Forgot your password? AICTE can issue a new activation code for your account.</li>
         </ul>
       </section>
 
-      <div className="rise relative w-full overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0a1024]/60 p-6 shadow-[0_50px_100px_-40px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-7"
+      <div className="rise relative w-full overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#11161d]/60 p-6 shadow-[0_50px_100px_-40px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl sm:p-7"
         style={{ ["--d" as string]: "120ms" }}>
-        <span aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#9db4ff]/60 to-transparent" />
+        <span aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#d4af37]/60 to-transparent" />
         <div role="tablist" aria-label="Sign in as" className="grid grid-cols-5 gap-1 rounded-2xl border border-white/[0.07] bg-black/25 p-1">
           {ROLES.map((r) => (
             <button key={r.key} type="button" role="tab" aria-selected={role === r.key} onClick={() => setRole(r.key)}
-              className={`relative rounded-xl px-1 py-2.5 font-manrope text-[12.5px] font-semibold transition-colors ${role === r.key ? "text-white" : "text-[#8b9bbd] hover:text-white"}`}>
+              className={`relative rounded-xl px-1 py-2.5 font-manrope text-[12.5px] font-semibold transition-colors ${role === r.key ? "text-white" : "text-[#a3a9b3] hover:text-white"}`}>
               {role === r.key && <motion.span layoutId="signin-tab" className="absolute inset-0 rounded-xl bg-gradient-to-b from-white/[0.12] to-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
                 transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
               <span className="relative">{r.label}</span>
@@ -108,10 +108,10 @@ export default function SignIn({ onLogin, demo, initialRole }: { onLogin: (s: Se
                   <label htmlFor="user-id" className={lbl}>{role === "aicte" ? "Official account ID" : "Organisation account ID"}</label>
                   <input id="user-id" value={userId} onChange={(e) => setUserId(e.target.value)} autoComplete="username" spellCheck={false}
                     placeholder={role === "aicte" ? "Issued by AICTE" : "From your AICTE approval"} className={`${input} font-mono`} />
-                  {demo && <p className="mt-1.5 px-1 text-[12px] text-[#8b9bbd]">Demo accounts: {role === "aicte" ? <><code className="text-[#c9d6ff]">aicte</code> (officer), <code className="text-[#c9d6ff]">auditor</code> (read-only)</> : <code className="text-[#c9d6ff]">employer</code>}</p>}
+                  {demo && <p className="mt-1.5 px-1 text-[12px] text-[#a3a9b3]">Demo accounts: {role === "aicte" ? <><code className="text-[#f7e08a]">aicte</code> (officer), <code className="text-[#f7e08a]">auditor</code> (read-only)</> : <code className="text-[#f7e08a]">employer</code>}</p>}
                 </div>
               )}
-              {account && <p className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5 text-[12.5px] text-[#a9b6d3]">
+              {account && <p className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5 text-[12.5px] text-[#b8bec8]">
                 Signing in to <span className="font-semibold text-white">{account.name}</span>{account.state ? `, ${account.state}` : ""}</p>}
               <PasswordField value={password} onChange={setPassword} disabled={busy} demo={demo} />
 
@@ -121,7 +121,7 @@ export default function SignIn({ onLogin, demo, initialRole }: { onLogin: (s: Se
                 </div>
               )}
               <button type="submit" disabled={busy}
-                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[#3b6bff] via-[#4f63ff] to-[#6f5cff] py-3.5 font-manrope text-[15.5px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_16px_36px_-14px_rgba(59,107,255,0.9)] transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60">
+                className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl btn-gold py-3.5 font-manrope text-[15.5px] font-bold transition-all duration-300 hover:-translate-y-0.5 disabled:opacity-60">
                 <span>{busy ? "Signing in…" : "Sign in"}</span>
                 <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
               </button>

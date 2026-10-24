@@ -3,8 +3,8 @@ import { Fingerprint } from "lucide-react";
 import { activateAndRegister, ApiError, passkeyLogin, studentLogin, type Session } from "../api/client";
 import { passkeyError, passkeysSupported } from "../webauthn";
 
-const field = "w-full rounded-xl border border-white/[0.09] bg-[#060b1c]/70 px-3.5 py-2.5 text-sm text-white focus:border-[#7aa2ff]/60 focus:outline-none focus:ring-2 focus:ring-[#7aa2ff]/20";
-const label = "mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.18em] text-[#6f7fa3]";
+const field = "w-full rounded-xl border border-white/[0.09] bg-[#0b0f14]/70 px-3.5 py-2.5 text-sm text-white focus:border-[#d4af37]/60 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/20";
+const label = "mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.18em] text-[#8a909a]";
 
 /** Students and guardians: passkey sign-in, first-time activation, and (DEMO_MODE only) the MOCK date-of-birth fallback. */
 export function StudentSignIn({ onLogin, demo }: { onLogin: (s: Session) => void; demo: boolean }) {
@@ -37,11 +37,11 @@ export function StudentSignIn({ onLogin, demo }: { onLogin: (s: Session) => void
     <div className="space-y-5">
       {supported ? (
         <button type="button" disabled={busy} onClick={() => run(async () => onLogin(await passkeyLogin()))}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#3b6bff] via-[#4f63ff] to-[#6f5cff] py-3.5 font-manrope text-[15px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22)] transition-opacity hover:opacity-95 disabled:opacity-50">
+          className="flex w-full items-center justify-center gap-2 rounded-2xl btn-gold py-3.5 font-manrope text-[15px] font-bold transition-opacity hover:opacity-95 disabled:opacity-50">
           <Fingerprint className="h-4 w-4" aria-hidden /> {busy ? "Waiting for passkey…" : "Sign in with passkey"}
         </button>
       ) : <p className="text-xs text-rose-300">This browser doesn't support passkeys.</p>}
-      <p className="text-xs text-[#9fb0d0]">Fingerprint, face or device PIN. Nothing to type, no password.</p>
+      <p className="text-xs text-[#b8bec8]">Fingerprint, face or device PIN. Nothing to type, no password.</p>
 
       <form onSubmit={activate} className="space-y-3 border-t border-white/[0.07] pt-4">
         <p className="text-xs text-slate-300">First time? Use the one-time activation code from your institution to register a passkey.</p>
@@ -52,7 +52,7 @@ export function StudentSignIn({ onLogin, demo }: { onLogin: (s: Session) => void
             <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="XXXX-XXXX-XX" autoComplete="one-time-code" className={`${field} font-mono uppercase`} /></label>
         </div>
         <button type="submit" disabled={busy || !supported}
-          className="w-full rounded-[14px] border border-blue-500/40 py-2.5 text-sm font-semibold text-blue-200 transition-colors hover:bg-blue-500/10 disabled:opacity-50">
+          className="w-full rounded-[14px] border border-[#d4af37]/40 py-2.5 text-sm font-semibold text-[#f1d488] transition-colors hover:bg-[#d4af37]/10 disabled:opacity-50">
           Activate and register passkey
         </button>
       </form>

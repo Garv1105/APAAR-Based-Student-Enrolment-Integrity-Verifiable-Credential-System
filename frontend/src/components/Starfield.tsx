@@ -28,7 +28,7 @@ export default function Starfield({ count = 90 }: { count?: number }) {
         x: rnd(0, w), y: rnd(0, h), z, r: 0.35 + z * rnd(0.5, 1.1),
         dir: rnd(0, Math.PI * 2), turn: rnd(-0.25, 0.25), speed: rnd(4, 11) * z, // px per second
         ph: rnd(0, Math.PI * 2), tw: rnd(0.4, 1.1),
-        tint: Math.random() < 0.75 ? "176, 196, 255" : "214, 196, 150", // mostly cool blue, a few warm gold
+        tint: Math.random() < 0.25 ? "176, 196, 255" : "226, 200, 140", // mostly warm gold, a few cool blue
       };
     });
     const draw = (dt: number) => {
