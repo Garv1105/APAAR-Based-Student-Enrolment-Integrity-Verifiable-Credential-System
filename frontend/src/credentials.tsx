@@ -58,7 +58,7 @@ export function Claims({ subject }: { subject: Record<string, unknown> }) {
     <div className="space-y-3">
       <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {entries.map(([k, v]) => (
-          <div key={k} className="rounded-xl border border-slate-200/70 bg-white/80 p-3 shadow-2xs">
+          <div key={k} className="rounded-xl border border-slate-200/70 bg-white/[0.03] p-3 shadow-2xs">
             <dt className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{CLAIM_LABEL[k] ?? k}</dt>
             <dd className={`mt-0.5 font-bold text-gov-900 ${k === "apaarId" || k === "studentId" ? "font-mono text-xs" : "text-sm"}`}>
               {String(v)}
@@ -119,7 +119,7 @@ export function VerifyResultView({ out }: { out: VerifyOut }) {
       <p className="mt-2.5 text-xs text-slate-700 font-medium">{r.help}</p>
 
       {/* Cryptographic Checklist */}
-      <div className="mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
+      <div className="mt-4 rounded-xl border border-slate-200/80 bg-surface p-4 shadow-2xs">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
           Trust & Signature Verification Checklist
         </span>
@@ -167,7 +167,7 @@ export function CredentialCard({ c, actions }: { c: S["CredentialOut"]; actions?
   }[c.type];
 
   return (
-    <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-premium transition-all hover:border-slate-300">
+    <div className="rounded-2xl border border-slate-200/90 bg-surface p-5 shadow-premium transition-all hover:border-slate-300">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
         <div className="flex items-center gap-3">
           <div className="grid h-10 w-10 place-items-center rounded-xl bg-accent-50 text-accent-700">
@@ -273,7 +273,7 @@ export function VerifyTool({ allowForgedDemo = false }: { allowForgedDemo?: bool
           rows={6}
           spellCheck={false}
           placeholder='{"@context": [...], "type": ["VerifiableCredential", ...], "proof": {...}}   or   AV1:...'
-          className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3 font-mono text-xs text-gov-900 shadow-2xs focus:bg-white focus:border-accent-600 focus:ring-1 focus:ring-accent-600"
+          className="w-full rounded-xl border border-slate-300 bg-slate-50/50 p-3 font-mono text-xs text-gov-900 shadow-2xs focus:bg-surface focus:border-accent-600 focus:ring-1 focus:ring-accent-600"
         />
 
         <div className="flex flex-wrap items-center gap-2.5">
