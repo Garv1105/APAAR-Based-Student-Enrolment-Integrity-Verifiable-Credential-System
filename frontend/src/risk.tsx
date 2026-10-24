@@ -10,7 +10,7 @@ export const COMPONENT_LABEL: Record<string, string> = {
 };
 export const FLAG_LABEL: Record<string, string> = {
   ENROLMENT_SPIKE: "Enrolment spike", CATEGORY_MIX_SHIFT: "Category-mix shift", DOB_CLUSTER: "DOB cluster",
-  SEQUENTIAL_APAAR: "Sequential APAAR IDs", DEADLINE_DUMP: "Deadline dump",
+  SEQUENTIAL_APAAR: "Sequential APAAR IDs", DEADLINE_DUMP: "Deadline dump", PEER_OUTLIER: "Peer outlier",
 };
 
 export function DqsBreakdown({ d }: { d: S["Dqs"] }) {
@@ -57,6 +57,7 @@ export function FlagList({ flags }: { flags: S["AnomalyFlag"][] }) {
 export function InspectionQueueCard() {
   const q = usePoll(() => getJson<S["InspectionEntry"][]>("/v1/inspection-queue"), 5000);
   const flags = usePoll(() => getJson<S["AnomalyFlag"][]>("/v1/anomalies"), 5000);
+  const peers = usePoll(() => getJson<S["PeerStatus"]>("/v1/anomalies/peer-status"), 15000);
   const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="grid gap-4 2xl:grid-cols-3">
@@ -85,6 +86,12 @@ export function InspectionQueueCard() {
       </Card>
       <Card title={<span className="flex items-center gap-2">Anomaly flags {flags.data && <Badge tone={flags.data.length ? "warning" : "ok"}>{flags.data.length}</Badge>}</span>}
         actions={<span className="text-xs text-slate-500">Risk indicators for review, not proof</span>}>
+        {peers.data && (
+          <p className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            Peer comparison: {peers.data.tests} test(s), {peers.data.flagged} flagged at a {Math.round(peers.data.fdr_q * 100)}% national
+            false-discovery rate. {peers.data.insufficient > 0 && <span className="text-warn">{peers.data.note}.</span>}
+          </p>
+        )}
         {flags.error ? <ErrorNote>{flags.error}</ErrorNote> : !flags.data ? <Loading /> : <FlagList flags={flags.data} />}
       </Card>
     </div>

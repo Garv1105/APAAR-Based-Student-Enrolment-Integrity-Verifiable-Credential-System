@@ -311,6 +311,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/anomalies/peer-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Anomalies Peer Status
+         * @description A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.
+         */
+        get: operations["anomalies_peer_status_v1_anomalies_peer_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/inspection-queue": {
         parameters: {
             query?: never;
@@ -1224,7 +1244,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP";
+            type: "ENROLMENT_SPIKE" | "CATEGORY_MIX_SHIFT" | "DOB_CLUSTER" | "SEQUENTIAL_APAAR" | "DEADLINE_DUMP" | "PEER_OUTLIER";
             /** Institution Id */
             institution_id: string;
             /** Programme */
@@ -1834,6 +1854,33 @@ export interface components {
             approve_after: string;
             /** Revoked */
             revoked: boolean;
+        };
+        /** PeerStatus */
+        PeerStatus: {
+            /**
+             * Tests
+             * @description peer comparisons run nationally (programme and institution level)
+             */
+            tests: number;
+            /**
+             * Flagged
+             * @description comparisons that survived Benjamini-Hochberg and the minimum practical gap
+             */
+            flagged: number;
+            /**
+             * Insufficient
+             * @description comparisons skipped because the peer group had fewer than min_peers members
+             */
+            insufficient: number;
+            /** Min Peers */
+            min_peers: number;
+            /**
+             * Fdr Q
+             * @description false discovery rate controlled across all tests
+             */
+            fdr_q: number;
+            /** Note */
+            note: string;
         };
         /** ProgrammeSeats */
         ProgrammeSeats: {
@@ -2617,6 +2664,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnomalyFlag"][];
+                };
+            };
+        };
+    };
+    anomalies_peer_status_v1_anomalies_peer_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeerStatus"];
                 };
             };
         };

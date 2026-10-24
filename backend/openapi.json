@@ -678,6 +678,30 @@
     ]
    }
   },
+  "/v1/anomalies/peer-status": {
+   "get": {
+    "summary": "Anomalies Peer Status",
+    "description": "A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.",
+    "operationId": "anomalies_peer_status_v1_anomalies_peer_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PeerStatus"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
   "/v1/inspection-queue": {
    "get": {
     "summary": "Inspection Queue",
@@ -2642,7 +2666,8 @@
        "CATEGORY_MIX_SHIFT",
        "DOB_CLUSTER",
        "SEQUENTIAL_APAAR",
-       "DEADLINE_DUMP"
+       "DEADLINE_DUMP",
+       "PEER_OUTLIER"
       ],
       "title": "Type"
      },
@@ -4042,6 +4067,48 @@
      "revoked"
     ],
     "title": "PasskeyOut"
+   },
+   "PeerStatus": {
+    "properties": {
+     "tests": {
+      "type": "integer",
+      "title": "Tests",
+      "description": "peer comparisons run nationally (programme and institution level)"
+     },
+     "flagged": {
+      "type": "integer",
+      "title": "Flagged",
+      "description": "comparisons that survived Benjamini-Hochberg and the minimum practical gap"
+     },
+     "insufficient": {
+      "type": "integer",
+      "title": "Insufficient",
+      "description": "comparisons skipped because the peer group had fewer than min_peers members"
+     },
+     "min_peers": {
+      "type": "integer",
+      "title": "Min Peers"
+     },
+     "fdr_q": {
+      "type": "number",
+      "title": "Fdr Q",
+      "description": "false discovery rate controlled across all tests"
+     },
+     "note": {
+      "type": "string",
+      "title": "Note"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tests",
+     "flagged",
+     "insufficient",
+     "min_peers",
+     "fdr_q",
+     "note"
+    ],
+    "title": "PeerStatus"
    },
    "ProgrammeSeats": {
     "properties": {

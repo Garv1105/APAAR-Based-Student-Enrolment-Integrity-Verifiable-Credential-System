@@ -14,7 +14,7 @@ from pydantic import ValidationError
 
 from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, PeerStatus, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
                         PasskeyOut, SetupOut, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
                         WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
@@ -299,7 +299,13 @@ def ledger_latest(conn=Depends(get_conn)):
 @app.get("/v1/anomalies", response_model=list[AnomalyFlag],
          description="Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).")
 def anomalies(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
-    return risk.flags(conn)
+    return risk.flags(conn, regulator=True)
+
+
+@app.get("/v1/anomalies/peer-status", response_model=PeerStatus,
+         description="A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.")
+def anomalies_peer_status(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
+    return risk.peer_status(conn)
 
 
 @app.get("/v1/inspection-queue", response_model=list[InspectionEntry],

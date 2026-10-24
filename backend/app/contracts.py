@@ -195,13 +195,22 @@ class AicteDashboard(BaseModel):
 
 
 class AnomalyFlag(BaseModel):
-    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP"]
+    type: Literal["ENROLMENT_SPIKE", "CATEGORY_MIX_SHIFT", "DOB_CLUSTER", "SEQUENTIAL_APAAR", "DEADLINE_DUMP", "PEER_OUTLIER"]
     institution_id: str
     programme: str | None
     score: float
     evidence: dict = Field(description="the numbers that triggered the rule")
     explanation: str
     label: str = Field(description="always: risk indicator for review, not proof of misconduct")
+
+
+class PeerStatus(BaseModel):
+    tests: int = Field(description="peer comparisons run nationally (programme and institution level)")
+    flagged: int = Field(description="comparisons that survived Benjamini-Hochberg and the minimum practical gap")
+    insufficient: int = Field(description="comparisons skipped because the peer group had fewer than min_peers members")
+    min_peers: int
+    fdr_q: float = Field(description="false discovery rate controlled across all tests")
+    note: str
 
 
 class Dqs(BaseModel):

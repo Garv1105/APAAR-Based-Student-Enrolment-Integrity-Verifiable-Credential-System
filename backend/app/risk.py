@@ -8,7 +8,7 @@ from .ingest import current_year
 
 def programme_features(conn, year: str) -> list[dict]:
     progs = conn.execute("""
-        SELECT p.id, p.institution_id, p.code, a.approved_intake,
+        SELECT p.id, p.institution_id, p.code, a.approved_intake, i.state,
                (SELECT filled FROM programme_category_counters c WHERE c.programme_id = p.id AND c.academic_year = %(y)s
                  AND c.category_code = 'REGULAR') AS regular,
                (SELECT filled FROM programme_category_counters c WHERE c.programme_id = p.id AND c.academic_year = %(y)s
@@ -17,6 +17,7 @@ def programme_features(conn, year: str) -> list[dict]:
                (SELECT max(max_dob_cluster) FROM batch_features f WHERE f.programme_id = p.id) AS dob_cluster,
                (SELECT max(longest_apaar_run) FROM batch_features f WHERE f.programme_id = p.id) AS apaar_run
           FROM programmes p JOIN approved_intake a ON a.programme_id = p.id AND a.academic_year = %(y)s
+          JOIN institutions i ON i.id = p.institution_id
          ORDER BY p.id""", {"y": year}).fetchall()
     hist = defaultdict(list)
     for h in conn.execute("SELECT * FROM intake_history ORDER BY academic_year"):
@@ -25,7 +26,12 @@ def programme_features(conn, year: str) -> list[dict]:
     for p in progs:
         h = hist[p["id"]]
         foreign_hist = [x["foreign_filled"] for x in h]
+        hist_shares = ([x["foreign_filled"] / (x["filled"] + x["foreign_filled"]) for x in h if x["filled"] + x["foreign_filled"]]
+                       if foreign_hist and None not in foreign_hist else None)
         out.append({"institution_id": p["institution_id"], "programme": p["code"], "programme_id": p["id"],
+                    "state": p["state"], "approved_intake": p["approved_intake"],
+                    "foreign_share": (p["foreign_pool"] or 0) / p["active"] if p["active"] else None,
+                    "history_foreign_shares": hist_shares or None,
                     "rows": p["active"], "fill": (p["regular"] or 0) / p["approved_intake"] if p["approved_intake"] else None,
                     "history_fills": [x["filled"] / x["approved"] for x in h if x["approved"]],
                     "foreign": p["foreign_pool"] or 0,
@@ -34,10 +40,47 @@ def programme_features(conn, year: str) -> list[dict]:
     return out
 
 
-def flags(conn) -> list[dict]:
+def peer_inputs(conn, year: str, feats: list[dict]) -> tuple[list[dict], list[dict]]:
+    """A1 inputs (regulator connection): programmes with submissions, and institution-level rates."""
+    progs = [x for x in feats if x["rows"]]
+    intake = defaultdict(float)
+    for x in feats:
+        intake[x["institution_id"]] += x["approved_intake"] or 0
+    late = {r["institution_id"]: r for r in conn.execute(
+        "SELECT b.institution_id, sum(f.rows) rows, sum(f.rows) FILTER (WHERE f.minutes_before_deadline BETWEEN 0 AND 1440) late "
+        "FROM batch_features f JOIN upload_batches b ON b.id = f.batch_id GROUP BY 1")}
+    insts = []
+    for r in conn.execute("SELECT b.institution_id, i.state, sum((b.row_counts_json->>'rows')::int) rows, "
+                          "sum((b.row_counts_json->>'rejected')::int) rejected FROM upload_batches b "
+                          "JOIN institutions i ON i.id = b.institution_id GROUP BY 1, 2"):
+        lt = late.get(r["institution_id"])
+        insts.append({"institution_id": r["institution_id"], "state": r["state"], "total_intake": intake[r["institution_id"]],
+                      "rejection_rate": r["rejected"] / r["rows"] if r["rows"] else None,
+                      "late_share": (lt["late"] or 0) / lt["rows"] if lt and lt["rows"] else None})
+    return progs, insts
+
+
+def peer_result(conn) -> dict:
     year = current_year(conn)["code"]
-    out = [f for x in programme_features(conn, year) if x["rows"] or x["max_dob_cluster"] or x["longest_apaar_run"]
+    return anomaly.peer.peer_flags(*peer_inputs(conn, year, programme_features(conn, year)))
+
+
+def peer_status(conn) -> dict:
+    r = peer_result(conn)
+    note = (f"{r['insufficient']} comparison(s) skipped: insufficient peers (needs at least {anomaly.peer.MIN_PEERS} similar "
+            f"programmes or institutions per group)" if r["insufficient"] else "every comparison had enough peers")
+    return {"tests": r["tests"], "flagged": len(r["flags"]), "insufficient": r["insufficient"], "min_peers": anomaly.peer.MIN_PEERS,
+            "fdr_q": anomaly.peer.FDR_Q, "note": note}
+
+
+def flags(conn, regulator: bool = False) -> list[dict]:
+    """Own-data rules for everyone; peer comparisons (A1) only on a regulator connection (they need every college's numbers)."""
+    year = current_year(conn)["code"]
+    feats = programme_features(conn, year)
+    out = [f for x in feats if x["rows"] or x["max_dob_cluster"] or x["longest_apaar_run"]
            for f in anomaly.programme_flags(x)]
+    if regulator:
+        out += anomaly.peer.peer_flags(*peer_inputs(conn, year, feats))["flags"]
     minutes = defaultdict(list)
     for r in conn.execute("SELECT DISTINCT b.institution_id, f.batch_id, f.minutes_before_deadline "
                           "FROM batch_features f JOIN upload_batches b ON b.id = f.batch_id"):
@@ -86,13 +129,14 @@ def institution_view(conn, institution_id: str) -> dict:
 def inspection_queue(conn) -> list[dict]:
     """Regulator connection: every institution, ranked by risk = (100 - DQS) x active enrolments."""
     year = current_year(conn)["code"]
-    all_flags = flags(conn)
+    all_flags = flags(conn, regulator=True)
     updates = {r["institution_id"]: r["n"] for r in conn.execute(
         "SELECT institution_id, count(*) n FROM ledger_entries WHERE event_type = 'enrolment.updated' GROUP BY 1")}
     entries = []
     for i in conn.execute("SELECT * FROM institutions ORDER BY id"):
         fl = [f for f in all_flags if f["institution_id"] == i["id"]]
-        m = dqs_inputs(conn, i["id"], year, len(fl), updates.get(i["id"], 0))
+        own = [f for f in fl if f["type"] != "PEER_OUTLIER"]  # DQS uses the institution's own data only (matches its own view)
+        m = dqs_inputs(conn, i["id"], year, len(own), updates.get(i["id"], 0))
         entries.append({"institution_id": i["id"], "name": i["name"], "state": i["state"], "status": i["status"],
                         "active": m["active"] if m else 0, "dqs": anomaly.dqs(m) if m else None, "flags": fl})
     ranked = anomaly.inspection_queue(entries)

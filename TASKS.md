@@ -19,6 +19,7 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - The MOCK DOB/OTP path exists only behind `DEMO_MODE`.
 - **W1 webhooks + ERP connector (Req 7):** Standard Webhooks signing; outbox with retries and backoff; delivery log; redeliver; secret rotation (24 h overlap); max 5 endpoints; SSRF guard that pins the validated IP (Host + SNI); `tools/erp_connector/` (YAML mapping, file-hash Idempotency-Key, verifying receiver).
 - **A0 anomaly package:** `backend/app/anomaly/` (`rules.py` = the five D3 rules unchanged, `stats.py` shared helpers); same public interface. Spec: `docs/ANOMALY_V2_SPEC.md`.
+- **A1 peer baselines:** each programme (and each institution, for rejection rate and late uploads) is compared with similar units this year (programme+state+size, then programme+size, then programme; institutions: state+size, then size; at least 8 peers). Uses peer robust z, one-sided p (`math.erfc`), Benjamini–Hochberg at q=0.05 across all tests nationally, plus a minimum practical gap. Fill and foreign share are tested raw only for programmes with no history; with history, their change is tested. Regulator-only. Too few peers gives "insufficient peers" (`GET /v1/anomalies/peer-status`); today's 4-college DB has no peer groups.
 - **Demo seed (T8.1):** `python -m app.demo` resets the demo database, replays the scenario through the API, and issues one credential with a pending consent request. `--live` leaves B for the on-stage upload. Runbook: `docs/demo-runbook.md` (T8.2), with the live steps rehearsed through the API.
 
 **Decisions:**
@@ -66,6 +67,10 @@ Hour 0 = 2026-10-23. Feature freeze at hour 30. Updated 2026-10-24.
   - The mix rule needs foreign-pool history, which only the teammate's data has.
   - There are few labelled positives.
   - The duplicate-exposure component penalises both institutions in a case.
+- A1 peer baselines:
+  - Rejection rate is institution-level only, because rejected rows carry no programme.
+  - Peer flags aren't counted in the DQS (it stays own-data only, so it matches the institution's own view).
+  - The peer rule needs at least 8 similar units per group, so it does nothing until the 300-college world is loaded.
 - Credentials:
   - Student sign-in and consent use **passkeys** (P1). The old APAAR + DOB + fixed-OTP path exists only with `DEMO_MODE=true`, labelled MOCK.
   - Activation codes reach the student out of band. In the prototype the institution hands them over; production delivers them via DigiLocker or the registered mobile number. Whoever holds an unused code can register the passkey; a reissued code puts a 24 h consent cooldown on the new passkey and notifies the student.
