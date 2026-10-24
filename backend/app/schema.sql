@@ -251,3 +251,83 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   ts         timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS audit_logs_student_idx ON audit_logs (student_id);
+
+-- Outbound webhooks (Req 7). Secrets are AES-GCM encrypted (HMAC signing needs them); shown once at creation.
+CREATE TABLE IF NOT EXISTS webhook_endpoints (
+  id              bigserial PRIMARY KEY,
+  institution_id  text NOT NULL REFERENCES institutions(id),
+  url             text NOT NULL,
+  events          text[] NOT NULL,
+  secret_enc      bytea NOT NULL,
+  secret_fp       text NOT NULL,                -- first 8 hex of SHA-256, for display only
+  prev_secret_enc bytea,                        -- after a rotation the old secret also signs until prev_expires_at
+  prev_expires_at timestamptz,
+  active          boolean NOT NULL DEFAULT true,
+  idempotency_key text,
+  request_hash    text,
+  created_by      text NOT NULL,
+  created_at      timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (institution_id, idempotency_key)
+);
+
+-- Outbox and delivery log in one. Response bodies are never stored.
+CREATE TABLE IF NOT EXISTS webhook_deliveries (
+  id               bigserial PRIMARY KEY,
+  endpoint_id      bigint NOT NULL REFERENCES webhook_endpoints(id),
+  event_id         uuid NOT NULL,
+  event_type       text NOT NULL,
+  payload          jsonb NOT NULL,              -- ids, counts, codes and statuses only (no PII)
+  status           text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','delivered','failed','cancelled')),
+  attempts         int NOT NULL DEFAULT 0,
+  next_attempt_at  timestamptz NOT NULL DEFAULT now(),
+  last_status_code int,
+  last_error       text,                        -- truncated
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  delivered_at     timestamptz
+);
+CREATE INDEX IF NOT EXISTS webhook_deliveries_due_idx ON webhook_deliveries (next_attempt_at) WHERE status = 'pending';
+
+-- Passkeys (P1, Req 5/8): one-time activation codes from the institution, WebAuthn passkeys, single-use challenges.
+CREATE TABLE IF NOT EXISTS activation_codes (
+  id             bigserial PRIMARY KEY,
+  student_id     bigint NOT NULL REFERENCES students(id),
+  kind           text NOT NULL CHECK (kind IN ('student','guardian')),
+  code_hash      text NOT NULL UNIQUE,            -- HMAC(k_activation, code); the plaintext is never stored
+  institution_id text NOT NULL REFERENCES institutions(id),
+  issued_by      text NOT NULL,
+  reissue        boolean NOT NULL,                -- true when issuing it revoked earlier passkeys (insider-impersonation cooldown)
+  idempotency_key text,
+  request_hash   text,
+  expires_at     timestamptz NOT NULL,
+  used_at        timestamptz,
+  registered_at  timestamptz,                    -- one passkey per code (L2)
+  voided_at      timestamptz,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (institution_id, idempotency_key)
+);
+
+CREATE TABLE IF NOT EXISTS passkeys (
+  id            bigserial PRIMARY KEY,
+  student_id    bigint NOT NULL REFERENCES students(id),
+  kind          text NOT NULL CHECK (kind IN ('student','guardian')),
+  credential_id bytea NOT NULL UNIQUE,
+  public_key    bytea NOT NULL,                   -- COSE key
+  sign_count    bigint NOT NULL,
+  transports    text[],
+  approve_after timestamptz NOT NULL DEFAULT now(), -- registered from a reissued code: no consent approval for 24 h
+  activation_code_id bigint REFERENCES activation_codes(id), -- which institution's code created it (H1: revoke own only)
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  last_used_at  timestamptz,
+  revoked_at    timestamptz
+);
+
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+  challenge   bytea PRIMARY KEY,
+  purpose     text NOT NULL CHECK (purpose IN ('register','login','consent')),
+  student_id  bigint,
+  kind        text,
+  consent_id  bigint,
+  terms_hash  text,
+  expires_at  timestamptz NOT NULL,
+  used_at     timestamptz
+);

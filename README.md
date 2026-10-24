@@ -53,7 +53,7 @@ How far each PS requirement has got, with the evidence in the test suite:
 | 4. Real-time dashboards (AICTE + institutions) | ✅ | Institution and AICTE web dashboards that refresh every 3 s by polling (no SSE push yet) |
 | 5. Secure verification for stakeholders | ✅ | `POST /v1/verify`: VALID / REVOKED / SUSPENDED / UNTRUSTED_ISSUER / TAMPERED / EXPIRED. Employer access is consent-gated. AICTE and the auditor get masked data. Verifier web page |
 | 6. Verifiable student records | ✅ | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the **official W3C test vectors**. Trust registry (MOCK) and Bitstring Status Lists |
-| 7. Integration/API | 🟡 | REST API + OpenAPI, public status lists, DID documents and a signed registry snapshot. Webhooks and the ERP connector are deferred |
+| 7. Integration/API | ✅ | REST API + OpenAPI, public status lists, DID documents, signed registry snapshot; signed webhooks (Standard Webhooks, retries, SSRF guard) and an ERP connector CLI (`tools/erp_connector/`) |
 | 8. Security, privacy, auth, RBAC, audit, consent | ✅ | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent with OTP (MOCK), guardian path for under-18s (MOCK, self-asserted). Student transparency log |
 | 9. Reports | ✅ | CSV reports, all safe against spreadsheet-formula injection and audited: accreditation pack (per institution), state summary, category-quota utilisation, excess-admission case file (each over-cap row with batch/row evidence and the ledger checkpoint), plus the per-batch error report. Institutions get their own data only (RLS) |
 | Innovation: anomaly detection, risk-based inspection (D3) | ✅ | Five explainable rules, each flag carrying its evidence numbers (enrolment spike by robust z, category-mix shift, DOB cluster, sequential APAAR run, deadline dump). Data Quality Score with visible weighted components. Inspection queue ranked by (100 − DQS) × enrolments. Scored against the teammate generator's independent labels (see Tests) |
@@ -103,6 +103,9 @@ py -3.14 -m venv .venv
 # 3. Create the 'apaar' database, the non-owner 'app_user' role, schema + RLS, and seed the mock registry
 cd backend
 ..\.venv\Scripts\python.exe -m app.seed --reset
+#    Or, for a ready demo (all uploads replayed, E501, duplicate cases, a credential + pending consent;
+#    student APAAR 328865551724; the seed prints her one-time passkey activation code):
+..\.venv\Scripts\python.exe -m app.demo
 
 # 4. Run the API
 ..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
@@ -124,7 +127,7 @@ npm run dev
 - **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, seat-ledger verify / sign checkpoint, the risk-based inspection queue (click a row for its DQS breakdown and flags), anomaly flags with evidence, and CSV reports.
 - **Institution DQS:** each institution sees its own data quality score, what pulled it down, and any flags about it.
 - **Institution student records:** find a student by APAAR ID or student ID, issue an enrolment credential, mark the enrolment completed or withdrawn (withdrawal revokes their credentials), and suspend a credential or lift the suspension.
-- **Student** (MOCK sign-in with APAAR ID + date of birth; consent approval uses OTP `123456`): enrolments, credential wallet, the consent inbox (approve, deny, revoke, guardian path), a printable certificate with QR, and **who accessed my data**.
+- **Student / guardian** (passkey sign-in after a one-time activation code from the institution): enrolments, credential wallet, the consent inbox (approve with passkey, deny, revoke), a printable certificate with QR, and **who accessed my data**. A guardian passkey approves for students under 18. With `DEMO_MODE=true` the old MOCK APAAR + DOB sign-in and OTP `123456` also work.
 - **Verifier** (`employer`): request consent for specific fields, fetch and verify the consent-scoped credential, a verify tool (paste JSON or the certificate QR text), and a forged-credential demo.
 - **University registrar** (`univ`): award degree credentials to affiliated institutions' students whose enrolment is completed.
 - **Verify a credential:** available from the header for AICTE, the auditor, institutions and the registrar.
@@ -132,7 +135,7 @@ npm run dev
 **Credentials demo in 2 minutes:**
 1. Sign in as `inst-a`, upload `A1.csv`, find a student, and issue an enrolment credential.
 2. As `employer`, request consent with that student's APAAR ID.
-3. Sign in as the student with their APAAR ID and date of birth (both in `A1.csv`), then approve with OTP `123456`.
+3. As the institution, open **Student records** for the student and issue a **passkey activation code**. On the sign-in page (at `http://localhost:5173`), activate with the APAAR ID + code, register a passkey, sign in with it, then **Approve with passkey**.
 4. As `employer`, fetch and verify: the result is **VALID**.
 5. As `inst-a`, withdraw the student, then verify again as `employer`: the result is **REVOKED**.
 6. As `inst-a`, mark another student completed. As `univ`, award the degree and open **Certificate & QR**.
@@ -160,7 +163,7 @@ Both files are gitignored. For a production deployment, keys belong in a KMS/HSM
 | `auditor` | auditor | Read-only regulator |
 | `employer` | verifier | Consent-based credential verification |
 | `univ` | university_registrar | Degree issuance for affiliated institutions A and B |
-| *(any uploaded student)* | student | APAAR ID + date of birth from the upload (MOCK) |
+| *(any uploaded student)* | student / guardian | passkey, registered with a one-time activation code from the institution (`DEMO_MODE=true` also enables the MOCK APAAR + DOB sign-in) |
 
 ## Trying the API
 
@@ -294,7 +297,12 @@ These are the main ones; the full list is in [`TASKS.md`](TASKS.md).
 - **Rejected rows don't count yet.** Rows rejected with errors don't count toward intake until they are corrected. Dashboards show the rejected-row total so they can't silently disappear.
 - **Latin script only.** Name matching doesn't handle Indic scripts, and fuzzy (no-APAAR) duplicate matching is deferred.
 - **No migrations.** Schema changes need `app.seed --reset`.
-- **MOCK student sign-in is NOT authentication.** Students sign in with APAAR ID + date of birth. A DOB isn't a secret, and consent approval uses a fixed MOCK OTP. So **anyone who knows a candidate's APAAR and DOB, including an employer, can sign in as the student and approve their own consent request.** Attempts are capped at 5 per APAAR per 15 minutes; the cap is race-safe but per process. It is also abusable, because anyone can lock a known APAAR out. There is no per-IP throttle. Guardian approval for under-18s is self-asserted (labelled MOCK in the signed consent artifact). Production needs real APAAR/DigiLocker authentication and linked guardian accounts.
+- **Passkey consent (P1).** Knowing a student's DOB no longer gets anyone in. Students and guardians register WebAuthn passkeys using one-time activation codes from the institution, and consent approval needs a passkey assertion bound to that request's terms.
+  - **Code delivery:** in the prototype the institution hands codes over in person; production delivers them via DigiLocker or the registered mobile number.
+  - **Insider risk:** a reissued code puts a 24 h consent cooldown on the new passkey, the student sees a notice and the reason, and AICTE sees a per-institution reissue count.
+  - **Not checked:** attestation (we accept any passkey).
+  - **Throttles** are per process.
+  - **DEMO_MODE:** the old MOCK DOB/OTP path remains only with `DEMO_MODE=true`.
 - **Online verification only.** Verification uses the API. The signed registry snapshot and status lists make offline verification possible, but no offline browser verifier is built yet. There is no camera QR scanner: paste the QR text instead.
 - **Demo DIDs.** DIDs are `did:web` style ids on a demo host. The DID documents are served by this API at `/dids/...`, not at the real `did:web` URL.
 - **Local key file.** Keys sit in a local file, not a KMS/HSM.

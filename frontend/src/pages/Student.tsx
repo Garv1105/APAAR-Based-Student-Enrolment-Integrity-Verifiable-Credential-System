@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Award,
   CheckCircle2,
@@ -7,21 +7,18 @@ import {
   History,
   ShieldCheck,
 } from "lucide-react";
-import { ApiError, getJson, sendJson, type S } from "../api/client";
+import { ApiError, approveWithPasskey, getJson, sendJson, type S } from "../api/client";
+import { passkeyError } from "../webauthn";
 import { CertificateButton, CredentialCard, downloadJson } from "../credentials";
 import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, Table, Td, Updated, usePoll } from "../ui";
 
 const ACTION_LABEL: Record<string, string> = {
-  "credential.verify": "Verified your credential",
-  "credential.issue": "Issued new verifiable credential",
-  "credential.read": "Viewed credential wallet",
-  "credential.certificate": "Generated official certificate",
-  "consent.request": "Requested selective data consent",
-  "consent.grant": "Consent approved via OTP",
-  "consent.deny": "Consent declined",
-  "consent.revoke": "Consent revoked by student",
-  "enrolment.read": "Queried enrolment record",
-  "enrolment.update": "Modified enrolment details",
+  "credential.verify": "Verified a credential", "credential.issue": "Issued a credential", "credential.read": "Viewed your credentials",
+  "credential.certificate": "Opened a certificate", "consent.request": "Requested your consent", "consent.grant": "Consent granted",
+  "consent.deny": "Consent denied", "consent.revoke": "Consent revoked", "enrolment.read": "Looked up your enrolment",
+  "enrolment.update": "Updated your enrolment", "activation_code.issue": "Issued a passkey activation code",
+  "passkey.register": "Registered a passkey", "passkey.sign_in": "Signed in with a passkey", "passkey.revoke": "Revoked a passkey",
+  "case.unmask": "Unmasked your record for a duplicate case",
 };
 
 export default function StudentHome() {
@@ -44,7 +41,7 @@ export default function StudentHome() {
     <div className="space-y-8 animate-fade-in">
       {/* Student Profile & Digital APAAR ID Card */}
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Digital APAAR ID Card (Simulated Government Identity Card) */}
+        {/* APAAR identity summary */}
         <div className="relative overflow-hidden rounded-3xl border border-slate-700 bg-gradient-to-br from-gov-950 via-slate-900 to-indigo-950 p-6 text-white shadow-premium-lg md:col-span-1 flex flex-col justify-between">
           <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-accent-600/20 blur-2xl" />
 
@@ -53,7 +50,7 @@ export default function StudentHome() {
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-amber-400" />
                 <span className="text-[11px] font-extrabold tracking-widest text-white uppercase">
-                  APAAR ID · भारत
+                  APAAR ID
                 </span>
               </div>
               <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-400/30">
@@ -62,57 +59,61 @@ export default function StudentHome() {
             </div>
 
             <div className="mt-6 space-y-1">
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">National Student ID</span>
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">APAAR ID (masked)</span>
               <div className="font-mono text-xl font-extrabold tracking-wider text-white">
                 {me.data.apaar_masked ?? me.data.provisional_id}
               </div>
               {me.data.provisional_id && !me.data.apaar_masked && (
-                <span className="text-[10px] text-amber-300 font-medium">Provisional ID (Pending Aadhaar link)</span>
+                <span className="text-[10px] text-amber-300 font-medium">Provisional ID: APAAR not linked</span>
               )}
             </div>
           </div>
 
           <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-300 font-medium">
-            <span>DigiLocker Synced</span>
-            <span className="font-mono text-[10px] text-slate-400">W3C Compliant</span>
+            <span>APAAR registry (MOCK)</span>
           </div>
         </div>
 
         {/* Overview Header */}
         <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-white p-6 shadow-premium md:col-span-2">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-accent-700">
-              <span>National Academic Depository</span>
-              <span>·</span>
-              <span>Beneficiary Wallet</span>
-            </div>
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gov-900 sm:text-3xl">My Academic Record</h1>
+            <h1 className="mt-1 text-2xl font-bold tracking-tight text-gov-900 sm:text-3xl">
+              {me.data.viewer === "guardian" ? "Guardian view: student's academic record" : "My academic record"}
+            </h1>
             <p className="mt-1 text-xs text-slate-500 font-medium leading-relaxed">
-              Your academic enrolments, degrees, and tamper-proof W3C credentials. You maintain full data sovereignty under the DPDP Act 2023.
+              Your enrolments, signed credentials, who asked for your data, and who accessed it.
             </p>
           </div>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
             <Updated at={consents.updatedAt} />
             <Button variant="secondary" onClick={refresh}>
-              Sync Records
+              Refresh
             </Button>
           </div>
         </div>
       </div>
+
+      {me.data.passkey_cooldown_until && (
+        <div role="alert" className="rounded-lg border border-warn/30 bg-warn-bg px-4 py-3 text-sm text-warn">
+          A new passkey was registered from an activation code your institution reissued. It can approve consent requests from
+          {" "}{fmtTime(me.data.passkey_cooldown_until)}. If this wasn't you, contact your institution and AICTE: the reissue and its
+          reason are listed under "Who accessed my data".
+        </div>
+      )}
 
       {/* Enrolment Registry Record */}
       <Card
         title={
           <div className="flex items-center gap-2">
             <GraduationCap className="h-4 w-4 text-accent-600" />
-            <span>Active Enrolments</span>
+            <span>Enrolments</span>
           </div>
         }
       >
         {me.data.enrolments.length === 0 ? (
-          <Empty>No enrolment records associated with this identity.</Empty>
+          <Empty>No enrolments.</Empty>
         ) : (
-          <Table head={["Enrolled Programme", "Sanctioned Institution", "Academic Session", "Student Roll ID", "Integrity Status"]}>
+          <Table head={["Programme", "Institution", "Year", "Student ID", "Status"]}>
             {me.data.enrolments.map((e, i) => (
               <tr key={i} className="transition-colors hover:bg-slate-50/70">
                 <Td className="font-bold text-gov-900">{e.programme}</Td>
@@ -135,7 +136,7 @@ export default function StudentHome() {
         title={
           <div className="flex items-center gap-2.5">
             <Fingerprint className="h-4 w-4 text-accent-600" />
-            <span>Data Verification Consent Requests (DPDP Act 2023)</span>
+            <span>Consent requests</span>
             {pending.length > 0 && (
               <Badge tone="flag" dot>
                 {pending.length} pending authorization
@@ -196,7 +197,7 @@ export default function StudentHome() {
             <span>My Digital Credentials Wallet</span>
           </div>
         }
-        actions={<span className="text-xs text-slate-500 font-medium">W3C Verifiable Credentials with offline QR verification</span>}
+        actions={<span className="text-xs text-slate-500 font-medium">Signed W3C Verifiable Credentials · verified online</span>}
       >
         {!creds.data ? (
           <Loading />
@@ -227,7 +228,7 @@ export default function StudentHome() {
         title={
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-accent-600" />
-            <span>DPDP Access Audit Trail (Section 6)</span>
+            <span>Who accessed my data</span>
           </div>
         }
         actions={<span className="text-xs text-slate-500 font-medium">Immutable record of every read, verification, and export</span>}
@@ -261,23 +262,18 @@ export default function StudentHome() {
 }
 
 function PendingConsent({ c, onDone }: { c: S["ConsentOut"]; onDone: () => void }) {
-  const [otp, setOtp] = useState("123456");
+  const [demo, setDemo] = useState(false);
+  const [otp, setOtp] = useState("");
   const [guardian, setGuardian] = useState(false);
-  const [gotp, setGotp] = useState("123456");
+  const [gotp, setGotp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => { getJson<S["AuthConfig"]>("/v1/auth/config").then((x) => setDemo(x.demo_mode)).catch(() => {}); }, []);
 
-  async function act(path: string, body?: unknown) {
+  async function act(fn: () => Promise<unknown>) {
     setBusy(true);
     setError(null);
-    try {
-      await sendJson(path, "POST", body);
-      onDone();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.text : "Authorization request failed");
-    } finally {
-      setBusy(false);
-    }
+    try { await fn(); onDone(); } catch (e) { setError(passkeyError(e) ?? (e instanceof ApiError ? e.text : "Request failed")); } finally { setBusy(false); }
   }
 
   return (
@@ -285,71 +281,43 @@ function PendingConsent({ c, onDone }: { c: S["ConsentOut"]; onDone: () => void 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h4 className="text-sm font-bold text-gov-900">
-            <strong className="text-accent-700">{c.requester}</strong> requests authorization to inspect:
+            <strong className="text-accent-700">{c.requester}</strong> asks to see:
           </h4>
           <p className="mt-1 font-semibold text-accent-950 text-xs">{c.fields.join(", ")}</p>
           <p className="mt-1 text-xs text-slate-600">
-            Purpose: <span className="font-medium">{c.purpose}</span> · Valid until {fmtTime(c.expires_at)}
+            Purpose: <span className="font-medium">{c.purpose}</span> · until {fmtTime(c.expires_at)}
           </p>
+          <p className="mt-1 text-xs text-slate-500">They will receive a signed credential with only these fields. You can revoke it at any time.
+            Your passkey signs exactly this request.</p>
         </div>
-        <Badge tone="flag" dot>ACTION REQUIRED</Badge>
+        <Badge tone="flag" dot>Action required</Badge>
       </div>
 
       <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-accent-200/60 pt-3 text-xs">
-        <div>
-          <label htmlFor={`otp-${c.id}`} className="block font-semibold uppercase tracking-wider text-slate-600 text-[10px]">
-            Student OTP (Mock: 123456)
-          </label>
-          <input
-            id={`otp-${c.id}`}
-            value={otp}
-            onChange={(e) => setOtp(e.target.value)}
-            inputMode="numeric"
-            className="mt-1 w-28 rounded-xl border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold shadow-xs focus:border-accent-600"
-          />
-        </div>
-
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 pb-2">
-          <input
-            type="checkbox"
-            checked={guardian}
-            onChange={(e) => setGuardian(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-accent-600 accent-accent-600"
-          />
-          <span>Minor under 18: Guardian consent required</span>
-        </label>
-
-        {guardian && (
-          <div>
-            <label htmlFor={`gotp-${c.id}`} className="block font-semibold uppercase tracking-wider text-slate-600 text-[10px]">
-              Guardian OTP
-            </label>
-            <input
-              id={`gotp-${c.id}`}
-              value={gotp}
-              onChange={(e) => setGotp(e.target.value)}
-              inputMode="numeric"
-              className="mt-1 w-28 rounded-xl border border-slate-300 bg-white px-3 py-1.5 font-mono text-xs font-bold shadow-xs"
-            />
-          </div>
-        )}
-
-        <Button
-          disabled={busy || !otp}
-          onClick={() =>
-            act(`/v1/consents/${c.id}/approve`, {
-              otp,
-              approved_by: guardian ? "guardian" : "student",
-              guardian_otp: guardian ? gotp : null,
-            })
-          }
-        >
-          Authorize Consent
+        <Button disabled={busy} onClick={() => act(() => approveWithPasskey(c.id))}>
+          <Fingerprint className="h-4 w-4" aria-hidden /> {busy ? "Waiting for passkey…" : "Approve with passkey"}
         </Button>
-        <Button variant="secondary" disabled={busy} onClick={() => act(`/v1/consents/${c.id}/deny`)}>
-          Decline
+        <Button variant="secondary" disabled={busy} onClick={() => act(() => sendJson(`/v1/consents/${c.id}/deny`, "POST"))}>
+          Deny
         </Button>
       </div>
+
+      {demo && (
+        <details className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-2 text-sm">
+          <summary className="cursor-pointer text-xs font-medium text-amber-900">Demo fallback: approve with MOCK OTP (DEMO_MODE)</summary>
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            <label className="text-sm"><span className="block text-xs text-slate-600">OTP (MOCK: 123456)</span>
+              <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" /></label>
+            <label className="flex items-center gap-2 text-xs text-slate-600">
+              <input type="checkbox" checked={guardian} onChange={(e) => setGuardian(e.target.checked)} />
+              Under 18: guardian approves (self-asserted, MOCK)</label>
+            {guardian && <label className="text-sm"><span className="block text-xs text-slate-600">Guardian OTP (MOCK)</span>
+              <input value={gotp} onChange={(e) => setGotp(e.target.value)} inputMode="numeric" className="mt-1 w-28 rounded-lg border border-slate-300 px-2 py-1" /></label>}
+            <Button variant="secondary" disabled={busy || !otp} onClick={() => act(() => sendJson(`/v1/consents/${c.id}/approve`, "POST",
+              { otp, approved_by: guardian ? "guardian" : "student", guardian_otp: guardian ? gotp : null }))}>Approve (MOCK)</Button>
+          </div>
+        </details>
+      )}
 
       {error && (
         <div className="mt-3">

@@ -4,9 +4,9 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 
 36-hour judging prototype (hybrid of the PRD and the implementation plan; see MVP_SCOPE.md for what is in/out).
 
-- Requirements and design: @APAAR_SIH_PRD.md (v2.1)
-- Phased task plan and task IDs: @IMPLEMENTATION_PLAN.md (6-person reference plan; only the tasks in MVP_SCOPE.md are in scope)
-- Scope, deferred features: @MVP_SCOPE.md. Progress, blockers, limitations: @TASKS.md
+- Requirements and design: `APAAR_SIH_PRD.md` (v2.1)
+- Phased task plan and task IDs: `IMPLEMENTATION_PLAN.md` (6-person reference plan; only the tasks in MVP_SCOPE.md are in scope)
+- Scope, deferred features: `MVP_SCOPE.md`. Progress, blockers, limitations: `TASKS.md`
 - API contract (source of truth): `backend/app/contracts.py` (pydantic). `backend/openapi.json` is generated from it; never hand-edit the JSON. Change the contract first, then backend and frontend.
 
 ## Stack (actual)
@@ -19,6 +19,7 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 - Eval table: `..\.venv\Scripts\python.exe -m pytest -s tests/test_eval.py`
 - Regenerate synthetic data: `..\.venv\Scripts\python.exe data/gen.py --seed 42`
 - Reset + seed demo DB `apaar`: `..\.venv\Scripts\python.exe -m app.seed --reset`
+- Demo seed (reset `apaar` + replay scenario through the API, credential + pending consent): `..\.venv\Scripts\python.exe -m app.demo`
 - Run API: `..\.venv\Scripts\python.exe -m uvicorn app.main:app --reload` → http://127.0.0.1:8000/docs (users inst-a, inst-b, inst-c, inst-d, aicte, auditor, employer, univ; password `demo`)
 - Regenerate contract: `..\.venv\Scripts\python.exe -c "import json; from app.main import app; open('openapi.json','w').write(json.dumps(app.openapi(), indent=1))"`
 
@@ -39,7 +40,7 @@ AICTE platform: institutions upload student-level data keyed by APAAR ID; we val
 ## Testing
 - Every endpoint has a wrong-role and a wrong-institution case (`tests/test_access_matrix.py`).
 - Don't weaken tests to pass; fix the code, or fix a test only when its expectation was demonstrably wrong (say so).
-- Security-relevant changes: run the `security-reviewer` agent (`.claude/agents/security-reviewer.md`) on the diff before finishing.
+- Run the `security-reviewer` agent (`.claude/agents/security-reviewer.md`) only when asked; after security-relevant changes, offer it in one line.
 - Show test output as evidence.
 
 ## Git

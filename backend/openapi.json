@@ -811,6 +811,827 @@
     }
    }
   },
+  "/v1/cases": {
+   "get": {
+    "summary": "List Cases",
+    "description": "Institutions: cases touching their own enrolments, neutral text, own enrolment ids only. Regulators: all.",
+    "operationId": "list_cases_v1_cases_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "status",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Status"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/CaseOut"
+         },
+         "title": "Response List Cases V1 Cases Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/cases/{case_id}/resolve": {
+   "post": {
+    "summary": "Resolve Case",
+    "description": "AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; under_investigation suspends them. Audited; visible to the student (D6).",
+    "operationId": "resolve_case_v1_cases__case_id__resolve_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "case_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Case Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CaseResolve"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaseOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/cases/{case_id}/unmask": {
+   "post": {
+    "summary": "Unmask Case",
+    "description": "AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).",
+    "operationId": "unmask_case_v1_cases__case_id__unmask_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "case_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Case Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CaseUnmask"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CaseOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/config": {
+   "get": {
+    "summary": "Auth Config",
+    "description": "Public: which sign-in paths are enabled.",
+    "operationId": "auth_config_v1_auth_config_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AuthConfig"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/activate": {
+   "post": {
+    "summary": "Activate",
+    "description": "Redeem (burn) a one-time activation code for a 15-minute session that can only register a passkey. 5 attempts per APAAR per 15 minutes.",
+    "operationId": "activate_v1_auth_activate_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActivateIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SetupOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/passkeys/register/options": {
+   "post": {
+    "summary": "Passkey Register Options",
+    "description": "Setup session: WebAuthn registration options (discoverable, UV required).",
+    "operationId": "passkey_register_options_v1_passkeys_register_options_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/passkeys/register/verify": {
+   "post": {
+    "summary": "Passkey Register Verify",
+    "description": "Setup session: store the passkey.",
+    "operationId": "passkey_register_verify_v1_passkeys_register_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasskeyCredentialIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PasskeyOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/auth/passkey/options": {
+   "post": {
+    "summary": "Passkey Login Options",
+    "description": "Public: discoverable sign-in options (no APAAR needed). 30/min per client.",
+    "operationId": "passkey_login_options_v1_auth_passkey_options_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/auth/passkey/verify": {
+   "post": {
+    "summary": "Passkey Login Verify",
+    "description": "Public: sign in as the student or guardian.",
+    "operationId": "passkey_login_verify_v1_auth_passkey_verify_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PasskeyCredentialIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LoginOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/passkeys": {
+   "get": {
+    "summary": "List Passkeys",
+    "description": "The caller's own passkeys.",
+    "operationId": "list_passkeys_v1_passkeys_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/PasskeyOut"
+         },
+         "type": "array",
+         "title": "Response List Passkeys V1 Passkeys Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/passkeys/{passkey_id}": {
+   "delete": {
+    "summary": "Revoke Passkey",
+    "description": "Revoke one of the caller's own passkeys.",
+    "operationId": "revoke_passkey_v1_passkeys__passkey_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "passkey_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Passkey Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PasskeyOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/enrolments/{enrolment_id}/activation-code": {
+   "post": {
+    "summary": "Activation Code",
+    "description": "Institution issues a one-time passkey activation code (7 days). A reason is required and shown in the student's access log. Revokes earlier passkeys of that kind; any code after the first is a reissue (24 h consent cooldown). Production: delivered via DigiLocker or the registered mobile number. Accepts Idempotency-Key (a replay never returns the code).",
+    "operationId": "activation_code_v1_enrolments__enrolment_id__activation_code_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "enrolment_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Enrolment Id"
+      }
+     },
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActivationCodeIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ActivationCodeOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/consents/{consent_id}/approve/options": {
+   "post": {
+    "summary": "Consent Approve Options",
+    "description": "WebAuthn options for approving this request; the challenge commits to the request's terms.",
+    "operationId": "consent_approve_options_v1_consents__consent_id__approve_options_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "consent_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Consent Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/webhooks": {
+   "post": {
+    "summary": "Create Webhook",
+    "description": "Register an endpoint. The signing secret is returned once (Standard Webhooks). Max 5 active per institution. Accepts Idempotency-Key.",
+    "operationId": "create_webhook_v1_webhooks_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "idempotency-key",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Idempotency-Key"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/WebhookIn"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookCreated"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "summary": "List Webhooks",
+    "description": "The institution's webhook endpoints (no secrets).",
+    "operationId": "list_webhooks_v1_webhooks_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/WebhookOut"
+         },
+         "title": "Response List Webhooks V1 Webhooks Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/webhooks/{endpoint_id}": {
+   "delete": {
+    "summary": "Delete Webhook",
+    "description": "Deactivate an endpoint and cancel its pending deliveries.",
+    "operationId": "delete_webhook_v1_webhooks__endpoint_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/webhooks/{endpoint_id}/rotate": {
+   "post": {
+    "summary": "Rotate Webhook",
+    "description": "New secret, returned once. The previous secret keeps signing (a second v1 signature) for 24 h.",
+    "operationId": "rotate_webhook_v1_webhooks__endpoint_id__rotate_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Endpoint Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookCreated"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/webhooks/{endpoint_id}/deliveries": {
+   "get": {
+    "summary": "Webhook Deliveries",
+    "description": "Delivery log (cursor paged).",
+    "operationId": "webhook_deliveries_v1_webhooks__endpoint_id__deliveries_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "endpoint_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Endpoint Id"
+      }
+     },
+     {
+      "name": "cursor",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 0,
+       "title": "Cursor"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "default": 100,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookDeliveriesPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/webhooks/deliveries/{delivery_id}/redeliver": {
+   "post": {
+    "summary": "Redeliver Webhook",
+    "description": "Queue another attempt now (same event id, freshly signed).",
+    "operationId": "redeliver_webhook_v1_webhooks_deliveries__delivery_id__redeliver_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "delivery_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Delivery Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookDelivery"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/credentials/{enrolment_id}/issue": {
    "post": {
     "summary": "Issue Credential",
@@ -1304,7 +2125,7 @@
   "/v1/consents/{consent_id}/approve": {
    "post": {
     "summary": "Consent Approve",
-    "description": "Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.",
+    "description": "Student (or the guardian, if the student is under 18) approves with a passkey assertion bound to this request; mints the scoped VerificationCredential. The MOCK OTP body works only in DEMO_MODE.",
     "operationId": "consent_approve_v1_consents__consent_id__approve_post",
     "security": [
      {
@@ -1600,6 +2421,129 @@
     ],
     "title": "AccessLogEntry"
    },
+   "ActivateIn": {
+    "properties": {
+     "apaar_id": {
+      "type": "string",
+      "title": "Apaar Id"
+     },
+     "code": {
+      "type": "string",
+      "maxLength": 20,
+      "title": "Code",
+      "description": "one-time activation code from the institution, e.g. 7K3M-Q9TB-2X"
+     }
+    },
+    "type": "object",
+    "required": [
+     "apaar_id",
+     "code"
+    ],
+    "title": "ActivateIn"
+   },
+   "ActivationCodeIn": {
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind",
+      "default": "student"
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "audited and shown in the student's access log"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "ActivationCodeIn"
+   },
+   "ActivationCodeOut": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "issued",
+       "already_issued"
+      ],
+      "title": "Status"
+     },
+     "code": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Code",
+      "description": "shown once; never stored (a replay returns null)"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At"
+     },
+     "revoked_passkeys": {
+      "type": "integer",
+      "title": "Revoked Passkeys"
+     },
+     "reissue": {
+      "type": "boolean",
+      "title": "Reissue"
+     },
+     "cooldown_hours": {
+      "type": "integer",
+      "title": "Cooldown Hours"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "code",
+     "kind",
+     "expires_at",
+     "revoked_passkeys",
+     "reissue",
+     "cooldown_hours"
+    ],
+    "title": "ActivationCodeOut"
+   },
    "AicteDashboard": {
     "properties": {
      "totals": {
@@ -1748,6 +2692,25 @@
     ],
     "title": "AnomalyFlag"
    },
+   "AuthConfig": {
+    "properties": {
+     "demo_mode": {
+      "type": "boolean",
+      "title": "Demo Mode",
+      "description": "true: the MOCK APAAR + DOB sign-in and OTP consent approval are enabled"
+     },
+     "rp_id": {
+      "type": "string",
+      "title": "Rp Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "demo_mode",
+     "rp_id"
+    ],
+    "title": "AuthConfig"
+   },
    "BatchCounts": {
     "properties": {
      "rows": {
@@ -1838,6 +2801,138 @@
      "counts"
     ],
     "title": "BatchOut"
+   },
+   "CaseOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "notice": {
+      "type": "string",
+      "title": "Notice",
+      "description": "Neutral text: names no other institution (F4)"
+     },
+     "enrolment_ids": {
+      "items": {
+       "type": "integer"
+      },
+      "type": "array",
+      "title": "Enrolment Ids",
+      "description": "Institutions: only their own enrolments in the case. Regulators: all"
+     },
+     "resolution_note": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resolution Note",
+      "description": "Regulators only"
+     },
+     "resolved_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Resolved At"
+     },
+     "detail": {
+      "anyOf": [
+       {
+        "items": {
+         "additionalProperties": true,
+         "type": "object"
+        },
+        "type": "array"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Detail",
+      "description": "AICTE officer only, from POST /v1/cases/{id}/unmask with a reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "status",
+     "created_at",
+     "notice",
+     "enrolment_ids"
+    ],
+    "title": "CaseOut"
+   },
+   "CaseResolve": {
+    "properties": {
+     "status": {
+      "type": "string",
+      "enum": [
+       "confirmed_duplicate",
+       "false_positive",
+       "under_investigation"
+      ],
+      "title": "Status"
+     },
+     "note": {
+      "type": "string",
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Note"
+     },
+     "keep_enrolment_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Keep Enrolment Id",
+      "description": "Required for confirmed_duplicate: the enrolment that stands. Credentials of the other enrolments in the case are revoked"
+     }
+    },
+    "type": "object",
+    "required": [
+     "status",
+     "note"
+    ],
+    "title": "CaseResolve"
+   },
+   "CaseUnmask": {
+    "properties": {
+     "reason": {
+      "type": "string",
+      "maxLength": 300,
+      "minLength": 10,
+      "title": "Reason",
+      "description": "Recorded in the audit log and shown to the student (D6)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "reason"
+    ],
+    "title": "CaseUnmask"
    },
    "CategoryMix": {
     "properties": {
@@ -1975,6 +3070,12 @@
      "batches": {
       "type": "integer",
       "title": "Batches"
+     },
+     "activation_reissues": {
+      "type": "integer",
+      "title": "Activation Reissues",
+      "description": "activation codes reissued (insider-impersonation signal, P1)",
+      "default": 0
      }
     },
     "type": "object",
@@ -1990,10 +3091,30 @@
    },
    "ConsentApprove": {
     "properties": {
+     "credential": {
+      "anyOf": [
+       {
+        "additionalProperties": true,
+        "type": "object"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Credential",
+      "description": "WebAuthn assertion (PublicKeyCredential JSON) answering POST /v1/consents/{id}/approve/options"
+     },
      "otp": {
-      "type": "string",
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
       "title": "Otp",
-      "description": "MOCK OTP; demo value is 123456"
+      "description": "DEMO_MODE only: MOCK OTP 123456"
      },
      "approved_by": {
       "type": "string",
@@ -2002,6 +3123,7 @@
        "guardian"
       ],
       "title": "Approved By",
+      "description": "DEMO_MODE only",
       "default": "student"
      },
      "guardian_otp": {
@@ -2014,13 +3136,10 @@
        }
       ],
       "title": "Guardian Otp",
-      "description": "required when the student is under 18 (MOCK OTP 123456)"
+      "description": "DEMO_MODE only: for students under 18 (MOCK OTP 123456)"
      }
     },
     "type": "object",
-    "required": [
-     "otp"
-    ],
     "title": "ConsentApprove"
    },
    "ConsentCredentialOut": {
@@ -2826,6 +3945,7 @@
        "auditor",
        "verifier",
        "student",
+       "guardian",
        "university_registrar"
       ],
       "title": "Role"
@@ -2854,6 +3974,73 @@
      "display_name"
     ],
     "title": "LoginOut"
+   },
+   "PasskeyCredentialIn": {
+    "properties": {
+     "credential": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Credential",
+      "description": "PublicKeyCredential JSON from navigator.credentials.create()/get()"
+     }
+    },
+    "type": "object",
+    "required": [
+     "credential"
+    ],
+    "title": "PasskeyCredentialIn"
+   },
+   "PasskeyOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "last_used_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Used At"
+     },
+     "approve_after": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Approve After"
+     },
+     "revoked": {
+      "type": "boolean",
+      "title": "Revoked"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "kind",
+     "created_at",
+     "last_used_at",
+     "approve_after",
+     "revoked"
+    ],
+    "title": "PasskeyOut"
    },
    "ProgrammeSeats": {
     "properties": {
@@ -2989,6 +4176,40 @@
     ],
     "title": "SeatLine"
    },
+   "SetupOut": {
+    "properties": {
+     "setup_token": {
+      "type": "string",
+      "title": "Setup Token",
+      "description": "15-minute session that can only register a passkey"
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Kind"
+     },
+     "reissue": {
+      "type": "boolean",
+      "title": "Reissue",
+      "description": "code was a reissue: the new passkey can't approve consent for 24 h"
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In"
+     }
+    },
+    "type": "object",
+    "required": [
+     "setup_token",
+     "kind",
+     "reissue",
+     "expires_in"
+    ],
+    "title": "SetupOut"
+   },
    "StateRow": {
     "properties": {
      "state": {
@@ -3113,6 +4334,28 @@
       },
       "type": "array",
       "title": "Enrolments"
+     },
+     "passkey_cooldown_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Passkey Cooldown Until",
+      "description": "a passkey registered from a reissued code can't approve consent until then; the portal shows a notice"
+     },
+     "viewer": {
+      "type": "string",
+      "enum": [
+       "student",
+       "guardian"
+      ],
+      "title": "Viewer",
+      "default": "student"
      }
     },
     "type": "object",
@@ -3282,6 +4525,284 @@
      "checks"
     ],
     "title": "VerifyOut"
+   },
+   "WebhookCreated": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "events": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Events"
+     },
+     "active": {
+      "type": "boolean",
+      "title": "Active"
+     },
+     "secret_fp": {
+      "type": "string",
+      "title": "Secret Fp",
+      "description": "first 8 hex of SHA-256(secret), for matching only"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "previous_secret_valid_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Secret Valid Until",
+      "description": "after a rotation the old secret also signs until then"
+     },
+     "secret": {
+      "type": "string",
+      "title": "Secret",
+      "description": "Shown once. Standard Webhooks signing secret (whsec_...)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "url",
+     "events",
+     "active",
+     "secret_fp",
+     "created_at",
+     "secret"
+    ],
+    "title": "WebhookCreated"
+   },
+   "WebhookDeliveriesPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/WebhookDelivery"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "next_cursor": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Next Cursor"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "next_cursor"
+    ],
+    "title": "WebhookDeliveriesPage"
+   },
+   "WebhookDelivery": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "endpoint_id": {
+      "type": "integer",
+      "title": "Endpoint Id"
+     },
+     "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Event Id"
+     },
+     "event_type": {
+      "type": "string",
+      "title": "Event Type"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Payload",
+      "description": "ids, counts, codes and statuses only (no personal data)"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "pending",
+       "delivered",
+       "failed",
+       "cancelled"
+      ],
+      "title": "Status"
+     },
+     "attempts": {
+      "type": "integer",
+      "title": "Attempts"
+     },
+     "next_attempt_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Next Attempt At"
+     },
+     "last_status_code": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Status Code"
+     },
+     "last_error": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Last Error",
+      "description": "truncated; response bodies are never stored"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "delivered_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Delivered At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "endpoint_id",
+     "event_id",
+     "event_type",
+     "payload",
+     "status",
+     "attempts",
+     "next_attempt_at",
+     "last_status_code",
+     "created_at",
+     "delivered_at"
+    ],
+    "title": "WebhookDelivery"
+   },
+   "WebhookIn": {
+    "properties": {
+     "url": {
+      "type": "string",
+      "maxLength": 500,
+      "title": "Url",
+      "description": "https only (http://localhost only in dev); must resolve to public IPs"
+     },
+     "events": {
+      "items": {
+       "type": "string",
+       "enum": [
+        "batch.validated",
+        "case.opened",
+        "case.resolved",
+        "credential.issued",
+        "credential.revoked"
+       ]
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Events"
+     }
+    },
+    "type": "object",
+    "required": [
+     "url",
+     "events"
+    ],
+    "title": "WebhookIn"
+   },
+   "WebhookOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "events": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Events"
+     },
+     "active": {
+      "type": "boolean",
+      "title": "Active"
+     },
+     "secret_fp": {
+      "type": "string",
+      "title": "Secret Fp",
+      "description": "first 8 hex of SHA-256(secret), for matching only"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "previous_secret_valid_until": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Previous Secret Valid Until",
+      "description": "after a rotation the old secret also signs until then"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "url",
+     "events",
+     "active",
+     "secret_fp",
+     "created_at"
+    ],
+    "title": "WebhookOut"
    }
   },
   "securitySchemes": {

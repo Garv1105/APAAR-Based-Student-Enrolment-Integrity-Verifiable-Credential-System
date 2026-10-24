@@ -30,6 +30,7 @@ const HOME: Record<Role, string> = {
   verifier: "/verifier",
   university_registrar: "/registrar",
   student: "/student",
+  guardian: "/student",
 };
 
 const CAN_VERIFY: Role[] = ["institution_admin", "aicte_officer", "auditor", "university_registrar"];
@@ -41,6 +42,7 @@ const ROLE_LABEL: Record<Role, string> = {
   verifier: "Credential Verifier",
   university_registrar: "University Registrar",
   student: "Student Beneficiary",
+  guardian: "Guardian",
 };
 
 export default function App() {
@@ -75,7 +77,7 @@ export default function App() {
   const r = session.role;
   let page;
 
-  if (cert && ["student", "institution_admin", "university_registrar"].includes(r)) {
+  if (cert && ["student", "guardian", "institution_admin", "university_registrar"].includes(r)) {
     page = <Certificate id={decodeURIComponent(cert[1])} />;
   } else if (hash === "/verify" && CAN_VERIFY.includes(r)) {
     page = <VerifyTool allowForgedDemo={r === "aicte_officer" || r === "auditor"} />;

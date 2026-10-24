@@ -1,0 +1,37 @@
+# ERP export column -> APAAR upload column (targets must be columns of GET /v1/batches/template.csv)
+columns:
+  apaar_id: "Stud APAAR No"
+  apaar_reason: "APAAR Remark"
+  institution_student_id: "Roll No"
+  student_name: "Student Name"
+  dob: "D.O.B"
+  guardian_name: "Father/Guardian"
+  programme_code: "Branch Code"
+  year_of_study: "Year"
+  seat_category: "Quota"
+  is_supernumerary: "Supernumerary?"
+  is_lateral_entry: "Lateral Entry?"
+  is_nri: "NRI?"
+  is_oci: "OCI?"
+  is_fn: "Foreign National?"
+  is_ciwg: "CIWG?"
+  admission_date: "Date of Admission"
+  declared_intake: "Sanctioned Intake"
+
+# value rewrites per target column
+yes_no: &yn {"Yes": "Y", "No": "N"}
+values:
+  is_supernumerary: *yn
+  is_lateral_entry: *yn
+  is_nri: *yn
+  is_oci: *yn
+  is_fn: *yn
+  is_ciwg: *yn
+
+# ERP dates are dd/mm/yyyy; the API wants ISO yyyy-mm-dd
+date_format: "%d/%m/%Y"
+dates: [dob, admission_date]
+
+# columns the ERP doesn't export
+defaults:
+  academic_year: "2026-27"

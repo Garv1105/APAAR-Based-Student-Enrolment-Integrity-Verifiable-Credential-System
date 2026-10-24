@@ -196,3 +196,55 @@ def sha256_hex(data: bytes) -> str:
 
 def b64url(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+# ---------- webhooks (Standard Webhooks v1: HMAC-SHA256 over "id.timestamp.body") ----------
+def webhook_secret() -> str:
+    return "whsec_" + base64.b64encode(os.urandom(32)).decode()
+
+
+def _webhook_key(secret: str) -> bytes:
+    return base64.b64decode(secret.removeprefix("whsec_"))
+
+
+def webhook_sign(secrets_: list[str], msg_id: str, ts: int, body: bytes) -> str:
+    """Value of the webhook-signature header: one 'v1,<base64>' per active secret (several during a rotation)."""
+    msg = f"{msg_id}.{ts}.".encode() + body
+    return " ".join("v1," + base64.b64encode(hmac.new(_webhook_key(s), msg, hashlib.sha256).digest()).decode() for s in secrets_)
+
+
+def webhook_verify(secret: str, msg_id: str, ts: int, body: bytes, signature_header: str, now: int, tolerance: int = 300) -> bool:
+    if abs(now - ts) > tolerance:
+        return False
+    expected = webhook_sign([secret], msg_id, ts, body).split(",", 1)[1]
+    return any(sig.startswith("v1,") and hmac.compare_digest(sig[3:], expected) for sig in signature_header.split())
+
+
+# ---------- passkeys (P1) ----------
+_CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+
+def activation_code() -> str:
+    """10 Crockford base32 characters (50 bits), shown as XXXX-XXXX-XX."""
+    raw = "".join(_CROCKFORD[b % 32] for b in os.urandom(10))
+    return f"{raw[:4]}-{raw[4:8]}-{raw[8:]}"
+
+
+def activation_code_hash(code: str) -> str:
+    """Keyed hash (HMAC, k_activation): a leaked table can't be brute-forced offline. Tolerates case, dashes, spaces
+    and the Crockford look-alikes (I/L -> 1, O -> 0)."""
+    norm = re.sub(r"[\s-]", "", code or "").upper().translate(str.maketrans("ILO", "110"))
+    return hmac.new(_key("k_activation"), norm.encode(), hashlib.sha256).hexdigest()
+
+
+def consent_terms_hash(terms: dict) -> str:
+    return hashlib.sha256(jcs(terms)).hexdigest()
+
+
+def consent_challenge(terms_hash: str) -> bytes:
+    """WebAuthn challenge that commits to the consent terms: SHA-256(SHA-256(JCS(terms)) || 32 random bytes)."""
+    return hashlib.sha256(bytes.fromhex(terms_hash) + os.urandom(32)).digest()
+
+
+def random_challenge() -> bytes:
+    return os.urandom(32)

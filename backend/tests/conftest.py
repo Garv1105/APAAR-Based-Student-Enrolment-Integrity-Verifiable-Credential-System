@@ -8,6 +8,8 @@ import pytest
 # Tests use a throwaway key file and a separate database so they never touch demo data.
 os.environ.setdefault("APAAR_KEY_FILE", str(Path(tempfile.mkdtemp()) / "keys.json"))
 os.environ.setdefault("APAAR_DB", "apaar_test")
+os.environ.setdefault("WEBHOOK_DISPATCH", "off")  # tests call webhooks.dispatch_due() themselves
+os.environ.setdefault("DEMO_MODE", "true")  # legacy suites use the MOCK DOB sign-in; passkey tests switch it off
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 

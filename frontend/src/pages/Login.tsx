@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { UserCheck, X } from "lucide-react";
-import { ApiError, login, studentLogin, type Session } from "../api/client";
+import { useEffect, useState } from "react";
+import { Fingerprint, UserCheck, X } from "lucide-react";
+import { activateAndRegister, ApiError, getJson, login, passkeyLogin, studentLogin, type S, type Session } from "../api/client";
+import { passkeyError, passkeysSupported } from "../webauthn";
 import Hero from "../components/Hero";
 import IdentityPanel from "../components/IdentityPanel";
 import IndiaMap from "../components/IndiaMap";
@@ -79,12 +80,7 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Student Login Modal State
   const [showStudentModal, setShowStudentModal] = useState(false);
-  const [apaar, setApaar] = useState("123456789012");
-  const [dob, setDob] = useState("2003-05-15");
-  const [studentBusy, setStudentBusy] = useState(false);
-  const [studentError, setStudentError] = useState<string | null>(null);
 
   async function handlePortalLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -102,25 +98,6 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
       );
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function handleStudentLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setStudentBusy(true);
-    setStudentError(null);
-    try {
-      onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), dob));
-    } catch (err) {
-      setStudentError(
-        err instanceof ApiError
-          ? err.status === 401
-            ? "APAAR ID and Date of Birth do not match registry records."
-            : err.text
-          : "Backend API unavailable on :8000."
-      );
-    } finally {
-      setStudentBusy(false);
     }
   }
 
@@ -173,9 +150,12 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
 
       {/* Student Login Modal */}
       {showStudentModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl">
-          <div className="relative w-full max-w-md rounded-[24px] border border-blue-500/30 bg-[#080f24] p-6 sm:p-7 shadow-2xl text-white ring-1 ring-white/10 animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-xl"
+          onKeyDown={(e) => e.key === "Escape" && setShowStudentModal(false)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="student-signin-title"
+            className="relative max-h-[calc(100vh-2rem)] w-full max-w-md overflow-y-auto rounded-[24px] border border-blue-500/30 bg-[#080f24] p-6 sm:p-7 shadow-2xl text-white ring-1 ring-white/10 animate-fade-in">
             <button
+              autoFocus
               onClick={() => setShowStudentModal(false)}
               className="absolute right-4 top-4 rounded-full p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
               aria-label="Close modal"
@@ -188,58 +168,95 @@ export default function Login({ onLogin }: { onLogin: (s: Session) => void }) {
                 <UserCheck className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="font-bold text-base text-white">Student Beneficiary Login</h3>
-                <p className="text-xs text-[#9fb0d0]">APAAR ID &amp; DigiLocker Gateway</p>
+                <h3 id="student-signin-title" className="font-bold text-base text-white">Students and guardians</h3>
+                <p className="text-xs text-[#9fb0d0]">Passkey sign-in · no password</p>
               </div>
             </div>
 
-            <form onSubmit={handleStudentLogin} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                  APAAR ID (12 Digits)
-                </label>
-                <input
-                  type="text"
-                  value={apaar}
-                  onChange={(e) => setApaar(e.target.value)}
-                  required
-                  placeholder="123456789012"
-                  className="w-full rounded-xl border border-slate-700 bg-[#060a16] px-3.5 py-2.5 font-mono text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                  Date of Birth
-                </label>
-                <input
-                  type="date"
-                  value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  required
-                  className="w-full rounded-xl border border-slate-700 bg-[#060a16] px-3.5 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-inner"
-                />
-              </div>
-
-              {studentError && (
-                <div className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-3 text-xs text-rose-300 font-semibold">
-                  {studentError}
-                </div>
-              )}
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={studentBusy}
-                  className="w-full rounded-[14px] bg-gradient-to-r from-[#2563ff] via-[#4f46e5] to-[#7c5cff] py-3 text-sm font-bold text-white shadow-[0_4px_20px_rgba(37,99,255,0.4)] hover:brightness-110 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {studentBusy ? "Verifying APAAR…" : "Access Student Wallet"}
-                </button>
-              </div>
-            </form>
+            <StudentSignIn onLogin={onLogin} />
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const field = "w-full rounded-xl border border-slate-700 bg-[#060a16] px-3.5 py-2.5 text-sm text-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+const label = "mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-300";
+
+/** Students and guardians: passkey sign-in, first-time activation, and (DEMO_MODE only) the MOCK date-of-birth fallback. */
+function StudentSignIn({ onLogin }: { onLogin: (s: Session) => void }) {
+  const [demo, setDemo] = useState(false);
+  const [apaar, setApaar] = useState("");
+  const [code, setCode] = useState("");
+  const [dob, setDob] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const supported = passkeysSupported();
+  useEffect(() => { getJson<S["AuthConfig"]>("/v1/auth/config").then((c) => setDemo(c.demo_mode)).catch(() => {}); }, []);
+
+  async function run(fn: () => Promise<void>) {
+    setBusy(true);
+    setError(null);
+    try { await fn(); } catch (err) {
+      setError(passkeyError(err) ?? (err instanceof ApiError ? (err.status === 401 ? "Sign-in failed. Check the details and try again." : err.text) : "Cannot reach the API. Is the backend running on :8000?"));
+    } finally { setBusy(false); }
+  }
+  const activate = (e: React.FormEvent) => {
+    e.preventDefault();
+    run(async () => {
+      const setup = await activateAndRegister(apaar.replace(/[\s-]/g, ""), code);
+      setNote(`Passkey registered for the ${setup.kind}.` + (setup.reissue ? " It can approve consent after 24 hours (reissued code)." : "") + " Now sign in with it.");
+      setCode("");
+    });
+  };
+  const dobSignIn = (e: React.FormEvent) => { e.preventDefault(); run(async () => onLogin(await studentLogin(apaar.replace(/[\s-]/g, ""), dob))); };
+
+  return (
+    <div className="mt-5 space-y-5">
+      {supported ? (
+        <button type="button" disabled={busy} onClick={() => run(async () => onLogin(await passkeyLogin()))}
+          className="flex w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r from-[#2563ff] via-[#4f46e5] to-[#7c5cff] py-3 text-sm font-bold text-white transition-all hover:brightness-110 disabled:opacity-50">
+          <Fingerprint className="h-4 w-4" aria-hidden /> {busy ? "Waiting for passkey…" : "Sign in with passkey"}
+        </button>
+      ) : <p className="text-xs text-rose-300">This browser doesn't support passkeys.</p>}
+      <p className="text-xs text-[#9fb0d0]">Fingerprint, face or device PIN. Nothing to type.</p>
+
+      <form onSubmit={activate} className="space-y-3 border-t border-slate-800 pt-4">
+        <p className="text-xs text-slate-300">First time? Use the one-time activation code from your institution to register a passkey.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block"><span className={label}>APAAR ID</span>
+            <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits" className={`${field} font-mono`} /></label>
+          <label className="block"><span className={label}>Activation code</span>
+            <input value={code} onChange={(e) => setCode(e.target.value)} required placeholder="XXXX-XXXX-XX" autoComplete="one-time-code" className={`${field} font-mono uppercase`} /></label>
+        </div>
+        <button type="submit" disabled={busy || !supported}
+          className="w-full rounded-[14px] border border-blue-500/40 py-2.5 text-sm font-semibold text-blue-200 transition-colors hover:bg-blue-500/10 disabled:opacity-50">
+          Activate and register passkey
+        </button>
+      </form>
+
+      {demo && (
+        <details className="rounded-xl border border-amber-500/40 bg-amber-950/30 p-3">
+          <summary className="cursor-pointer text-xs font-semibold text-amber-200">Demo fallback: date-of-birth sign-in <span className="ml-1 rounded bg-amber-500/20 px-1">MOCK · DEMO_MODE</span></summary>
+          <p className="mt-2 text-xs text-amber-100/80">Not authentication: a date of birth isn't a secret. Enabled only because the server runs in DEMO_MODE.</p>
+          <form onSubmit={dobSignIn} className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="block"><span className={label}>APAAR ID</span>
+              <input value={apaar} onChange={(e) => setApaar(e.target.value)} required inputMode="numeric" placeholder="12 digits" className={`${field} font-mono`} /></label>
+            <label className="block"><span className={label}>Date of birth</span>
+              <input type="date" value={dob} onChange={(e) => setDob(e.target.value)} required className={field} /></label>
+            <button type="submit" disabled={busy} className="rounded-[14px] border border-amber-500/40 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-500/10 disabled:opacity-50 sm:col-span-2">
+              {busy ? "Signing in…" : "Sign in (MOCK)"}
+            </button>
+          </form>
+        </details>
+      )}
+
+      <div aria-live="polite">
+        {note && <p className="text-sm text-emerald-300" role="status">{note}</p>}
+        {error && <div role="alert" className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-3 text-xs font-semibold text-rose-300">{error}</div>}
+      </div>
     </div>
   );
 }

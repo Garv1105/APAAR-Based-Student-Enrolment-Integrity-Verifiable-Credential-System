@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ApiError, getJson, sendJson, type Role, type S } from "../api/client";
+import { CaseQueueCard } from "../cases";
 import { InspectionQueueCard } from "../risk";
 import { Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, ReportsCard, Stat, Table, Td, Updated, usePoll } from "../ui";
 
@@ -241,7 +242,7 @@ export default function AicteHome({ role }: { role: Role }) {
           }
           className="lg:col-span-2"
         >
-          <Table head={["Institution", "State", "Approval Status", "Submitted Batches", "Last Upload Activity"]}>
+          <Table head={["Institution", "State", "Approval Status", "Submitted Batches", "Last Upload Activity", "Code reissues"]}>
             {data.upload_compliance.map((c) => (
               <tr key={c.id} className="transition-colors hover:bg-slate-50/70">
                 <Td className="font-semibold text-gov-900">{c.name}</Td>
@@ -259,11 +260,14 @@ export default function AicteHome({ role }: { role: Role }) {
                     <Badge tone="warning">Not submitted</Badge>
                   )}
                 </Td>
+                <Td className="tabular-nums">{c.activation_reissues ? <Badge tone="warning">{c.activation_reissues}</Badge> : 0}</Td>
               </tr>
             ))}
           </Table>
         </Card>
       </div>
+
+      <CaseQueueCard canResolve={role === "aicte_officer"} />
 
       {/* Risk-based Inspection Queue (D3) */}
       <InspectionQueueCard />

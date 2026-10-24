@@ -4,6 +4,7 @@ Change this file first, then backend and frontend.
 """
 from datetime import date, datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +30,7 @@ REQUIRED_COLUMNS = [c for c in CSV_COLUMNS if c not in ("apaar_id", "apaar_reaso
 APAAR_REASONS = ("REFUSED", "NOT_GENERATED", "PENDING")
 
 Severity = Literal["error", "warning", "flag"]
-Role = Literal["institution_admin", "aicte_officer", "auditor", "verifier", "student", "university_registrar"]
+Role = Literal["institution_admin", "aicte_officer", "auditor", "verifier", "student", "guardian", "university_registrar"]
 
 
 class StudentRow(BaseModel):
@@ -180,6 +181,7 @@ class ComplianceRow(BaseModel):
     status: str
     last_upload: datetime | None
     batches: int
+    activation_reissues: int = Field(0, description="activation codes reissued (insider-impersonation signal, P1)")
 
 
 class AicteDashboard(BaseModel):
@@ -247,13 +249,22 @@ class CaseOut(BaseModel):
     id: int
     status: str
     created_at: datetime
-    notice: str
-    detail: dict | None = Field(None, description="AICTE only, after unmask with reason")
+    notice: str = Field(description="Neutral text: names no other institution (F4)")
+    enrolment_ids: list[int] = Field(description="Institutions: only their own enrolments in the case. Regulators: all")
+    resolution_note: str | None = Field(None, description="Regulators only")
+    resolved_at: datetime | None = None
+    detail: list[dict] | None = Field(None, description="AICTE officer only, from POST /v1/cases/{id}/unmask with a reason")
 
 
 class CaseResolve(BaseModel):
     status: Literal["confirmed_duplicate", "false_positive", "under_investigation"]
-    note: str = Field(min_length=3)
+    note: str = Field(min_length=3, max_length=500)
+    keep_enrolment_id: int | None = Field(None, description="Required for confirmed_duplicate: the enrolment that stands. "
+                                          "Credentials of the other enrolments in the case are revoked")
+
+
+class CaseUnmask(BaseModel):
+    reason: str = Field(min_length=10, max_length=300, description="Recorded in the audit log and shown to the student (D6)")
 
 
 class ConsentRequestIn(BaseModel):
@@ -277,9 +288,11 @@ class ConsentOut(BaseModel):
 
 
 class ConsentApprove(BaseModel):
-    otp: str = Field(description="MOCK OTP; demo value is 123456")
-    approved_by: Literal["student", "guardian"] = "student"
-    guardian_otp: str | None = Field(None, description="required when the student is under 18 (MOCK OTP 123456)")
+    credential: dict | None = Field(None, description="WebAuthn assertion (PublicKeyCredential JSON) answering "
+                                    "POST /v1/consents/{id}/approve/options")
+    otp: str | None = Field(None, description="DEMO_MODE only: MOCK OTP 123456")
+    approved_by: Literal["student", "guardian"] = Field("student", description="DEMO_MODE only")
+    guardian_otp: str | None = Field(None, description="DEMO_MODE only: for students under 18 (MOCK OTP 123456)")
 
 
 class ConsentCredentialOut(BaseModel):
@@ -300,6 +313,9 @@ class StudentProfile(BaseModel):
     provisional_id: str | None
     apaar_status: str
     enrolments: list[StudentEnrolment]
+    passkey_cooldown_until: datetime | None = Field(None, description="a passkey registered from a reissued code can't "
+                                                    "approve consent until then; the portal shows a notice")
+    viewer: Literal["student", "guardian"] = "student"
 
 
 class VerifyIn(BaseModel):
@@ -402,4 +418,94 @@ class Problem(BaseModel):
     type: str = "about:blank"
     title: str
     status: int
+    detail: str | None = None
+
+
+# ---------- webhooks (Req 7) ----------
+WebhookEvent = Literal["batch.validated", "case.opened", "case.resolved", "credential.issued", "credential.revoked"]
+
+
+class WebhookIn(BaseModel):
+    url: str = Field(max_length=500, description="https only (http://localhost only in dev); must resolve to public IPs")
+    events: list[WebhookEvent] = Field(min_length=1)
+
+
+class WebhookOut(BaseModel):
+    id: int
+    url: str
+    events: list[str]
+    active: bool
+    secret_fp: str = Field(description="first 8 hex of SHA-256(secret), for matching only")
+    created_at: datetime
+    previous_secret_valid_until: datetime | None = Field(None, description="after a rotation the old secret also signs until then")
+
+
+class WebhookCreated(WebhookOut):
+    secret: str = Field(description="Shown once. Standard Webhooks signing secret (whsec_...)")
+
+
+class WebhookDelivery(BaseModel):
+    id: int
+    endpoint_id: int
+    event_id: UUID
+    event_type: str
+    payload: dict = Field(description="ids, counts, codes and statuses only (no personal data)")
+    status: Literal["pending", "delivered", "failed", "cancelled"]
+    attempts: int
+    next_attempt_at: datetime
+    last_status_code: int | None
+    last_error: str | None = Field(None, description="truncated; response bodies are never stored")
+    created_at: datetime
+    delivered_at: datetime | None
+
+
+class WebhookDeliveriesPage(BaseModel):
+    items: list[WebhookDelivery]
+    next_cursor: int | None
+
+
+# ---------- passkeys (P1) ----------
+class AuthConfig(BaseModel):
+    demo_mode: bool = Field(description="true: the MOCK APAAR + DOB sign-in and OTP consent approval are enabled")
+    rp_id: str
+
+
+class ActivateIn(BaseModel):
+    apaar_id: str
+    code: str = Field(max_length=20, description="one-time activation code from the institution, e.g. 7K3M-Q9TB-2X")
+
+
+class SetupOut(BaseModel):
+    setup_token: str = Field(description="15-minute session that can only register a passkey")
+    kind: Literal["student", "guardian"]
+    reissue: bool = Field(description="code was a reissue: the new passkey can't approve consent for 24 h")
+    expires_in: int
+
+
+class PasskeyCredentialIn(BaseModel):
+    credential: dict = Field(description="PublicKeyCredential JSON from navigator.credentials.create()/get()")
+
+
+class PasskeyOut(BaseModel):
+    id: int
+    kind: Literal["student", "guardian"]
+    created_at: datetime
+    last_used_at: datetime | None
+    approve_after: datetime
+    revoked: bool
+
+
+class ActivationCodeIn(BaseModel):
+    kind: Literal["student", "guardian"] = "student"
+    reason: str = Field(min_length=10, max_length=300, description="audited and shown in the student's access log")
+
+
+class ActivationCodeOut(BaseModel):
+    status: Literal["issued", "already_issued"]
+    code: str | None = Field(description="shown once; never stored (a replay returns null)")
+    kind: Literal["student", "guardian"]
+    expires_at: datetime | None
+    revoked_passkeys: int
+    reissue: bool
+    cooldown_hours: int
     detail: str | None = None

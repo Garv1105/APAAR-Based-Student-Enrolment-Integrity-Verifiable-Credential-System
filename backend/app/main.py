@@ -4,6 +4,7 @@ import io
 import json
 import uuid
 import zlib
+from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,9 +12,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import auth, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, reports, risk
+from . import auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessLogEntry, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
+from .contracts import (CSV_COLUMNS, AccessLogEntry, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
+                        PasskeyOut, SetupOut, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
+                        WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
                         ConsentCredentialOut, ConsentOut, ConsentRequestIn, CredentialOut, CredentialStatusIn, EnrolmentOut,
                         EnrolmentPatch, InstitutionDashboard, IssueIn, IssuesPage, LedgerVerifyOut, LoginIn, LoginOut,
                         ProgrammeSeats, RegistryIssuer, StudentLoginIn, StudentProfile, VerifyIn, VerifyOut)
@@ -22,7 +25,13 @@ from .validation import missing_columns
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 MAX_ROWS = 50_000
 
-app = FastAPI(title="APAAR Student Data & Verification Platform (SIH26263 prototype)", version="0.1.0",
+@asynccontextmanager
+async def lifespan(_app):
+    webhooks.start_poller()  # off with WEBHOOK_DISPATCH=off (tests, demo seed)
+    yield
+
+
+app = FastAPI(title="APAAR Student Data & Verification Platform (SIH26263 prototype)", version="0.1.0", lifespan=lifespan,
               description="Prototype. APAAR registry, AICTE approval registry, OTP and identity provider are MOCKS. Synthetic data only.")
 app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
                    allow_methods=["*"], allow_headers=["*"], expose_headers=["X-Request-Id"])
@@ -56,9 +65,29 @@ async def api_problem(_, exc: ingest.ApiError):
     return problem(exc.status, exc.detail)
 
 
+@app.exception_handler(auth.LoginThrottled)
+async def throttled_problem(_, exc: auth.LoginThrottled):
+    return problem(429, "Too many attempts; try again later")
+
+
 @app.exception_handler(credentials.CredentialError)
 async def credential_problem(_, exc: credentials.CredentialError):
     return problem(exc.status, exc.detail)
+
+
+def require_person(*roles: str):
+    """require() plus M3: a guardian acts only while the student is under 18 (checked on every request)."""
+    def dep(user=Depends(require(*roles)), conn=Depends(get_conn)) -> dict:
+        if user["role"] == "guardian" and not passkeys.is_minor(conn, user["student_id"]):
+            raise HTTPException(403, "Guardian access ended: the student is 18 or over")
+        return user
+    return dep
+
+
+def anon_conn():
+    """Anonymous connection for sign-in flows (the anonymous-only SECURITY DEFINER functions), even if a token is sent."""
+    with db.app_connect(None) as conn:
+        yield conn
 
 
 def get_conn(user=Depends(auth.optional_user)):
@@ -86,6 +115,8 @@ def login(body: LoginIn, conn=Depends(get_conn)):
           description="MOCK student sign-in: APAAR ID + date of birth. Production: APAAR/DigiLocker authentication. "
                       "5 failed attempts per APAAR in 15 minutes lock it out.")
 def student_login(body: StudentLoginIn, conn=Depends(get_conn)):
+    if not passkeys.demo_mode():
+        raise HTTPException(403, "APAAR + date-of-birth sign-in is a MOCK available only in DEMO_MODE; sign in with your passkey")
     try:
         out = auth.student_login(conn, body.apaar_id.replace(" ", "").replace("-", ""), body.dob.isoformat())
     except auth.LoginThrottled:
@@ -317,6 +348,142 @@ def report_csv(kind: str, request: Request, institution_id: str | None = None,
     return csv_response(header, rows, f"{kind}.csv")
 
 
+# ---------- duplicate cases (Req 3, 8; PRD §10 steps 4-5) ----------
+@app.get("/v1/cases", response_model=list[CaseOut],
+         description="Institutions: cases touching their own enrolments, neutral text, own enrolment ids only. Regulators: all.")
+def list_cases(status: str | None = None, user=Depends(require("institution_admin", "aicte_officer", "auditor")),
+               conn=Depends(get_conn)):
+    return cases.list_cases(conn, user, status)
+
+
+@app.post("/v1/cases/{case_id}/resolve", response_model=CaseOut,
+          description="AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; "
+                      "under_investigation suspends them. Audited; visible to the student (D6).")
+def resolve_case(case_id: int, body: CaseResolve, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    return cases.resolve(conn, user, case_id, body.model_dump(), request)
+
+
+@app.post("/v1/cases/{case_id}/unmask", response_model=CaseOut,
+          description="AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).")
+def unmask_case(case_id: int, body: CaseUnmask, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    return cases.unmask(conn, user, case_id, body.reason, request)
+
+
+# ---------- passkeys (P1, Req 5/8) ----------
+@app.get("/v1/auth/config", response_model=AuthConfig, description="Public: which sign-in paths are enabled.")
+def auth_config():
+    return {"demo_mode": passkeys.demo_mode(), "rp_id": passkeys.rp_id()}
+
+
+@app.post("/v1/auth/activate", response_model=SetupOut,
+          description="Redeem (burn) a one-time activation code for a 15-minute session that can only register a passkey. "
+                      "5 attempts per APAAR per 15 minutes.")
+def activate(body: ActivateIn, request: Request, conn=Depends(anon_conn)):
+    return passkeys.activate(conn, body.apaar_id, body.code, request.client.host if request.client else "unknown")
+
+
+@app.post("/v1/passkeys/register/options", description="Setup session: WebAuthn registration options (discoverable, UV required).")
+def passkey_register_options(user=Depends(auth.require_setup), conn=Depends(get_conn)):
+    return passkeys.register_options(conn, user)
+
+
+@app.post("/v1/passkeys/register/verify", response_model=PasskeyOut, status_code=201, description="Setup session: store the passkey.")
+def passkey_register_verify(body: PasskeyCredentialIn, user=Depends(auth.require_setup), conn=Depends(get_conn)):
+    return passkeys.register_verify(conn, user, body.credential)
+
+
+@app.post("/v1/auth/passkey/options", description="Public: discoverable sign-in options (no APAAR needed). 30/min per client.")
+def passkey_login_options(request: Request, conn=Depends(anon_conn)):
+    return passkeys.login_options(conn, request.client.host if request.client else "unknown")
+
+
+@app.post("/v1/auth/passkey/verify", response_model=LoginOut, description="Public: sign in as the student or guardian.")
+def passkey_login_verify(body: PasskeyCredentialIn, conn=Depends(anon_conn)):
+    return passkeys.login_verify(conn, body.credential)
+
+
+@app.get("/v1/passkeys", response_model=list[PasskeyOut], description="The caller's own passkeys.")
+def list_passkeys(user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
+    return [passkeys.passkey_out(k) for k in conn.execute("SELECT * FROM passkeys ORDER BY id")]
+
+
+@app.delete("/v1/passkeys/{passkey_id}", response_model=PasskeyOut, description="Revoke one of the caller's own passkeys.")
+def revoke_passkey(passkey_id: int, request: Request, user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
+    k = conn.execute("SELECT * FROM revoke_own_passkey(%s)", (passkey_id,)).fetchone()
+    if k is None:
+        raise HTTPException(404, "Passkey not found")
+    auth.audit(conn, user, "passkey.revoke", "passkey", passkey_id, student_id=user["student_id"], request=request)
+    conn.commit()
+    return passkeys.passkey_out(k)
+
+
+@app.post("/v1/enrolments/{enrolment_id}/activation-code", response_model=ActivationCodeOut,
+          description="Institution issues a one-time passkey activation code (7 days). A reason is required and shown in the "
+                      "student's access log. Revokes earlier passkeys of that kind; any code after the first is a reissue (24 h "
+                      "consent cooldown). Production: delivered via DigiLocker or the registered mobile number. Accepts "
+                      "Idempotency-Key (a replay never returns the code).")
+def activation_code(enrolment_id: int, body: ActivationCodeIn, request: Request, idempotency_key: str | None = Header(None),
+                    user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    req_hash = crypto.sha256_hex(f"{enrolment_id}|{body.model_dump_json()}".encode())
+    return passkeys.issue_code(conn, user, enrolment_id, body.kind, body.reason, idempotency_key, req_hash)
+
+
+@app.post("/v1/consents/{consent_id}/approve/options",
+          description="WebAuthn options for approving this request; the challenge commits to the request's terms.")
+def consent_approve_options(consent_id: int, user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
+    return consent.approve_options(conn, user, consent_id)
+
+
+# ---------- webhooks (Req 7) ----------
+@app.post("/v1/webhooks", response_model=WebhookCreated, status_code=201,
+          description="Register an endpoint. The signing secret is returned once (Standard Webhooks). Max 5 active per "
+                      "institution. Accepts Idempotency-Key.")
+def create_webhook(body: WebhookIn, request: Request, idempotency_key: str | None = Header(None),
+                   user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.register(conn, user, body.url, list(body.events), idempotency_key, crypto.sha256_hex(body.model_dump_json().encode()))
+    auth.audit(conn, user, "webhook.create", "webhook_endpoint", out["id"], request=request)
+    conn.commit()
+    return out
+
+
+@app.get("/v1/webhooks", response_model=list[WebhookOut], description="The institution's webhook endpoints (no secrets).")
+def list_webhooks(user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    return [webhooks.endpoint_out(w) for w in conn.execute("SELECT * FROM webhook_endpoints ORDER BY id")]
+
+
+@app.delete("/v1/webhooks/{endpoint_id}", response_model=WebhookOut,
+            description="Deactivate an endpoint and cancel its pending deliveries.")
+def delete_webhook(endpoint_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.deactivate(conn, endpoint_id)
+    auth.audit(conn, user, "webhook.delete", "webhook_endpoint", endpoint_id, request=request)
+    conn.commit()
+    return out
+
+
+@app.post("/v1/webhooks/{endpoint_id}/rotate", response_model=WebhookCreated,
+          description="New secret, returned once. The previous secret keeps signing (a second v1 signature) for 24 h.")
+def rotate_webhook(endpoint_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.rotate(conn, endpoint_id)
+    auth.audit(conn, user, "webhook.rotate", "webhook_endpoint", endpoint_id, request=request)
+    conn.commit()
+    return out
+
+
+@app.get("/v1/webhooks/{endpoint_id}/deliveries", response_model=WebhookDeliveriesPage, description="Delivery log (cursor paged).")
+def webhook_deliveries(endpoint_id: int, cursor: int = 0, limit: int = 100, user=Depends(require("institution_admin")),
+                       conn=Depends(get_conn)):
+    return webhooks.deliveries(conn, endpoint_id, cursor, max(1, min(limit, 500)))
+
+
+@app.post("/v1/webhooks/deliveries/{delivery_id}/redeliver", response_model=WebhookDelivery,
+          description="Queue another attempt now (same event id, freshly signed).")
+def redeliver_webhook(delivery_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    out = webhooks.redeliver(conn, delivery_id)
+    auth.audit(conn, user, "webhook.redeliver", "webhook_delivery", delivery_id, request=request)
+    conn.commit()
+    return out
+
+
 # ---------- verifiable credentials (Req 5, 6, 10) ----------
 REGULATORS = ("aicte_officer", "auditor")
 
@@ -342,6 +509,9 @@ def issue_credential(enrolment_id: int, body: IssueIn, request: Request, idempot
     if not replayed:
         auth.audit(conn, user, "credential.issue", "credential", vc["id"], student_id=row["subject_student_id"], reason=body.type,
                    request=request)
+        if user["role"] == "institution_admin":
+            webhooks.emit(conn, "credential.issued", user["institution_id"], credential_id=row["id"], type=row["type"],
+                          enrolment_id=row["enrolment_id"])
     conn.commit()
     out = CredentialOut(**_credential_out(conn, row, user)).model_dump(mode="json")
     return JSONResponse(out, status_code=200 if replayed else 201)
@@ -350,7 +520,7 @@ def issue_credential(enrolment_id: int, body: IssueIn, request: Request, idempot
 @app.get("/v1/credentials", response_model=list[CredentialOut],
          description="Credentials visible to the caller (issuer, subject student or regulator), optionally for one enrolment.")
 def list_credentials(request: Request, enrolment_id: int | None = None,
-                     user=Depends(require("institution_admin", "university_registrar", "student", "aicte_officer", "auditor")),
+                     user=Depends(require_person("institution_admin", "university_registrar", "student", "guardian", "aicte_officer", "auditor")),
                      conn=Depends(get_conn)):
     rows = conn.execute("SELECT * FROM credentials WHERE (%s::bigint IS NULL OR enrolment_id = %s) ORDER BY issued_at DESC LIMIT 200",
                         (enrolment_id, enrolment_id)).fetchall()
@@ -364,7 +534,7 @@ def list_credentials(request: Request, enrolment_id: int | None = None,
 @app.get("/v1/credentials/certificate", response_model=CertificateOut,
          description="Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.")
 def credential_certificate(id: str, request: Request,
-                           user=Depends(require("institution_admin", "university_registrar", "student")), conn=Depends(get_conn)):
+                           user=Depends(require_person("institution_admin", "university_registrar", "student", "guardian")), conn=Depends(get_conn)):
     row = conn.execute("SELECT * FROM credentials WHERE id=%s", (id,)).fetchone()  # RLS: issuer or subject only
     if row is None:
         raise HTTPException(404, "Credential not found")
@@ -385,6 +555,9 @@ def change_credential_status(body: CredentialStatusIn, request: Request,
     if body.purpose == "revocation" and not body.value:
         raise HTTPException(422, "Revocation is permanent; issue a new credential instead")
     conn.execute("SELECT set_credential_status(%s, %s, %s)", (row["id"], body.purpose, body.value))
+    if body.purpose == "revocation" and user["role"] == "institution_admin":
+        webhooks.emit(conn, "credential.revoked", user["institution_id"], credential_id=row["id"], enrolment_id=row["enrolment_id"],
+                      reason="revoked_by_issuer")
     auth.audit(conn, user, f"credential.{body.purpose}.{'set' if body.value else 'clear'}", "credential", row["id"],
                student_id=row["subject_student_id"], reason=body.reason, request=request)
     conn.commit()
@@ -465,7 +638,7 @@ def consent_request(body: ConsentRequestIn, request: Request, user=Depends(requi
 
 @app.get("/v1/consents", response_model=list[ConsentOut],
          description="Verifier: its own requests. Student: requests about them. Regulators: all.")
-def consent_list(user=Depends(require("verifier", "student", "aicte_officer", "auditor")), conn=Depends(get_conn)):
+def consent_list(user=Depends(require_person("verifier", "student", "guardian", "aicte_officer", "auditor")), conn=Depends(get_conn)):
     if user["role"] == "verifier":  # never sees student_id (no "is this APAAR registered" signal)
         return [consent.consent_out(k, None, "verifier") for k in consent.verifier_requests(conn)]
     rows = conn.execute("SELECT * FROM consents ORDER BY requested_at DESC LIMIT 200").fetchall()
@@ -473,9 +646,11 @@ def consent_list(user=Depends(require("verifier", "student", "aicte_officer", "a
 
 
 @app.post("/v1/consents/{consent_id}/approve", response_model=ConsentCredentialOut,
-          description="Student (or guardian, if under 18) approves with the MOCK OTP; mints the scoped VerificationCredential.")
-def consent_approve(consent_id: int, body: ConsentApprove, request: Request, user=Depends(require("student")), conn=Depends(get_conn)):
-    k, vc = consent.approve(conn, user, consent_id, body.otp, body.approved_by, body.guardian_otp)
+          description="Student (or the guardian, if the student is under 18) approves with a passkey assertion bound to this "
+                      "request; mints the scoped VerificationCredential. The MOCK OTP body works only in DEMO_MODE.")
+def consent_approve(consent_id: int, body: ConsentApprove, request: Request, user=Depends(require_person("student", "guardian")),
+                    conn=Depends(get_conn)):
+    k, vc = consent.approve(conn, user, consent_id, body.model_dump())
     auth.audit(conn, user, "consent.grant", "consent", k["id"], student_id=k["student_id"], reason=f"granted by {k['granted_by']}",
                request=request)
     conn.commit()
@@ -483,7 +658,7 @@ def consent_approve(consent_id: int, body: ConsentApprove, request: Request, use
 
 
 @app.post("/v1/consents/{consent_id}/deny", response_model=ConsentOut)
-def consent_deny(consent_id: int, request: Request, user=Depends(require("student")), conn=Depends(get_conn)):
+def consent_deny(consent_id: int, request: Request, user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
     k = consent.deny(conn, user, consent_id)
     auth.audit(conn, user, "consent.deny", "consent", k["id"], student_id=k["student_id"], request=request)
     conn.commit()
@@ -492,7 +667,7 @@ def consent_deny(consent_id: int, request: Request, user=Depends(require("studen
 
 @app.post("/v1/consents/{consent_id}/revoke", response_model=ConsentOut,
           description="Student withdraws consent; the VerificationCredential is revoked via the status list.")
-def consent_revoke(consent_id: int, request: Request, user=Depends(require("student")), conn=Depends(get_conn)):
+def consent_revoke(consent_id: int, request: Request, user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
     k = consent.revoke(conn, user, consent_id)
     auth.audit(conn, user, "consent.revoke", "consent", k["id"], student_id=k["student_id"], request=request)
     conn.commit()
@@ -510,18 +685,18 @@ def consent_credential(consent_id: int, request: Request, user=Depends(require("
 
 # ---------- student self-service (D6) ----------
 @app.get("/v1/students/me", response_model=StudentProfile)
-def student_me(user=Depends(require("student")), conn=Depends(get_conn)):
+def student_me(user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
     s = conn.execute("SELECT apaar_masked, provisional_id, apaar_status FROM students WHERE id=%s", (user["student_id"],)).fetchone()
     if s is None:
         raise HTTPException(404, "Student not found")
     ens = conn.execute("SELECT p.name programme, i.name institution, e.academic_year, e.status, e.institution_student_id "
                        "FROM enrolments e JOIN programmes p ON p.id=e.programme_id JOIN institutions i ON i.id=p.institution_id "
                        "WHERE e.student_id=%s ORDER BY e.id DESC", (user["student_id"],)).fetchall()
-    return {**s, "enrolments": ens}
+    return {**s, "enrolments": ens, "passkey_cooldown_until": passkeys.cooldown_until(conn), "viewer": user["role"]}
 
 
 @app.get("/v1/students/me/access-log", response_model=list[AccessLogEntry],
          description="D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).")
-def student_access_log(user=Depends(require("student")), conn=Depends(get_conn)):
+def student_access_log(user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
     return conn.execute("SELECT ts, actor, role, action, reason, entity, entity_id FROM audit_logs WHERE student_id=%s "
                         "ORDER BY ts DESC LIMIT 500", (user["student_id"],)).fetchall()

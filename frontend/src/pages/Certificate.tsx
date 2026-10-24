@@ -3,7 +3,7 @@ import { ArrowLeft, CheckCircle2, Copy, Printer, ShieldCheck } from "lucide-reac
 import { ApiError, getJson, type S } from "../api/client";
 import { Button, ErrorNote, Loading } from "../ui";
 
-/** Printable certificate (Req 10): APAAR ID and student ID in full, plus the offline-verifiable QR. */
+/** Printable certificate (Req 10): APAAR ID and student ID in full, plus the verification QR (checked online). */
 export default function Certificate({ id }: { id: string }) {
   const [cert, setCert] = useState<S["CertificateOut"] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,18 +137,18 @@ export default function Certificate({ id }: { id: string }) {
             </div>
           </dl>
 
-          {/* Offline-Verifiable High Density QR */}
+          {/* Verification QR: carries the signed credential, checked online at /verify */}
           <figure className="flex flex-col items-center justify-center rounded-2xl border-2 border-slate-300 bg-white p-4 shadow-sm text-center">
             <img
               src={qrSrc}
-              alt="Offline Verifiable Credential QR Code containing Ed25519 digital signature"
+              alt="Verification QR code containing the signed credential"
               className="h-44 w-44 object-contain"
             />
             <figcaption className="mt-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-              Scan to Verify Offline · Level M
+              Contains the signed credential · verify at /verify
             </figcaption>
             <span className="text-[10px] font-mono text-slate-400">
-              {cert.qr_payload_chars} bytes · Ed25519 Signed
+              {cert.qr_payload_chars} chars · EC level M
             </span>
           </figure>
         </div>
@@ -157,10 +157,10 @@ export default function Certificate({ id }: { id: string }) {
         <footer className="relative mt-8 text-center text-[11px] font-medium text-slate-500 space-y-1.5 leading-normal">
           <div className="flex items-center justify-center gap-1.5 text-success font-semibold">
             <CheckCircle2 className="h-4 w-4 text-success" />
-            <span>Cryptographically Secured by W3C Verifiable Credentials (eddsa-jcs-2022)</span>
+            <span>W3C Verifiable Credential · eddsa-jcs-2022 signature</span>
           </div>
           <p>
-            This document is issued under the authority of the AICTE National Trust Registry. Any alteration to the text or QR payload will cause instant cryptographic verification failure.
+            Issuer listed in the AICTE trust registry (MOCK). Verify the QR and check that the signed details it shows match this printout: an altered QR fails verification, and altered print won't match.
           </p>
         </footer>
       </article>
