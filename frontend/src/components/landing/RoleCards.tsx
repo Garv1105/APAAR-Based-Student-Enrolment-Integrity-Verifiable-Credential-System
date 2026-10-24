@@ -15,7 +15,7 @@ export default function RoleCards() {
       <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {ROLES.map(({ icon: Icon, title, body, href }) => (
           <li key={title}>
-            <a href={href} onMouseMove={spotlight} className="glass-premium lift group flex h-full items-start gap-4 rounded-2xl p-6">
+            <a href={href} onMouseMove={spotlight} className="glass-premium lift relative group flex h-full items-start gap-4 rounded-2xl p-6">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-amber-300/20 to-amber-500/5 text-amber-300 ring-1 ring-amber-300/25 shadow-[0_0_24px_-8px_rgba(245,192,103,0.6)]" aria-hidden>
                 <Icon className="h-5 w-5" strokeWidth={1.7} /></span>
               <span className="min-w-0 flex-1">

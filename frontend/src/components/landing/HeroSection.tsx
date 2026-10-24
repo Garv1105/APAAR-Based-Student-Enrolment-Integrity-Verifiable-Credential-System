@@ -1,6 +1,6 @@
 import { ArrowRight, PlayCircle } from "lucide-react";
 import type { S } from "../../api/client";
-import IndiaMap3D from "./IndiaMap3D";
+import IndiaMapLive from "./IndiaMapLive";
 import TrustBar from "./TrustBar";
 import { BTN_PRIMARY, BTN_SECONDARY, fmt } from "./styles";
 
@@ -32,7 +32,7 @@ export default function HeroSection({ stats, failed }: { stats: S["PublicStats"]
 
       <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <div className="rise">
-          <p className="glass-premium inline-flex items-center gap-3 rounded-full px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-amber-300/90">
+          <p className="glass-premium relative inline-flex items-center gap-3 rounded-full px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-amber-300/90">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.9)]" />
             A trusted academic ecosystem for a stronger India
           </p>
@@ -55,7 +55,7 @@ export default function HeroSection({ stats, failed }: { stats: S["PublicStats"]
         </div>
 
         <figure className="rise relative" style={{ ["--d" as string]: "150ms" }}>
-          <IndiaMap3D states={stats?.states ?? []} badges={badges} />
+          <IndiaMapLive states={stats?.states ?? []} badges={badges} />
           <figcaption className="mt-2 text-center text-xs text-slate-500">
             {stats ? `States shaded by students recorded, ${stats.academic_year}. Hover a state for its numbers.`
               : failed ? "Live figures are unavailable right now." : "Loading live figures…"}

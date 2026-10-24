@@ -17,7 +17,7 @@ export default function MetricsDock({ stats }: { stats: S["PublicStats"] | null 
         <span aria-hidden className="h-px w-12 bg-gradient-to-r from-transparent to-amber-400/60" />Empowering India's education ecosystem
         <span aria-hidden className="h-px w-12 bg-gradient-to-l from-transparent to-amber-400/60" />
       </h2>
-      <div onMouseMove={spotlight} className="glass-premium grid grid-cols-1 gap-6 rounded-2xl p-7 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
+      <div onMouseMove={spotlight} className="glass-premium relative grid grid-cols-1 gap-6 rounded-2xl p-7 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
         {items.map(({ icon: Icon, value, label, sub }, i) => (
           <div key={label} className={`flex items-center gap-4 ${i ? "lg:border-l lg:border-white/10 lg:pl-6" : ""}`}>
             <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-amber-300/20 to-amber-500/5 ring-1 ring-amber-300/25 shadow-[0_0_24px_-6px_rgba(245,192,103,0.6)]" aria-hidden>
