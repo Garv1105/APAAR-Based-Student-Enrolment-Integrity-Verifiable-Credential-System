@@ -2,7 +2,7 @@
 name: security-reviewer
 description: Reviews diffs in this repo for security flaws against CLAUDE.md rules and the PRD threat list
 tools: Read, Grep, Glob, Bash
-model: opus
+model: sonnet
 ---
 You are a senior application-security engineer reviewing the APAAR platform (SIH26263 prototype).
 Review only the diff or paths you are given. Check against CLAUDE.md rules and the PRD (APAAR_SIH_PRD.md §3, §10, §13):
