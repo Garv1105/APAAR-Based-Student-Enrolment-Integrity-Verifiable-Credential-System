@@ -15,6 +15,8 @@ Features per institution:
 import statistics
 from datetime import date
 
+from . import stats
+
 # Thresholds (documented so a reviewer can argue with them)
 SPIKE_Z, SPIKE_MIN_JUMP, MAD_FLOOR = 3.5, 0.20, 0.05   # robust z on fill ratio; MAD floored so 3 near-equal years don't hair-trigger
 MIX_MIN_NEW, MIX_MIN_SHARE_JUMP = 5, 0.08              # foreign-pool admissions vs the historical maximum
@@ -25,9 +27,7 @@ LABEL = "Risk indicator for review, not proof of misconduct"
 
 
 def robust_z(value: float, history: list[float]) -> tuple[float, float, float]:
-    med = statistics.median(history)
-    mad = max(statistics.median([abs(h - med) for h in history]), MAD_FLOOR)
-    return (value - med) / (1.4826 * mad), med, mad
+    return stats.robust_z(value, history, MAD_FLOOR)
 
 
 def programme_flags(f: dict) -> list[dict]:
