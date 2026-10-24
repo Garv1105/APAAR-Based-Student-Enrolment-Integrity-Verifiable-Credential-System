@@ -4,7 +4,7 @@ import { getJson, type S } from "../api/client";
 import HeroSection from "../components/landing/HeroSection";
 import MetricsDock from "../components/landing/MetricsDock";
 import RoleCards from "../components/landing/RoleCards";
-import { GOLD_TEXT } from "../components/landing/styles";
+import { GOLD_TEXT, spotlight } from "../components/landing/styles";
 
 const STEPS = [
   [Upload, "Institutions upload", "Student-level records keyed by APAAR ID, through the portal or their ERP."],
@@ -30,9 +30,9 @@ export default function Landing({ section }: { section?: string | null }) {
       <RoleCards />
       <section id="how" aria-labelledby="how-heading" className="scroll-mt-28 pb-6">
         <h2 id="how-heading" className="font-inter text-[28px] font-bold tracking-[-0.02em] text-white">How it <span className={GOLD_TEXT}>works</span></h2>
-        <ol className="mt-6 grid gap-px overflow-hidden rounded-2xl border border-white/[0.08] bg-white/[0.06] sm:grid-cols-2 xl:grid-cols-4">
+        <ol className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {STEPS.map(([Icon, title, body], i) => (
-            <li key={title} className="bg-[#0b0e14]/95 p-6">
+            <li key={title} onMouseMove={spotlight} className="glass-premium lift rounded-2xl p-6">
               <span className="flex items-center gap-3">
                 <span className="font-mono text-[13px] tracking-[0.18em] text-amber-400">0{i + 1}</span>
                 <Icon className="h-5 w-5 text-amber-400" strokeWidth={1.6} aria-hidden />

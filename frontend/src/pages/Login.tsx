@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { getJson, type S, type Session } from "../api/client";
 import Starfield from "../components/Starfield";
+import Backdrop from "../components/landing/Backdrop";
 import Navbar from "../components/Navbar";
 import Landing from "./Landing";
 import SignIn from "./SignIn";
@@ -27,14 +28,10 @@ export function useDemoMode() {
 
 function PublicShell({ demo, current, children }: { demo: boolean; current: string; children: ReactNode }) {
   return (
-    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#07090E] font-inter text-white selection:bg-[#d4af37]/40 selection:text-white">
+    <div className="relative min-h-screen w-full overflow-x-hidden bg-[#05070B] font-inter text-white selection:bg-[#d4af37]/40 selection:text-white">
       {/* living background: base light, drifting aurora bands, faint grid, particles */}
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 bg-[#07090E]" />
-      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-        <div className="aurora-1 absolute -left-[10%] top-[-20%] h-[70vh] w-[70vw] rounded-full bg-[radial-gradient(closest-side,rgba(212,175,55,0.10),transparent)] blur-3xl" />
-        <div className="aurora-2 absolute -right-[15%] bottom-[-25%] h-[75vh] w-[65vw] rounded-full bg-[radial-gradient(closest-side,rgba(74,104,150,0.16),transparent)] blur-3xl" />
-      </div>
-      <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-60" />
+      <Backdrop />
+      <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-40" />
       <Starfield />
       <Navbar demo={demo} current={current} />
       <main className="relative z-10 mx-auto w-full max-w-[1440px] px-5 pb-14 pt-6 sm:px-8">{children}</main>

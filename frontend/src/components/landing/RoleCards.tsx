@@ -1,5 +1,5 @@
 import { ArrowRight, FileCheck, Landmark, ShieldCheck, Users } from "lucide-react";
-import { GOLD_TEXT } from "./styles";
+import { GOLD_TEXT, spotlight } from "./styles";
 
 const ROLES = [
   { icon: Landmark, title: "For Institutions", body: "Submit, validate and manage student records. Universities award degree credentials.", href: "#/signin?as=institution" },
@@ -15,8 +15,8 @@ export default function RoleCards() {
       <ul className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {ROLES.map(({ icon: Icon, title, body, href }) => (
           <li key={title}>
-            <a href={href} className="group flex h-full items-start gap-4 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 backdrop-blur-xl transition-colors hover:border-amber-400/40">
-              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-amber-400/20 bg-amber-400/[0.07] text-amber-400" aria-hidden>
+            <a href={href} onMouseMove={spotlight} className="glass-premium lift group flex h-full items-start gap-4 rounded-2xl p-6">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-amber-300/20 to-amber-500/5 text-amber-300 ring-1 ring-amber-300/25 shadow-[0_0_24px_-8px_rgba(245,192,103,0.6)]" aria-hidden>
                 <Icon className="h-5 w-5" strokeWidth={1.7} /></span>
               <span className="min-w-0 flex-1">
                 <span className="block text-[16px] font-semibold text-white">{title}</span>

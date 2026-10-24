@@ -5,3 +5,11 @@ export const BTN_PRIMARY =
 export const BTN_SECONDARY =
   "flex items-center gap-2 rounded-lg border border-white/20 bg-white/[0.03] px-6 py-3 text-white backdrop-blur-md transition-colors hover:bg-white/[0.08]";
 export const fmt = (n: number) => n.toLocaleString("en-IN");
+
+/** Moves a .glass-premium card's spotlight to the pointer. */
+export const spotlight = (e: { currentTarget: HTMLElement; clientX: number; clientY: number }) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+  e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+};
+export const GLASS = "glass-premium rounded-2xl";
