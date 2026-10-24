@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ApiError, getJson, sendJson, type S } from "../api/client";
 import { downloadJson, VerifyResultView, VerifyTool } from "../credentials";
-import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, PageHeader, Updated, usePoll } from "../ui";
+import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, PageHeader, usePoll } from "../ui";
 
 const FIELDS = [
   ["name", "Name"], ["programme", "Programme"], ["institution", "Institution"], ["academic_year", "Academic year"],
@@ -14,8 +14,7 @@ export default function VerifierHome() {
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="Employer verification" title="Verify a candidate"
-        meta={<span>Ask the student for consent. You receive a signed credential with only the fields they approve.</span>}
-        actions={<Updated at={consents.updatedAt} />} />
+        meta={<span>Ask the student for consent. You receive a signed credential with only the fields they approve.</span>} />
       <div className="grid gap-4 lg:grid-cols-2">
         <RequestForm onDone={consents.refresh} />
         <Card id="requests" title="My consent requests">

@@ -75,7 +75,7 @@ export default function StudentHome() {
         </div>
 
         {/* Overview Header */}
-        <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-white p-6 shadow-premium md:col-span-2">
+        <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-surface p-6 shadow-premium md:col-span-2">
           <div>
             <h1 className="mt-1 font-display text-[36px] font-normal leading-tight text-ink sm:text-[42px]">
               {me.data.viewer === "guardian" ? "Guardian view: student's academic record" : "My academic record"}

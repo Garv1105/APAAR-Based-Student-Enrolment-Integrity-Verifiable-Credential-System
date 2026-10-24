@@ -8,13 +8,13 @@ import GoldIndiaMap from "../components/GoldIndiaMap";
 import { NetworkCard } from "../network";
 import { InspectionQueueCard, RulePerformanceCard } from "../risk";
 import {
-  Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, Meter, PageHeader, ReportsCard, Ring, Stat, Table, Td, Updated, usePoll,
+  Badge, Button, CATEGORY_LABEL, Card, Empty, ErrorNote, fmtTime, Loading, Meter, PageHeader, ReportsCard, Ring, Stat, Table, Td, usePoll,
 } from "../ui";
 
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 
 export default function AicteHome({ role }: { role: Role }) {
-  const { data, error, updatedAt, refresh } = usePoll(() => getJson<S["AicteDashboard"]>("/v1/dashboard/aicte"));
+  const { data, error, refresh } = usePoll(() => getJson<S["AicteDashboard"]>("/v1/dashboard/aicte"));
   if (error && !data) return <ErrorNote>{error}</ErrorNote>;
   if (!data) return <Loading />;
   const t = data.totals;
@@ -34,7 +34,7 @@ export default function AicteHome({ role }: { role: Role }) {
           <span aria-hidden className="text-slate-300">·</span>
           <span>Approval registry <Badge tone="warning">MOCK</Badge></span>
         </>}
-        actions={<Updated at={updatedAt} />}
+
       />
       {error && <ErrorNote>{error}</ErrorNote>}
 

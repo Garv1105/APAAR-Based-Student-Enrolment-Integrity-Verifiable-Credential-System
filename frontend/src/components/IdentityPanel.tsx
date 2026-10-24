@@ -1,76 +1,25 @@
-import React from "react";
-import { ArrowRight, Building2, Cog, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
+import React, { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, ShieldAlert } from "lucide-react";
 import IdentityCard, { type IconKind } from "./IdentityCard";
 import PasswordField from "./PasswordField";
 
-interface PersonaConfig {
-  id: string;
-  title: string;
-  subtitle: string;
-  iconType: IconKind;
-  group: "INSTITUTIONS" | "REGULATORS" | "VERIFICATION";
-}
-
-const PERSONAS: PersonaConfig[] = [
-  // INSTITUTIONS
-  {
-    id: "inst-a",
-    title: "Demo Institute of Technology",
-    subtitle: "Clean data · inst-a",
-    iconType: "institution",
-    group: "INSTITUTIONS",
-  },
-  {
-    id: "inst-b",
-    title: "Sample College of Engineering",
-    subtitle: "Messy data · inst-b",
-    iconType: "institution",
-    group: "INSTITUTIONS",
-  },
-  {
-    id: "inst-c",
-    title: "Example School of Management",
-    subtitle: "Enrollment spike · inst-c",
-    iconType: "institution",
-    group: "INSTITUTIONS",
-  },
-  {
-    id: "inst-d",
-    title: "Closed Polytechnic",
-    subtitle: "Not approved · inst-d",
-    iconType: "institution",
-    group: "INSTITUTIONS",
-  },
-  // REGULATORS
-  {
-    id: "aicte",
-    title: "AICTE Monitoring Officer",
-    subtitle: "National monitoring · aicte",
-    iconType: "aicte",
-    group: "REGULATORS",
-  },
-  {
-    id: "auditor",
-    title: "Regulator (auditor)",
-    subtitle: "Read-only · auditor",
-    iconType: "auditor",
-    group: "REGULATORS",
-  },
-  // VERIFICATION
-  {
-    id: "employer",
-    title: "Acme Hiring (verifier)",
-    subtitle: "Employer · consent-based",
-    iconType: "employer",
-    group: "VERIFICATION",
-  },
-  {
-    id: "univ",
-    title: "Demo Technological University",
-    subtitle: "Registrar · awards degrees · univ",
-    iconType: "univ",
-    group: "VERIFICATION",
-  },
+// Seeded MOCK identities (backend/data/seed/registry.json), shown so judges can switch roles quickly.
+const GROUPS: { title: string; items: { id: string; title: string; subtitle: string; icon: IconKind }[] }[] = [
+  { title: "Institutions", items: [
+    { id: "inst-a", title: "Demo Institute of Technology", subtitle: "Clean data", icon: "institution" },
+    { id: "inst-b", title: "Sample College of Engineering", subtitle: "Messy data, duplicates", icon: "institution" },
+    { id: "inst-c", title: "Example School of Management", subtitle: "Enrolment spike", icon: "institution" },
+    { id: "inst-d", title: "Closed Polytechnic", subtitle: "Not approved this year", icon: "institution" },
+  ] },
+  { title: "Regulators", items: [
+    { id: "aicte", title: "AICTE Monitoring Officer", subtitle: "National monitoring, cases, ledger", icon: "aicte" },
+    { id: "auditor", title: "Regulator (auditor)", subtitle: "Read-only national view", icon: "auditor" },
+  ] },
+  { title: "Verifiers", items: [
+    { id: "employer", title: "Acme Hiring", subtitle: "Employer, consent-based checks", icon: "employer" },
+    { id: "univ", title: "Demo Technological University", subtitle: "Registrar, awards degrees", icon: "univ" },
+  ] },
 ];
 
 interface IdentityPanelProps {
@@ -83,135 +32,71 @@ interface IdentityPanelProps {
   error?: string | null;
 }
 
-export default function IdentityPanel({
-  selectedId,
-  onSelectId,
-  password,
-  onPasswordChange,
-  onSubmit,
-  busy,
-  error,
-}: IdentityPanelProps) {
-  const institutions = PERSONAS.filter((p) => p.group === "INSTITUTIONS");
-  const regulators = PERSONAS.filter((p) => p.group === "REGULATORS");
-  const verification = PERSONAS.filter((p) => p.group === "VERIFICATION");
+export default function IdentityPanel({ selectedId, onSelectId, password, onPasswordChange, onSubmit, busy, error }: IdentityPanelProps) {
+  const [tab, setTab] = useState(() => Math.max(0, GROUPS.findIndex((g) => g.items.some((i) => i.id === selectedId))));
+  const pick = (i: number) => {
+    setTab(i);
+    if (!GROUPS[i].items.some((it) => it.id === selectedId)) onSelectId(GROUPS[i].items[0].id); // keep a selection in view
+  };
+  const group = GROUPS[tab];
 
   return (
-    <div className="relative w-full rounded-[24px] border border-blue-500/20 bg-[#080f24]/85 p-6 sm:p-7 backdrop-blur-2xl shadow-[0_0_50px_rgba(10,20,50,0.8),0_0_30px_rgba(37,99,255,0.12)] ring-1 ring-white/5">
-      {/* Header */}
-      <div className="space-y-1.5 pb-5">
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
-          Choose your{" "}
-          <span className="bg-gradient-to-r from-blue-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
-            identity
-          </span>
-        </h2>
-        <p className="text-xs sm:text-sm text-[#9fb0d0]">
-          Select an institution, regulator or verifier and enter the password to access the portal.
-        </p>
-      </div>
+    <div className="rise relative w-full overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0a1024]/55 p-7 font-inter shadow-[0_50px_100px_-40px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-2xl">
+      <span aria-hidden className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#9db4ff]/60 to-transparent" />
+      <span aria-hidden className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-[#5b6bff]/20 blur-3xl" />
 
-      {error && (
-        <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-rose-500/40 bg-rose-950/40 p-3 text-xs font-semibold text-rose-300">
-          <ShieldAlert className="h-4 w-4 shrink-0 text-rose-400" />
-          <span>{error}</span>
-        </div>
-      )}
+      <div className="relative">
+        <p className="text-[12px] font-semibold tracking-[0.14em] text-[#8ea8ff]">SIGN IN</p>
+        <h2 className="mt-2 font-manrope text-[30px] font-extrabold leading-tight tracking-[-0.03em] text-white">Choose your identity</h2>
+        <p className="mt-1.5 text-[14px] leading-relaxed text-[#93a2c4]">Demo accounts for each role. Every account uses the same demo password.</p>
 
-      {/* Main Form */}
-      <form onSubmit={onSubmit} className="space-y-5">
-        {/* Section 1: INSTITUTIONS */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            <Building2 className="h-3.5 w-3.5 text-sky-400" />
-            <span>Institutions</span>
+        {error && (
+          <div role="alert" className="mt-4 flex items-start gap-2.5 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3.5 py-2.5 text-[13px] text-rose-200">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />{error}
           </div>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {institutions.map((p) => (
-              <IdentityCard
-                key={p.id}
-                id={p.id}
-                title={p.title}
-                subtitle={p.subtitle}
-                iconType={p.iconType}
-                isSelected={selectedId === p.id}
-                onSelect={onSelectId}
-              />
-            ))}
-          </div>
+        )}
+
+        <div role="tablist" aria-label="Role" className="mt-6 grid grid-cols-3 gap-1 rounded-2xl border border-white/[0.07] bg-black/25 p-1">
+          {GROUPS.map((g, i) => (
+            <button key={g.title} type="button" role="tab" aria-selected={tab === i} onClick={() => pick(i)}
+              className={`relative rounded-xl px-3 py-2.5 font-manrope text-[13.5px] font-semibold transition-colors duration-200 ${tab === i ? "text-white" : "text-[#8b9bbd] hover:text-white"}`}>
+              {tab === i && <motion.span layoutId="role-tab" className="absolute inset-0 rounded-xl bg-gradient-to-b from-white/[0.12] to-white/[0.05] shadow-[inset_0_1px_0_rgba(255,255,255,0.12),0_6px_18px_-8px_rgba(0,0,0,0.8)]"
+                transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
+              <span className="relative">{g.title} <span className="font-inter text-[11.5px] font-medium opacity-60">{g.items.length}</span></span>
+            </button>
+          ))}
         </div>
 
-        {/* Section 2: REGULATORS */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            <Cog className="h-3.5 w-3.5 text-blue-400" />
-            <span>Regulators</span>
-          </div>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {regulators.map((p) => (
-              <IdentityCard
-                key={p.id}
-                id={p.id}
-                title={p.title}
-                subtitle={p.subtitle}
-                iconType={p.iconType}
-                isSelected={selectedId === p.id}
-                onSelect={onSelectId}
-              />
-            ))}
-          </div>
-        </div>
+        <form onSubmit={onSubmit} className="mt-4">
+          <fieldset className="min-h-[316px]">
+            <legend className="sr-only">{group.title}</legend>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div key={group.title} className="space-y-2.5"
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.22, ease: "easeOut" }}>
+                {group.items.map((p) => (
+                  <IdentityCard key={p.id} id={p.id} title={p.title} subtitle={p.subtitle} iconType={p.icon}
+                    isSelected={selectedId === p.id} onSelect={onSelectId} />
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          </fieldset>
 
-        {/* Section 3: VERIFICATION */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            <Shield className="h-3.5 w-3.5 text-cyan-400" />
-            <span>Verification</span>
+          <div className="mt-5">
+            <PasswordField value={password} onChange={onPasswordChange} disabled={busy} />
           </div>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {verification.map((p) => (
-              <IdentityCard
-                key={p.id}
-                id={p.id}
-                title={p.title}
-                subtitle={p.subtitle}
-                iconType={p.iconType}
-                isSelected={selectedId === p.id}
-                onSelect={onSelectId}
-              />
-            ))}
-          </div>
-        </div>
 
-        {/* Password Field */}
-        <div className="pt-1">
-          <PasswordField
-            value={password}
-            onChange={onPasswordChange}
-            disabled={busy}
-          />
-        </div>
-
-        {/* Full-width Access Portal Button */}
-        <div>
-          <button
-            type="submit"
-            disabled={busy}
-            className="group relative flex w-full items-center justify-center gap-2 rounded-[14px] bg-gradient-to-r from-[#2563ff] via-[#4f46e5] to-[#7c5cff] py-3.5 text-sm font-bold text-white shadow-[0_4px_25px_rgba(37,99,255,0.4)] transition-all hover:shadow-[0_6px_35px_rgba(37,99,255,0.65)] hover:brightness-110 active:scale-[0.99] disabled:opacity-50 cursor-pointer"
-          >
-            <span>{busy ? "Connecting to Ledger…" : "Access Portal"}</span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+          <button type="submit" disabled={busy}
+            className="group relative mt-5 flex w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-[#3b6bff] via-[#4f63ff] to-[#6f5cff] py-3.5 font-manrope text-[15.5px] font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_16px_36px_-14px_rgba(59,107,255,0.9)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_22px_44px_-14px_rgba(79,99,255,1)] disabled:opacity-60">
+            <span aria-hidden className="absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/20 blur-md transition-transform duration-700 group-hover:translate-x-[420%]" />
+            <span className="relative">{busy ? "Signing in…" : "Sign in"}</span>
+            <ArrowRight className="relative h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" aria-hidden />
           </button>
-        </div>
 
-        {/* Bottom Disclaimer */}
-        <div className="flex items-center justify-center gap-1.5 pt-1 text-center text-[10px] sm:text-[11px] text-slate-400 font-normal">
-          <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-blue-400/80" />
-          <span>
-            Prototype · Synthetic data only · APAAR registry, AICTE approval registry, OTP and logins are MOCK
-          </span>
-        </div>
-      </form>
+          <p className="mt-4 text-center text-[12px] leading-relaxed text-[#6f7fa3]">
+            Prototype · synthetic data only · APAAR registry, AICTE approval registry, OTP and logins are MOCK
+          </p>
+        </form>
+      </div>
     </div>
   );
 }
