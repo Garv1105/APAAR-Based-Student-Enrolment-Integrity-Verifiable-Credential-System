@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import IndiaMap from "../components/IndiaMap";
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
 import {
-  AlertTriangle, ArrowRight, BadgeCheck, BarChart3, CheckCircle2, ChevronRight, FileDown, FileSpreadsheet, History, Megaphone,
+  AlertTriangle, Armchair, ArrowRight, BadgeCheck, BarChart3, CalendarDays, IdCard, UserX, CheckCircle2, ChevronRight, FileDown, FileSpreadsheet, History, Megaphone,
   PieChart as PieIcon, ShieldCheck, Siren, UploadCloud, Users,
 } from "lucide-react";
 import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
@@ -43,20 +43,9 @@ export default function InstitutionHome() {
           <h1 className="mt-4 font-display text-[40px] font-bold leading-[1.06] tracking-[-0.035em] text-ink sm:text-[48px] 2xl:text-[54px]">
             {data.name}
           </h1>
-          <dl className="mt-7 grid max-w-2xl grid-cols-2 gap-x-6 gap-y-5 md:grid-cols-4 lg:grid-cols-2 2xl:grid-cols-4">
-            {([
-              ["AICTE ID", <span className="font-mono text-[16px]">{data.institution_id}</span>, null],
-              ["Academic year", year ?? "Not set", null],
-              ["Approved intake", <span className="inline-flex items-center gap-2">{intake}<Badge tone="warning">MOCK</Badge></span>, "From AICTE registry"],
-              ["Without APAAR", withoutApaar, `${cov.REFUSED ?? 0} refused · ${cov.PENDING ?? 0} pending · ${cov.NOT_GENERATED ?? 0} not generated`],
-            ] as const).map(([k, v, sub]) => (
-              <div key={k} className="min-w-0 border-l border-gold/35 pl-4">
-                <dt className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-mute">{k}</dt>
-                <dd className="mt-1.5 whitespace-nowrap font-display text-[19px] font-bold tabular-nums text-ink">{v}</dd>
-                {sub && <dd className="mt-1 text-[12.5px] leading-snug text-slate-500">{sub}</dd>}
-              </div>
-            ))}
-          </dl>
+          <p className="mt-4 max-w-lg text-[16.5px] leading-relaxed text-slate-600">
+            Student records keyed by APAAR ID, validated row by row and checked against AICTE-approved seats.
+          </p>
         </div>
         <div aria-hidden className="pointer-events-none hidden xl:block">
           <div className="relative">
@@ -66,6 +55,26 @@ export default function InstitutionHome() {
         </div>
         <Notices notices={data.open_notices} />
       </section>
+      {/* identity ribbon: one glass panel, each fact with its own gold icon tile */}
+      <dl className="glass rise grid grid-cols-1 gap-1 rounded-2xl p-2 sm:grid-cols-2 xl:grid-cols-4">
+        {([
+          [IdCard, "AICTE ID", <span className="font-mono text-[15.5px] tracking-tight">{data.institution_id}</span>, null],
+          [CalendarDays, "Academic year", year ?? "Not set", null],
+          [Armchair, "Approved intake", <span className="inline-flex items-center gap-2">{intake}<Badge tone="warning">MOCK</Badge></span>, null],
+          [UserX, "Without APAAR", withoutApaar, ([[cov.REFUSED, "refused"], [cov.PENDING, "pending"], [cov.NOT_GENERATED, "not generated"]] as const).filter(([n]) => n).map(([n, w]) => `${n} ${w}`).join(" · ") || null],
+        ] as const).map(([Icon, k, v, sub]) => (
+          <div key={k} className="group flex min-w-0 items-center gap-3.5 rounded-xl px-3.5 py-3 transition-colors duration-300 hover:bg-white/[0.035]">
+            <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-gold/25 to-gold/[0.04] text-champagne ring-1 ring-gold/30 shadow-[0_6px_20px_-10px_rgba(212,175,55,0.8)]">
+              <Icon className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-mute">{k}</dt>
+              <dd className="mt-0.5 whitespace-nowrap font-display text-[18px] font-bold tabular-nums text-ink">{v}</dd>
+              {sub && <dd className="text-[12px] leading-snug text-slate-500">{sub}</dd>}
+            </div>
+          </div>
+        ))}
+      </dl>
       {error && <ErrorNote>{error}</ErrorNote>}
 
       {/* KPIs */}
@@ -90,12 +99,12 @@ export default function InstitutionHome() {
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-12">
         <SeatsCard programmes={data.programmes} />
-        <CategoryCard programmes={data.programmes} />
+        <AnomalyCard risk={risk.data} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-12">
         <BatchesCard batches={data.batches} />
-        <AnomalyCard risk={risk.data} />
+        <CategoryCard programmes={data.programmes} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-12">
@@ -368,7 +377,7 @@ function CategoryCard({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
     { name: "CIWG", key: "ciwg", value: ciwg, color: CAT.ciwg },
   ];
   return (
-    <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-5">
+    <Card delay={500} title="Category utilisation" icon={<PieIcon />} className="xl:col-span-3">
       {total === 0 ? <Empty>No enrolments yet.</Empty> : (<>
         <div className="relative mx-auto h-48 w-48" role="img"
           aria-label={`Filled seats by category: ${parts.map((p) => `${p.name} ${p.value}`).join(", ")}`}>
@@ -452,7 +461,7 @@ function QualityCard({ risk, error }: { risk: S["InstitutionRisk"] | null; error
 function AnomalyCard({ risk }: { risk: S["InstitutionRisk"] | null }) {
   const flags = risk?.flags ?? [];
   return (
-    <Card delay={680} title="Anomaly flags" icon={<Siren />} className="xl:col-span-3" actions={risk && <Badge tone={flags.length ? "warning" : "ok"} dot>{flags.length} active</Badge>}>
+    <Card delay={680} title="Anomaly flags" icon={<Siren />} className="lg:col-span-2 xl:col-span-5" actions={risk && <Badge tone={flags.length ? "warning" : "ok"} dot>{flags.length} active</Badge>}>
       {!risk ? <p className="py-8 text-center text-[15px] text-mute">Loading…</p> : flags.length === 0 ? (
         <div className="flex items-start gap-3 rounded-lg border border-success-border bg-success-bg p-4">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success-text" aria-hidden />
@@ -485,7 +494,7 @@ const STATUS_TONE = { completed: "ok", processing: "warning", failed: "error" } 
 
 function BatchesCard({ batches }: { batches: S["BatchOut"][] }) {
   return (
-    <Card id="batches" delay={620} title="Recent upload batches" icon={<History />} className="xl:col-span-9" actions={<span>Last {Math.min(batches.length, 20)} · newest first · open a batch for row-level issues</span>}>
+    <Card id="batches" delay={620} title="Recent upload batches" icon={<History />} className="xl:col-span-9 [&_td]:px-3 [&_th]:px-3" actions={<span>Last {Math.min(batches.length, 20)} · newest first · open a batch for row-level issues</span>}>
       {batches.length === 0 ? <Empty>No uploads yet.</Empty> : (
         <Table head={["Batch", "Uploaded", "Rows", "Accepted", "Rejected", "Warnings", "Flags", "Status"]}>
           {batches.map((b) => (
