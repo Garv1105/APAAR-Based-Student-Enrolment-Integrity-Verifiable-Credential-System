@@ -1,4 +1,4 @@
-# ShikshaNetra: APAAR-Based Student Enrolment Integrity & Verifiable Credential System
+# VidyaPramaan: APAAR-Based Student Enrolment Integrity & Verifiable Credential System
 
 Prototype for **Smart India Hackathon problem statement SIH26263**: an APAAR ID-based student data management and verification platform for AICTE-approved institutions.
 

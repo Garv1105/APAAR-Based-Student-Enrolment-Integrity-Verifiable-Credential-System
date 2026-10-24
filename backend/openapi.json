@@ -1,7 +1,7 @@
 {
  "openapi": "3.1.0",
  "info": {
-  "title": "ShikshaNetra: APAAR Student Data & Verification Platform (SIH26263 prototype)",
+  "title": "VidyaPramaan: APAAR Student Data & Verification Platform (SIH26263 prototype)",
   "description": "Prototype. APAAR registry, AICTE approval registry, OTP and identity provider are MOCKS. Synthetic data only.",
   "version": "0.1.0"
  },

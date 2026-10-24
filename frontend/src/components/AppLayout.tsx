@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import type { Role, Session } from "../api/client";
 import { go } from "../ui";
-import BrandMark from "./BrandMark";
+import { BrandLogo } from "./BrandMark";
 
 interface AppLayoutProps {
   session?: Session | null;
@@ -70,17 +70,7 @@ function scrollToSection(id: string) {
 }
 
 function Brand() {
-  return (
-    <span className="flex items-center gap-3">
-      <span aria-hidden className="grid h-10 w-10 place-items-center rounded-xl border border-gold/35 bg-gradient-to-br from-gold/20 to-gold/[0.04] text-gold shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
-        <BrandMark className="h-6 w-6" />
-      </span>
-      <span className="leading-tight">
-        <span className="block text-[16px] font-semibold tracking-[-0.015em] text-ink">ShikshaNetra</span>
-        <span className="block text-[11px] text-mute">Seat integrity &amp; credentials</span>
-      </span>
-    </span>
-  );
+  return <BrandLogo size="sm" />;
 }
 
 const PAGE_LABEL = (hash: string, home: string) =>
@@ -176,10 +166,14 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
             </nav>
             <p className="border-t border-line px-4 py-1.5 text-[11px] text-warning-text lg:hidden" role="note">Prototype · synthetic data · registries, OTP and logins are MOCK</p>
             <div className="hidden items-center justify-between gap-4 px-8 py-3 lg:flex">
-              <div className="flex items-center gap-2 text-xs text-mute">
-                <span>{roleLabel}</span>
-                <span className="text-slate-300" aria-hidden>/</span>
-                <span className="text-slate-700">{PAGE_LABEL(currentHash, home)}</span>
+              <div className="flex items-center gap-4 text-xs text-mute">
+                <span className="flex items-center gap-2">
+                  <span>{roleLabel}</span>
+                  <span className="text-slate-300" aria-hidden>/</span>
+                  <span className="text-slate-700">{PAGE_LABEL(currentHash, home)}</span>
+                </span>
+                <span aria-hidden className="h-4 w-px bg-white/10" />
+                <span className="hidden text-[11px] text-slate-400 xl:inline">SIH26263 prototype · not an official Government of India or AICTE website</span>
               </div>
               <div className="flex items-center gap-4">
                 <span className="text-xs text-mute">
