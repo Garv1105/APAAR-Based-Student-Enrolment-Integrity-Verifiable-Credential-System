@@ -1,7 +1,7 @@
 .venv/
 __pycache__/
 .pytest_cache/
-backend/.keys.json
+backend/.keys*.json
 node_modules/
 frontend/dist/
 .env
@@ -10,3 +10,6 @@ frontend/dist/
 /data/
 /data_demo/
 .claude/settings.local.json
+
+.vercel
+.env*

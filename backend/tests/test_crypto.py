@@ -81,3 +81,23 @@ def test_multikey_roundtrip():
     priv = crypto.signing_key("test-issuer")
     pub = crypto.public_from_multikey(crypto.public_multikey(priv))
     pub.verify(priv.sign(b"x"), b"x")
+
+
+def test_keys_from_environment_are_read_only(monkeypatch):
+    """Serverless: keys come from APAAR_KEYS_JSON; a missing key fails instead of being invented per instance."""
+    import json
+    from app import crypto
+    keys = {"k_enc": "11" * 32, "signing": {"aicte-ledger": "22" * 32}}
+    monkeypatch.setenv(crypto.KEYS_ENV, json.dumps(keys))
+    monkeypatch.setattr(crypto, "_keys", None)
+    try:
+        assert crypto.secret("k_enc") == bytes.fromhex("11" * 32)
+        assert crypto.public_multikey(crypto.signing_key("aicte-ledger"))
+        for missing in (lambda: crypto.secret("k_jwt"), lambda: crypto.signing_key("did:web:unknown")):
+            try:
+                missing()
+                raise AssertionError("expected a missing-key error")
+            except RuntimeError as e:
+                assert crypto.KEYS_ENV in str(e)
+    finally:
+        monkeypatch.setattr(crypto, "_keys", None)  # later tests reload the test key file
