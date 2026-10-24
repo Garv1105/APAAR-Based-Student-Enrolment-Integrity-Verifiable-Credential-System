@@ -867,6 +867,185 @@
     ]
    }
   },
+  "/v1/ai/explain-institution/{institution_id}": {
+   "post": {
+    "summary": "Ai Explain Institution",
+    "description": "Regulators: a short plain-language briefing on why a college ranks where it does in the inspection queue. Advisory; built from aggregates only (no student data). Falls back to a rule-based summary.",
+    "operationId": "ai_explain_institution_v1_ai_explain_institution__institution_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "institution_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Institution Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/ai/inspection-note/{institution_id}": {
+   "post": {
+    "summary": "Ai Inspection Note",
+    "description": "AICTE officer: a DRAFT inspection visit note (purpose, findings to verify, records to request, questions) for the officer to edit. Advisory; aggregates and the officers' own decisions only.",
+    "operationId": "ai_inspection_note_v1_ai_inspection_note__institution_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "institution_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Institution Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/ai/map-columns": {
+   "post": {
+    "summary": "Ai Map Columns",
+    "description": "Institution: suggests which template column each of its CSV headers means, when an upload was rejected for missing columns. Header NAMES only; a header that looks like data (long numbers, dates, emails) is refused. The institution confirms every match before re-uploading.",
+    "operationId": "ai_map_columns_v1_ai_map_columns_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ColumnMapIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ColumnMapOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/v1/ai/upload-summary/{batch_id}": {
+   "post": {
+    "summary": "Ai Upload Summary",
+    "description": "Institution: a short, ordered checklist of what to fix in its own upload. Advisory; built from problem codes, counts and column names only (no row contents). Falls back to a rule-based checklist.",
+    "operationId": "ai_upload_summary_v1_ai_upload_summary__batch_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "batch_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Batch Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/dqs": {
    "get": {
     "summary": "Own Dqs",
@@ -3363,6 +3542,52 @@
     ],
     "title": "ActivationCodeOut"
    },
+   "AiSummary": {
+    "properties": {
+     "text": {
+      "type": "string",
+      "title": "Text"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "gemini",
+       "rules"
+      ],
+      "title": "Source",
+      "description": "gemini = AI-generated; rules = the platform's own fallback summary"
+     },
+     "model": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Model"
+     },
+     "cached": {
+      "type": "boolean",
+      "title": "Cached"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label",
+      "description": "show this next to the text"
+     }
+    },
+    "type": "object",
+    "required": [
+     "text",
+     "source",
+     "model",
+     "cached",
+     "label"
+    ],
+    "title": "AiSummary"
+   },
    "AicteDashboard": {
     "properties": {
      "totals": {
@@ -3913,6 +4138,107 @@
      "published_at"
     ],
     "title": "CheckpointOut"
+   },
+   "ColumnMapIn": {
+    "properties": {
+     "headers": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 60,
+      "minItems": 1,
+      "title": "Headers",
+      "description": "the file's header row (column NAMES only)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "headers"
+    ],
+    "title": "ColumnMapIn"
+   },
+   "ColumnMapOut": {
+    "properties": {
+     "matches": {
+      "items": {
+       "$ref": "#/components/schemas/ColumnMatch"
+      },
+      "type": "array",
+      "title": "Matches"
+     },
+     "columns": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Columns",
+      "description": "all template columns, in order"
+     },
+     "required": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Required"
+     },
+     "missing": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Missing",
+      "description": "required template columns no header was matched to"
+     },
+     "source": {
+      "type": "string",
+      "enum": [
+       "gemini",
+       "rules"
+      ],
+      "title": "Source"
+     },
+     "label": {
+      "type": "string",
+      "title": "Label"
+     }
+    },
+    "type": "object",
+    "required": [
+     "matches",
+     "columns",
+     "required",
+     "missing",
+     "source",
+     "label"
+    ],
+    "title": "ColumnMapOut"
+   },
+   "ColumnMatch": {
+    "properties": {
+     "header": {
+      "type": "string",
+      "title": "Header"
+     },
+     "column": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Column",
+      "description": "suggested template column, or null to ignore this column"
+     }
+    },
+    "type": "object",
+    "required": [
+     "header",
+     "column"
+    ],
+    "title": "ColumnMatch"
    },
    "ComplianceRow": {
     "properties": {

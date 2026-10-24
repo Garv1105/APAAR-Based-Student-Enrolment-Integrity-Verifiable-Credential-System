@@ -5,6 +5,7 @@ import {
   IdCard, Megaphone, ShieldCheck, UploadCloud, Users,
 } from "lucide-react";
 import { ApiError, download, getJson, uploadCsv, type S } from "../api/client";
+import { ColumnMatcher } from "../ai";
 import { EnrolmentLookup } from "./Registrar";
 import IndiaMap from "../components/IndiaMap";
 import { useMounted } from "../components/motion";
@@ -210,16 +211,19 @@ function Upload({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<S["BatchOut"] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mismatch, setMismatch] = useState<File | null>(null);
 
   async function send(file: File | undefined) {
     if (!file) return;
     setBusy(true);
     setError(null);
     setResult(null);
+    setMismatch(null);
     try {
       setResult(await uploadCsv(file));
       onDone();
     } catch (e) {
+      if (e instanceof ApiError && e.status === 422 && e.title === "Missing required columns") setMismatch(file);
       setError(e instanceof ApiError ? e.text : "Upload failed: cannot reach the API.");
     } finally {
       setBusy(false);
@@ -265,7 +269,8 @@ function Upload({ onDone }: { onDone: () => void }) {
       </div>
 
       <div aria-live="polite">
-        {error && <div className="border-t border-white/[0.07] p-5"><ErrorNote>{error}</ErrorNote></div>}
+        {error && <div className="border-t border-white/[0.07] p-5"><ErrorNote>{error}</ErrorNote>
+          {mismatch && <div className="mt-4"><ColumnMatcher file={mismatch} onUpload={(f) => send(f)} onCancel={() => setMismatch(null)} /></div>}</div>}
         {result && (
           <div className="border-t border-white/[0.07] bg-white/[0.02] px-7 py-6 sm:px-10">
             <div className="flex flex-wrap items-center justify-between gap-3">

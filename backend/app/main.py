@@ -14,9 +14,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import ValidationError
 
-from . import accounts, auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
+from . import accounts, ai, auth, cases, consent, credentials, crypto, dashboards, db, i18n, ingest, ledger, passkeys, reports, risk, webhooks
 from .auth import require
-from .contracts import (CSV_COLUMNS, AccessRequestCreated, AccessRequestDecided, AccessRequestDecisionIn, AccessRequestIn,
+from .contracts import (CSV_COLUMNS, REQUIRED_COLUMNS, AiSummary, ColumnMapIn, ColumnMapOut, AccessRequestCreated, AccessRequestDecided, AccessRequestDecisionIn, AccessRequestIn,
                         AccessRequestOut, AccountActivateIn, AccountActivateOut, AccountCodeIn, AccountCodeOut, PublicAccount, PublicStats, AccessLogEntry, FlagReviewIn, FlagReviewOut, NetworkOut, PeerStatus, RulePerformance, ActivateIn, ActivationCodeIn, ActivationCodeOut, AuthConfig, PasskeyCredentialIn,
                         PasskeyOut, SetupOut, CaseOut, CaseResolve, CaseUnmask, WebhookCreated, WebhookDeliveriesPage,
                         WebhookDelivery, WebhookIn, WebhookOut, AicteDashboard, AnomalyFlag, InspectionEntry, InstitutionRisk, BatchJsonIn, BatchOut, CertificateOut, CheckpointOut, ConsentApprove,
@@ -359,6 +359,90 @@ def anomalies_peer_status(user=Depends(require("aicte_officer", "auditor")), con
          description="Institutions ranked by risk = (100 - DQS) x active enrolments, with DQS components and reasons.")
 def inspection_queue(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
     return risk.inspection_queue(conn)
+
+
+# ---------- T-AI: plain-language explanations (Gemini free tier, allow-listed aggregates only; app/ai.py) ----------
+def _queue_entry(conn, institution_id: str) -> tuple[dict, str]:
+    """The college's inspection-queue entry and its priority bucket (top 10% High, next 20% Medium, rest Low)."""
+    queue = risk.inspection_queue(conn)
+    entry = next((e for e in queue if e["institution_id"] == institution_id), None)
+    if entry is None:
+        raise HTTPException(404, "Institution not found")
+    ranked = sorted((e for e in queue if e["risk"] is not None), key=lambda e: -(e["risk"] or 0))
+    pos = next((i for i, e in enumerate(ranked) if e["institution_id"] == institution_id), None)
+    priority = ("No data" if pos is None else "Low" if (entry["risk"] or 0) <= 0
+                else "High" if pos < 0.1 * len(ranked) else "Medium" if pos < 0.3 * len(ranked) else "Low")
+    return entry, priority
+
+
+@app.post("/v1/ai/explain-institution/{institution_id}", response_model=AiSummary,
+          description="Regulators: a short plain-language briefing on why a college ranks where it does in the inspection queue. "
+                      "Advisory; built from aggregates only (no student data). Falls back to a rule-based summary.")
+def ai_explain_institution(institution_id: str, request: Request, user=Depends(require("aicte_officer", "auditor")),
+                           conn=Depends(get_conn)):
+    auth.throttle("ai:" + user["id"], 20, 60)
+    entry, priority = _queue_entry(conn, institution_id)
+    facts = ai.institution_facts(entry, priority)
+    out = ai.generate("explain-institution", facts,
+                      "In 3 to 4 sentences, explain to an AICTE inspector why this college has this priority and what to check "
+                      "first on a visit. Mention the weakest score parts and the most serious warning signs by their numbers.",
+                      ai.institution_fallback(facts))
+    auth.audit(conn, user, "ai.explain_institution", "institution", institution_id, reason=out["source"], request=request)
+    conn.commit()
+    return out
+
+
+@app.post("/v1/ai/inspection-note/{institution_id}", response_model=AiSummary,
+          description="AICTE officer: a DRAFT inspection visit note (purpose, findings to verify, records to request, questions) "
+                      "for the officer to edit. Advisory; aggregates and the officers' own decisions only.")
+def ai_inspection_note(institution_id: str, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    auth.throttle("ai:" + user["id"], 20, 60)
+    entry, priority = _queue_entry(conn, institution_id)
+    facts = ai.note_facts(entry, priority)
+    out = ai.generate("inspection-note", facts,
+                      "Draft an inspection visit note for an AICTE officer with these headings, each on its own line: Purpose of visit; "
+                      "Findings to verify; Records to request; Questions for the principal. Use short dash bullets under each heading, "
+                      "only the facts given, at most 220 words. Say what to verify, never conclude wrongdoing.",
+                      ai.note_fallback(facts), max_tokens=700)
+    auth.audit(conn, user, "ai.inspection_note", "institution", institution_id, reason=out["source"], request=request)
+    conn.commit()
+    return out
+
+
+@app.post("/v1/ai/map-columns", response_model=ColumnMapOut,
+          description="Institution: suggests which template column each of its CSV headers means, when an upload was rejected for "
+                      "missing columns. Header NAMES only; a header that looks like data (long numbers, dates, emails) is refused. "
+                      "The institution confirms every match before re-uploading.")
+def ai_map_columns(body: ColumnMapIn, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    auth.throttle("ai:" + user["id"], 20, 60)
+    headers = [h.strip() for h in body.headers if h.strip()]
+    if any(ai.looks_like_data(h) for h in headers):
+        return problem(422, "The first row looks like student data, not column names",
+                       "Add a header row with column names, or download the template.")
+    out = ai.map_columns(headers, CSV_COLUMNS)
+    used = {c for c in out["mapping"].values() if c}
+    auth.audit(conn, user, "ai.map_columns", "upload_batch", None, reason=out["source"], request=request)
+    conn.commit()
+    return {"matches": [{"header": h, "column": c} for h, c in out["mapping"].items()], "columns": CSV_COLUMNS,
+            "required": REQUIRED_COLUMNS, "missing": [c for c in REQUIRED_COLUMNS if c not in used],
+            "source": out["source"], "label": out["label"]}
+
+
+@app.post("/v1/ai/upload-summary/{batch_id}", response_model=AiSummary,
+          description="Institution: a short, ordered checklist of what to fix in its own upload. Advisory; built from problem "
+                      "codes, counts and column names only (no row contents). Falls back to a rule-based checklist.")
+def ai_upload_summary(batch_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    auth.throttle("ai:" + user["id"], 20, 60)
+    b = _own_batch(conn, user, batch_id)
+    rows = conn.execute("SELECT row_no, code, severity, field, params FROM validation_issues WHERE batch_id=%s", (batch_id,)).fetchall()
+    facts = ai.upload_facts(b["row_counts_json"], _rendered(rows, "en"))
+    out = ai.generate("upload-summary", facts,
+                      "Write a short checklist (at most 5 numbered steps) telling the college's data officer what to fix first in "
+                      "this upload and how, most serious first. Then one sentence on what happens to rows sent to AICTE.",
+                      ai.upload_fallback(facts))
+    auth.audit(conn, user, "ai.upload_summary", "upload_batch", batch_id, reason=out["source"], request=request)
+    conn.commit()
+    return out
 
 
 @app.get("/v1/dqs", response_model=InstitutionRisk, description="The calling institution's own Data Quality Score and flags.")

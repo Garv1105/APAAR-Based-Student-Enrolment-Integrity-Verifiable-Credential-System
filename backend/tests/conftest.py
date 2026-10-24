@@ -62,3 +62,11 @@ def student_headers(client, apaar):
     r = client.post("/v1/auth/student-login", json={"apaar_id": apaar, "dob": dob_of(apaar)})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+@pytest.fixture(autouse=True)
+def _no_real_gemini(monkeypatch):
+    """Tests never call Gemini, even when backend/.env has a key: the model call is stubbed (rule-based fallback)."""
+    from app import ai
+    monkeypatch.setattr(ai, "_call", lambda facts, task, **k: None)
+    ai._cache.clear()
