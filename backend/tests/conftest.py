@@ -68,5 +68,5 @@ def student_headers(client, apaar):
 def _no_real_gemini(monkeypatch):
     """Tests never call Gemini, even when backend/.env has a key: the model call is stubbed (rule-based fallback)."""
     from app import ai
-    monkeypatch.setattr(ai, "_call", lambda facts, task: None)
+    monkeypatch.setattr(ai, "_call", lambda facts, task, **k: None)
     ai._cache.clear()

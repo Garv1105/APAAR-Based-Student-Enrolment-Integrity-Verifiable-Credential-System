@@ -431,6 +431,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ai/inspection-note/{institution_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ai Inspection Note
+         * @description AICTE officer: a DRAFT inspection visit note (purpose, findings to verify, records to request, questions) for the officer to edit. Advisory; aggregates and the officers' own decisions only.
+         */
+        post: operations["ai_inspection_note_v1_ai_inspection_note__institution_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/map-columns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ai Map Columns
+         * @description Institution: suggests which template column each of its CSV headers means, when an upload was rejected for missing columns. Header NAMES only; a header that looks like data (long numbers, dates, emails) is refused. The institution confirms every match before re-uploading.
+         */
+        post: operations["ai_map_columns_v1_ai_map_columns_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ai/upload-summary/{batch_id}": {
         parameters: {
             query?: never;
@@ -1851,6 +1891,48 @@ export interface components {
              * Format: date-time
              */
             published_at: string;
+        };
+        /** ColumnMapIn */
+        ColumnMapIn: {
+            /**
+             * Headers
+             * @description the file's header row (column NAMES only)
+             */
+            headers: string[];
+        };
+        /** ColumnMapOut */
+        ColumnMapOut: {
+            /** Matches */
+            matches: components["schemas"]["ColumnMatch"][];
+            /**
+             * Columns
+             * @description all template columns, in order
+             */
+            columns: string[];
+            /** Required */
+            required: string[];
+            /**
+             * Missing
+             * @description required template columns no header was matched to
+             */
+            missing: string[];
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "gemini" | "rules";
+            /** Label */
+            label: string;
+        };
+        /** ColumnMatch */
+        ColumnMatch: {
+            /** Header */
+            header: string;
+            /**
+             * Column
+             * @description suggested template column, or null to ignore this column
+             */
+            column: string | null;
         };
         /** ComplianceRow */
         ComplianceRow: {
@@ -3460,6 +3542,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AiSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_inspection_note_v1_ai_inspection_note__institution_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                institution_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_map_columns_v1_ai_map_columns_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ColumnMapIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ColumnMapOut"];
                 };
             };
             /** @description Validation Error */

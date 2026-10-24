@@ -17,7 +17,7 @@ REAL_CALL = ai._call  # captured at import, before the conftest stub replaces it
 def _capture(monkeypatch, reply="AI SUMMARY"):
     seen = []
     monkeypatch.setattr(ai, "enabled", lambda: True)
-    monkeypatch.setattr(ai, "_call", lambda facts, task: (seen.append(json.dumps(facts)), reply)[1])
+    monkeypatch.setattr(ai, "_call", lambda facts, task, **k: (seen.append(json.dumps(facts)), reply)[1])
     return seen
 
 
@@ -77,3 +77,47 @@ def test_gemini_call_uses_header_key_and_survives_errors(monkeypatch):
         raise httpx.ConnectTimeout("slow")
     monkeypatch.setattr(httpx, "post", boom)
     assert REAL_CALL({"a": 1}, "task") is None
+
+
+def test_inspection_note_draft_officer_only(client, monkeypatch):
+    upload(client, "inst-c", "C1.csv")
+    r = client.post("/v1/ai/inspection-note/1-0000000003", headers=login(client, "aicte"))
+    assert r.status_code == 200 and r.json()["source"] == "rules"
+    assert all(h in r.json()["text"] for h in ("Purpose of visit", "Findings to verify", "Records to request", "Questions for the principal"))
+    seen = _capture(monkeypatch, "Purpose of visit\n- draft")
+    r = client.post("/v1/ai/inspection-note/1-0000000003", headers=login(client, "aicte"))
+    assert r.json()["source"] == "gemini" and "officer_decisions" in json.loads(seen[0])
+    assert client.post("/v1/ai/inspection-note/1-0000000003", headers=login(client, "auditor")).status_code == 403
+
+
+def test_map_columns_suggests_and_refuses_data(client, monkeypatch):
+    h = login(client, "inst-a")
+    headers = ["APAAR No", "Roll No.", "Name of Student", "Date of Birth", "Branch", "Session", "Year", "Category", "Admission Date", "Notes"]
+    r = client.post("/v1/ai/map-columns", json={"headers": headers}, headers=h)
+    assert r.status_code == 200 and r.json()["source"] == "rules"
+    got = {m["header"]: m["column"] for m in r.json()["matches"]}
+    assert got["Name of Student"] == "student_name" and got["Date of Birth"] == "dob" and got["APAAR No"] == "apaar_id"
+    assert got["Notes"] is None and "is_nri" in r.json()["missing"]
+    for data_row in (["934098168005", "Pratik Jadhav"], ["Name", "2008-08-27"], ["x@college.example"]):
+        bad = client.post("/v1/ai/map-columns", json={"headers": data_row}, headers=h)
+        assert bad.status_code == 422 and bad.headers["content-type"].startswith("application/problem+json")
+    # the model's suggestions are checked: an unknown or repeated column falls back to the rule match
+    monkeypatch.setattr(ai, "enabled", lambda: True)
+    monkeypatch.setattr(ai, "_call", lambda facts, task, **k: json.dumps({"Name of Student": "student_name", "Branch": "not_a_column",
+                                                                         "Year": "student_name"}))
+    r = client.post("/v1/ai/map-columns", json={"headers": ["Name of Student", "Branch", "Year"]}, headers=h)
+    got = {m["header"]: m["column"] for m in r.json()["matches"]}
+    assert r.json()["source"] == "gemini" and got == {"Name of Student": "student_name", "Branch": "programme_code", "Year": "year_of_study"}
+
+
+def test_hindi_messages_keep_placeholders_and_codes():
+    from app.i18n import catalogue, render
+    en, hi = catalogue("en"), catalogue("hi")
+    keep = __import__("re").compile(r"\{[a-z]+\}|\b[a-z]+_[a-z_]+\b|\b[A-Z][A-Z_]{2,}\b|YYYY-MM-DD")
+    for code, e in en.items():
+        if code.startswith("_"):
+            continue
+        for f in ("title", "template", "fix_hint"):
+            assert hi[code][f].strip(), (code, f)
+            assert set(keep.findall(e[f])) <= set(keep.findall(hi[code][f])), (code, f)
+    assert "R-17" in render("E205", {"detail": "R-17"}, "hi")["message"]

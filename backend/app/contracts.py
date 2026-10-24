@@ -726,3 +726,21 @@ class AiSummary(BaseModel):
     model: str | None
     cached: bool
     label: str = Field(description="show this next to the text")
+
+
+class ColumnMapIn(BaseModel):
+    headers: list[str] = Field(min_length=1, max_length=60, description="the file's header row (column NAMES only)")
+
+
+class ColumnMatch(BaseModel):
+    header: str
+    column: str | None = Field(description="suggested template column, or null to ignore this column")
+
+
+class ColumnMapOut(BaseModel):
+    matches: list[ColumnMatch]
+    columns: list[str] = Field(description="all template columns, in order")
+    required: list[str]
+    missing: list[str] = Field(description="required template columns no header was matched to")
+    source: Literal["gemini", "rules"]
+    label: str

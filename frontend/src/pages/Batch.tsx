@@ -24,9 +24,10 @@ export default function BatchDetail({ id }: { id: number }) {
   const [error, setError] = useState<string | null>(null);
   const [sev, setSev] = useState<Sev | "all">("all");
   const [selected, setSelected] = useState<string | null>(null);
+  const [lang, setLang] = useState<"en" | "hi">("en");
 
   async function loadPage(after: number) {
-    const page = await getJson<S["IssuesPage"]>(`/v1/batches/${id}/issues?cursor=${after}&limit=1000`);
+    const page = await getJson<S["IssuesPage"]>(`/v1/batches/${id}/issues?cursor=${after}&limit=1000&lang=${lang}`);
     setIssues((prev) => (after === 0 ? page.items : [...prev, ...page.items]));
     setCursor(page.next_cursor);
   }
@@ -40,7 +41,7 @@ export default function BatchDetail({ id }: { id: number }) {
         setError(e instanceof ApiError ? (e.status === 404 ? "This upload was not found." : e.text) : "The service is unreachable. Try again shortly.");
       }
     })();
-  }, [id]);
+  }, [id, lang]);
 
   // one group per problem type, worst first, then the most rows first
   const groups = useMemo(() => {
@@ -81,6 +82,13 @@ export default function BatchDetail({ id }: { id: number }) {
       </div>
 
       <Card title="Problems found, by type" actions={issues.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+        <div role="group" aria-label="Language" className="flex gap-1 rounded-full border border-line p-0.5">
+          {([["en", "English"], ["hi", "हिन्दी"]] as const).map(([k, l]) => (
+            <button key={k} type="button" onClick={() => setLang(k)} aria-pressed={lang === k} lang={k}
+              className={`rounded-full px-3 py-1 text-[13px] font-semibold ${lang === k ? "bg-gold/15 text-champagne" : "text-slate-600 hover:text-ink"}`}>{l}</button>
+          ))}
+        </div>
         <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
           {(["all", ...ORDER] as const).map((s) => (
             <button key={s} type="button" onClick={() => setSev(s)} aria-pressed={sev === s}
@@ -88,6 +96,7 @@ export default function BatchDetail({ id }: { id: number }) {
               {s === "all" ? "All" : `${SEV[s].label} (${rowsWith(s)} rows)`}
             </button>
           ))}
+        </div>
         </div>
       )}>
         {issues.length === 0 ? (
@@ -206,7 +215,8 @@ function Detail({ items }: { items: S["Issue"][] }) {
           </ul>
         )}
       </div>
-      <p className="mt-2 text-[12.5px] text-mute">Row numbers count from the first data row of your file (the header is not counted).</p>
+      <p className="mt-2 text-[12.5px] text-mute">Row numbers count from the first data row of your file (the header is not counted).
+        Hindi messages are machine-translated and awaiting review.</p>
     </section>
   );
 }
