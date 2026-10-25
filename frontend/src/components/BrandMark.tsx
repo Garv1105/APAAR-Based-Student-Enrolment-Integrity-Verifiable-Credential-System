@@ -1,6 +1,6 @@
 import markUrl from "../assets/vidyapramaan-mark.png";
 
-/** VidyaPramaan mark: the team's logo artwork (frontend/Reference Images/Logo Design.png), resized for the UI. */
+/** VidyaPramaan mark: the team's logo artwork (docs/design/logo.png), resized for the UI. */
 export default function BrandMark({ className = "h-10" }: { className?: string }) {
   return <img src={markUrl} alt="" aria-hidden="true" draggable={false} className={`w-auto select-none ${className}`} />;
 }

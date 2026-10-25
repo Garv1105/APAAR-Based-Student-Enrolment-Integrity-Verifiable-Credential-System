@@ -14,7 +14,7 @@ export default function PublicSite({ hash, onLogin }: { hash: string; onLogin: (
   const page = path === "/signin" ? <SignIn onLogin={onLogin} demo={demo} initialRole={params.get("as")} />
     : path === "/activate" ? <Activate />
     : path === "/request-access" ? <RequestAccess />
-    : <Landing section={params.get("s")} />;
+    : <Landing section={params.get("s")} demo={demo} />;
   useEffect(() => { window.scrollTo(0, 0); }, [path]);
   return <PublicShell demo={demo} current={path === "/" ? params.get("s") ?? "/" : path}>{page}</PublicShell>;
 }

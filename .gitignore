@@ -13,3 +13,9 @@ frontend/dist/
 
 .vercel
 .env*
+
+# local tooling and backups
+.agents/
+.claude/skills/
+skills-lock.json
+*.backup.json

@@ -117,20 +117,15 @@ export default function IndiaMapLive({ states, badges }: { states: StateStat[]; 
         <path d={INDIA_PATH} fill="none" stroke={`url(#edge-${u})`} strokeWidth="1.4" strokeLinejoin="round" pointerEvents="none" />
 
         <g pointerEvents="none">
-          {/* constellation web: dark underlay + gold line, readable on pale and dark states */}
+          {/* constellation web: one thin solid line per link */}
           {web.map(([i, j]) => (
-            <g key={`${i}-${j}`}>
-              <line x1={pts[i][0]} y1={pts[i][1]} x2={pts[j][0]} y2={pts[j][1]} stroke="#2a1a05" strokeOpacity="0.45" strokeWidth="1.8" />
-              <line x1={pts[i][0]} y1={pts[i][1]} x2={pts[j][0]} y2={pts[j][1]} stroke="#F5C067" strokeOpacity="0.55" strokeWidth="0.8" />
-            </g>
+            <line key={`${i}-${j}`} x1={pts[i][0]} y1={pts[i][1]} x2={pts[j][0]} y2={pts[j][1]}
+              stroke="#FFE7A8" strokeOpacity="0.4" strokeWidth="0.7" strokeLinecap="round" />
           ))}
           {/* live routes to New Delhi */}
           {ROUTES.map((ci, i) => (
-            <g key={ci}>
-              <path id={`r-${u}-${i}`} d={arc(pts[ci], hub)} fill="none" stroke="#2a1a05" strokeOpacity="0.35" strokeWidth="2.2" />
-              <path d={arc(pts[ci], hub)} fill="none" stroke={`url(#route-${u})`} strokeWidth="1.2" strokeLinecap="round"
-                className={reduce ? "" : "arc-flow"} style={{ animationDuration: `${2.4 + (i % 4) * 0.5}s` }} />
-            </g>
+            <path key={ci} id={`r-${u}-${i}`} d={arc(pts[ci], hub)} fill="none" stroke={`url(#route-${u})`} strokeWidth="1.3"
+              strokeLinecap="round" />
           ))}
           {!reduce && ROUTES.map((_, i) => (
             <circle key={i} r="2.4" fill="#FFF8E1" style={{ filter: "drop-shadow(0 0 4px #F5B841)" }}>
@@ -155,7 +150,7 @@ export default function IndiaMapLive({ states, badges }: { states: StateStat[]; 
             <circle cx={hub[0]} cy={hub[1]} r="8" fill="none" stroke="#FDE68A" strokeWidth="1.2" className="hub-pulse" />
             <circle cx={hub[0]} cy={hub[1]} r="8" fill="none" stroke="#FDE68A" strokeWidth="1.2" className="hub-pulse" style={{ animationDelay: "1.6s" }} />
           </>}
-          <circle cx={hub[0]} cy={hub[1]} r="16" fill="none" stroke="#FDE68A" strokeOpacity="0.5" strokeWidth="0.9" strokeDasharray="2 4" className={reduce ? "" : "orbit"} />
+          <circle cx={hub[0]} cy={hub[1]} r="16" fill="none" stroke="#FDE68A" strokeOpacity="0.35" strokeWidth="0.9" />
           <circle cx={hub[0]} cy={hub[1]} r="5" fill="#07090E" stroke="#FDE68A" strokeWidth="1.8" />
         </g>
       </svg>

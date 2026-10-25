@@ -9,3 +9,4 @@ backend/tests
 backend/.env
 backend/.keys*.json
 .claude
+docs

@@ -134,13 +134,9 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
         <path d={INDIA_PATH} fill="none" stroke={`url(#edge-${u})`} strokeWidth="1.1" strokeLinejoin="round" />
         <path d={INDIA_PATH} fill="none" stroke={p.label} strokeOpacity="0.35" strokeWidth="3" strokeLinejoin="round" filter={`url(#soft-${u})`} />
 
-        {/* routes to New Delhi: a faint base line plus a flowing dash, and travelling signals */}
+        {/* routes to New Delhi: one smooth solid line each, with travelling signals */}
         {ROUTES.map((ci, i) => (
-          <g key={ci}>
-            <path id={`r-${u}-${i}`} d={arc(pts[ci])} fill="none" stroke={p.base} strokeOpacity="0.22" strokeWidth="0.8" />
-            <path d={arc(pts[ci])} fill="none" stroke={`url(#route-${u})`} strokeWidth="1" strokeLinecap="round"
-              className={reduce ? "" : "arc-flow"} style={{ animationDuration: `${2.6 + (i % 4) * 0.5}s` }} />
-          </g>
+          <path key={ci} id={`r-${u}-${i}`} d={arc(pts[ci])} fill="none" stroke={`url(#route-${u})`} strokeWidth="1.1" strokeLinecap="round" />
         ))}
         {!reduce && ROUTES.map((_, i) => (
           <circle key={i} r="2" fill="#ffffff">
@@ -168,7 +164,7 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
           <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke={p.dot} strokeWidth="1" className="hub-pulse" />
           <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke={p.dot} strokeWidth="1" className="hub-pulse" style={{ animationDelay: "1.6s" }} />
         </>}
-        <circle cx={HUB[0]} cy={HUB[1]} r="15" fill="none" stroke={p.dot} strokeOpacity="0.45" strokeWidth="0.8" strokeDasharray="2 4" className={reduce ? "" : "orbit"} />
+        <circle cx={HUB[0]} cy={HUB[1]} r="15" fill="none" stroke={p.dot} strokeOpacity="0.35" strokeWidth="0.8" />
         <circle cx={HUB[0]} cy={HUB[1]} r="4.6" fill={p.core[0]} stroke={p.core[1]} strokeWidth="1.5" />
         <circle cx={HUB[0]} cy={HUB[1]} r="1.8" fill="#ffffff" />
         {hubLabel && <text x={HUB[0] + 20} y={HUB[1] - 14} fill={p.label} className="font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>}

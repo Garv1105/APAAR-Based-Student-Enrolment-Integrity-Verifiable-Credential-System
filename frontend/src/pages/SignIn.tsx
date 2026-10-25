@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, ShieldAlert } from "lucide-react";
 import { ApiError, getJson, login, type S, type Session } from "../api/client";
 import AccountSearch, { type Account } from "../components/AccountSearch";
+import DemoAccess from "../components/DemoAccess";
 import PasswordField from "../components/PasswordField";
 import { StudentSignIn } from "./StudentSignIn";
 
@@ -87,6 +88,7 @@ export default function SignIn({ onLogin, demo, initialRole }: { onLogin: (s: Se
         </div>
 
         <div className="mt-6" role="tabpanel">
+          {demo && <DemoAccess key={role} tab={role} onLogin={onLogin} />}
           {role === "student" ? <StudentSignIn onLogin={onLogin} demo={demo} /> : (
             <form onSubmit={submit} className="space-y-4" noValidate>
               {role === "institution" && (
@@ -108,7 +110,6 @@ export default function SignIn({ onLogin, demo, initialRole }: { onLogin: (s: Se
                   <label htmlFor="user-id" className={lbl}>{role === "aicte" ? "Official account ID" : "Organisation account ID"}</label>
                   <input id="user-id" value={userId} onChange={(e) => setUserId(e.target.value)} autoComplete="username" spellCheck={false}
                     placeholder={role === "aicte" ? "Issued by AICTE" : "From your AICTE approval"} className={`${input} font-mono`} />
-                  {demo && <p className="mt-1.5 px-1 text-[12px] text-[#a3a9b3]">Demo accounts: {role === "aicte" ? <><code className="text-[#f7e08a]">aicte</code> (officer), <code className="text-[#f7e08a]">auditor</code> (read-only)</> : <code className="text-[#f7e08a]">employer</code>}</p>}
                 </div>
               )}
               {account && <p className="rounded-xl border border-white/[0.07] bg-white/[0.03] px-3.5 py-2.5 text-[12.5px] text-[#b8bec8]">

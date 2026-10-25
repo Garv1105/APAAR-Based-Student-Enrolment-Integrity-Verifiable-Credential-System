@@ -13,7 +13,7 @@ const STEPS = [
   [FileCheck2, "Credentials, with consent", "W3C verifiable credentials that students share only when they approve."],
 ] as const;
 
-export default function Landing({ section }: { section?: string | null }) {
+export default function Landing({ section, demo = false }: { section?: string | null; demo?: boolean }) {
   const [stats, setStats] = useState<S["PublicStats"] | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => { getJson<S["PublicStats"]>("/v1/public/stats").then(setStats).catch(() => setFailed(true)); }, []);
@@ -24,7 +24,7 @@ export default function Landing({ section }: { section?: string | null }) {
   return (
     <div className="space-y-20">
       <div>
-        <HeroSection stats={stats} failed={failed} />
+        <HeroSection stats={stats} failed={failed} demo={demo} />
         <MetricsDock stats={stats} />
       </div>
       <RoleCards />

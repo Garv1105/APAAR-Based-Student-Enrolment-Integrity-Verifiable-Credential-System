@@ -1,4 +1,4 @@
--- APAAR SIH prototype schema (PostgreSQL 16+). PRD §8, trimmed to MVP_SCOPE.md.
+-- APAAR SIH prototype schema (PostgreSQL 16+). PRD §8, trimmed to docs/MVP_SCOPE.md.
 -- Approved intake comes only from the (mock) AICTE registry tables, never from uploads (F9).
 
 CREATE TABLE IF NOT EXISTS institutions (

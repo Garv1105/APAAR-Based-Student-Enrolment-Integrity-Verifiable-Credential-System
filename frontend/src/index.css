@@ -338,10 +338,6 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
 /* Map details */
 @keyframes twinkle { 0%, 100% { opacity: var(--lo, .45); } 50% { opacity: 1; } }
 .city { animation: twinkle var(--t, 4s) ease-in-out infinite; animation-delay: var(--dl, 0s); }
-@keyframes flow { to { stroke-dashoffset: -40; } }
-.arc-flow { stroke-dasharray: 2 6; animation: flow 3.2s linear infinite; }
-@keyframes orbit { to { transform: rotate(360deg); } }
-.orbit { transform-box: fill-box; transform-origin: center; animation: orbit 24s linear infinite; }
 @keyframes scan { 0% { transform: translateY(-110%); } 100% { transform: translateY(110%); } }
 .scan { animation: scan 9s cubic-bezier(.45,0,.55,1) infinite; }
 

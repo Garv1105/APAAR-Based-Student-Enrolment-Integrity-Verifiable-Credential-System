@@ -10,7 +10,7 @@ const HERO_BG = Object.values(import.meta.glob("../../assets/hero-bg.webp", { ea
 
 const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
 
-export default function HeroSection({ stats, failed }: { stats: S["PublicStats"] | null; failed: boolean }) {
+export default function HeroSection({ stats, failed, demo = false }: { stats: S["PublicStats"] | null; failed: boolean; demo?: boolean }) {
   const badges = stats ? [
     { lon: 77.21, lat: 28.61, title: `${fmt(stats.institutions_reporting)} Institutions Connected`, sub: "Reporting this academic year" },
     { lon: 72.88, lat: 19.08, title: `${stats.states_covered} States`, sub: "Unified Academic Network", side: "left" as const },
@@ -48,6 +48,11 @@ export default function HeroSection({ stats, failed }: { stats: S["PublicStats"]
             <button type="button" onClick={() => scrollTo("how")} className={`${BTN_SECONDARY} group`}>
               See How it Works <ArrowDown className="h-4 w-4 transition-transform group-hover:translate-y-0.5" aria-hidden />
             </button>
+            {demo && (
+              <a href="#/signin" className="group inline-flex items-center gap-1.5 text-[15px] font-semibold text-[#f1d488] underline decoration-[#d4af37]/40 underline-offset-4 hover:text-white">
+                Try the demo: one-click access <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden />
+              </a>
+            )}
           </div>
           <div className="mt-10"><TrustBar /></div>
         </div>
