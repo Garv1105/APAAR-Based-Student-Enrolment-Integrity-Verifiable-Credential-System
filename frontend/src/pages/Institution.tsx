@@ -82,27 +82,27 @@ export default function InstitutionHome() {
       </section>
 
       <div className="mt-16 space-y-24">
-        <Section id="upload" n="01" title="Upload & validate"
+        <Section id="upload" title="Upload & validate"
           lede="Drop the term's student file. Every row runs through the same five checks, in order, before it can count toward your intake.">
           <Upload onDone={refresh} />
         </Section>
 
-        <Section id="seats" n="02" title="Seats against approved intake" aside={<>Limits from the AICTE registry <Badge tone="warning">MOCK</Badge></>}>
+        <Section id="seats" title="Seats against approved intake" aside={<>Limits from the AICTE registry <Badge tone="warning">MOCK</Badge></>}>
           <div className="grid gap-14 xl:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
             <Seats programmes={data.programmes} />
             <Categories programmes={data.programmes} />
           </div>
         </Section>
 
-        <Section id="quality" n="03" title="Data quality & integrity" aside="What AICTE's inspection queue sees">
+        <Section id="quality" title="Data quality & integrity" aside="What AICTE's inspection queue sees">
           <Quality risk={risk.data} error={risk.error} />
         </Section>
 
-        <Section id="batches" n="04" title="Upload history" aside="Newest first · open a batch for row-level issues">
+        <Section id="batches" title="Upload history" aside="Newest first · open a batch for row-level issues">
           <History batches={data.batches} />
         </Section>
 
-        <Section id="students" n="05" title="Students & credentials"
+        <Section id="students" title="Students & credentials"
           lede="Find a student to see their enrolment, issue a verifiable credential, or record that they completed or withdrew.">
           <div className="grid gap-14 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             <EnrolmentLookup mode="institution" bare />
@@ -116,15 +116,12 @@ export default function InstitutionHome() {
 
 /* ---------- layout primitives ---------- */
 
-function Section({ id, n, title, lede, aside, children }: { id: string; n: string; title: string; lede?: string; aside?: ReactNode; children: ReactNode }) {
+function Section({ id, title, lede, aside, children }: { id: string; title: string; lede?: string; aside?: ReactNode; children: ReactNode }) {
   return (
     <section id={id} aria-labelledby={`${id}-h`} className="scroll-mt-28">
       <div className="mb-10 flex flex-wrap items-end justify-between gap-x-10 gap-y-3">
         <div className="min-w-0 max-w-3xl">
-          <p className="flex items-center gap-3 font-mono text-[13px] font-medium tracking-[0.18em] text-gold">
-            {n}<span aria-hidden className="h-px w-10 bg-gradient-to-r from-gold/70 to-transparent" />
-          </p>
-          <h2 id={`${id}-h`} className="mt-3 font-display text-[30px] font-bold leading-tight tracking-[-0.025em] text-ink sm:text-[34px]">{title}</h2>
+          <h2 id={`${id}-h`} className="font-display text-[30px] font-bold leading-tight tracking-[-0.025em] text-ink sm:text-[34px]">{title}</h2>
           {lede && <p className="mt-3 text-[16.5px] leading-relaxed text-slate-600">{lede}</p>}
         </div>
         {aside && <div className="flex items-center gap-2 pb-1 text-[14.5px] text-slate-600">{aside}</div>}

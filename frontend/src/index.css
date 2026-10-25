@@ -365,3 +365,52 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
   border-radius: 9999px;
   box-shadow: 0 -2px 0 0 rgb(240 205 110 / 0.35), 0 -40px 120px -10px rgb(212 175 55 / 0.28), inset 0 30px 80px -40px rgb(212 175 55 / 0.25);
 }
+
+/* ===================================================================
+   Landing (premium): glass, grain, shimmer, living backdrop
+   =================================================================== */
+/* Layered glass: translucent fill, top highlight, a gold-to-clear gradient edge and a cursor spotlight (--mx/--my). */
+.glass-premium {
+  /* no `position` here: unlayered CSS would override Tailwind's absolute/fixed; add `relative` where needed */
+  isolation: isolate;
+  background:
+    linear-gradient(155deg, rgb(255 255 255 / 0.085) 0%, rgb(255 255 255 / 0.025) 38%, rgb(255 255 255 / 0.012) 100%),
+    rgb(10 12 18 / 0.45);
+  -webkit-backdrop-filter: blur(26px) saturate(165%);
+  backdrop-filter: blur(26px) saturate(165%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.14), inset 0 -1px 0 rgb(255 255 255 / 0.03),
+    0 30px 60px -28px rgb(0 0 0 / 0.85), 0 0 0 1px rgb(255 255 255 / 0.03);
+  transition: transform 400ms cubic-bezier(.2,.8,.2,1), box-shadow 400ms ease;
+}
+.glass-premium::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; z-index: 1;
+  background: linear-gradient(135deg, rgb(253 224 71 / 0.55), rgb(212 175 55 / 0.10) 30%, rgb(255 255 255 / 0.05) 62%, rgb(234 179 8 / 0.35));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.glass-premium::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgb(245 192 103 / 0.16), transparent 60%);
+  opacity: 0; transition: opacity 400ms ease;
+}
+.glass-premium:hover::after { opacity: 1; }
+.glass-premium.lift:hover { transform: translateY(-3px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 40px 70px -30px rgb(0 0 0 / 0.9), 0 0 40px -18px rgb(245 192 103 / 0.45); }
+
+/* Fine film grain (inline SVG noise), sits above the backdrop lights */
+.grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.05; mix-blend-mode: overlay;
+}
+
+/* Slow light sweep across gold gradient text */
+@keyframes goldShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+.gold-shimmer {
+  background-image: linear-gradient(100deg, #EAB308 0%, #D4AF37 20%, #FDE68A 32%, #FDE047 40%, #D4AF37 55%, #EAB308 75%, #FDE68A 90%, #EAB308 100%);
+  background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: goldShimmer 9s linear infinite;
+}
+
+/* Living backdrop lights */
+@keyframes driftC { 0% { transform: translate3d(0, 0, 0) scale(1); } 100% { transform: translate3d(-6vw, 8vh, 0) scale(1.2); } }
+.orb-c { animation: driftC 52s ease-in-out infinite alternate; }
+

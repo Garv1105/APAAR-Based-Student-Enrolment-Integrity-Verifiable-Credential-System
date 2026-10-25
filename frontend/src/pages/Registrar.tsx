@@ -76,10 +76,9 @@ export function EnrolmentLookup({ mode, bare = false }: { mode: "registrar" | "i
             [Search, "Find the record", "Enrolment status, programme and academic year, with the APAAR ID masked."],
             [FileCheck, "Issue a credential", "A signed W3C Verifiable Credential the student holds and shares with consent."],
             [CheckCircle2, "Keep it current", "Mark the student completed or withdrawn; withdrawal revokes active credentials."],
-          ] as const).map(([Icon, t, d], i) => (
+          ] as const).map(([Icon, t, d]) => (
             <li key={t} className="relative border-t border-gold/25 pt-5">
-              <span className="font-mono text-[12.5px] tracking-[0.18em] text-gold">{String(i + 1).padStart(2, "0")}</span>
-              <p className="mt-2 flex items-center gap-2.5 text-[16.5px] font-semibold text-ink"><Icon className="h-5 w-5 text-gold" strokeWidth={1.7} aria-hidden />{t}</p>
+              <p className="flex items-center gap-2.5 text-[16.5px] font-semibold text-ink"><Icon className="h-5 w-5 text-gold" strokeWidth={1.7} aria-hidden />{t}</p>
               <p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{d}</p>
             </li>
           ))}

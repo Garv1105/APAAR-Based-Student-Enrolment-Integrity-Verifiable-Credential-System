@@ -61,8 +61,8 @@ const PALETTE = {
     core: ["#0B0F14", "#FBE7A1"], label: "#E8D9A8" },
 };
 
-export default function IndiaMap({ className = "", tone = "blue", values, unit = "students" }: {
-  className?: string; tone?: keyof typeof PALETTE; values?: Record<string, number | null>; unit?: string;
+export default function IndiaMap({ className = "", tone = "blue", values, unit = "students", hubLabel = true }: {
+  className?: string; tone?: keyof typeof PALETTE; values?: Record<string, number | null>; unit?: string; hubLabel?: boolean;
 }) {
   const p = PALETTE[tone];
   const u = useId().replace(/:/g, "");
@@ -171,7 +171,7 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
         <circle cx={HUB[0]} cy={HUB[1]} r="15" fill="none" stroke={p.dot} strokeOpacity="0.45" strokeWidth="0.8" strokeDasharray="2 4" className={reduce ? "" : "orbit"} />
         <circle cx={HUB[0]} cy={HUB[1]} r="4.6" fill={p.core[0]} stroke={p.core[1]} strokeWidth="1.5" />
         <circle cx={HUB[0]} cy={HUB[1]} r="1.8" fill="#ffffff" />
-        <text x={HUB[0] + 20} y={HUB[1] - 14} fill={p.label} className="font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>
+        {hubLabel && <text x={HUB[0] + 20} y={HUB[1] - 14} fill={p.label} className="font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>}
 
         {/* hover layer on top of the decoration: each state names its number */}
         {values && STATE_PATHS.map((s) => (
