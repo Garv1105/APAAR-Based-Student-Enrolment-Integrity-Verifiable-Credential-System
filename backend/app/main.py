@@ -362,6 +362,46 @@ def inspection_queue(user=Depends(require("aicte_officer", "auditor")), conn=Dep
 
 
 # ---------- T-AI: plain-language explanations (Gemini free tier, allow-listed aggregates only; app/ai.py) ----------
+def _lang(lang: str) -> None:
+    if lang not in ai.LANGS:
+        raise HTTPException(422, f"Unsupported language; use one of: {', '.join(ai.LANGS)}")
+
+
+@app.get("/v1/ai/languages", description="Languages the AI summaries can answer in (code -> name).")
+def ai_languages():
+    return ai.LANGS
+
+
+REPORT_TASKS = {
+    "state-summary": "In 4 to 5 sentences, summarise this state-wise report for an AICTE official: where seats are filled most and "
+                     "least, which states have seats over the limit or open duplicate cases, and where APAAR coverage is weak.",
+    "category-utilisation": "In 3 to 4 sentences, summarise category-quota use: which seat categories are near or over their caps "
+                            "and the largest overshoots by institution and programme.",
+    "excess-case-file": "In 3 to 4 sentences, summarise the excess-admission case file: how many admissions and institutions, "
+                        "which institutions to act on first, and whether the seat ledger supports using this as evidence.",
+    "ledger": "In 2 to 3 sentences, explain in plain words what this seat-ledger check result means and what to do next.",
+}
+
+
+@app.post("/v1/ai/report-summary/{kind}", response_model=AiSummary,
+          description="Regulators: plain-language summary of a national report (state-summary, category-utilisation, "
+                      "excess-case-file) or of the seat-ledger check (ledger). Aggregates only; advisory; ?lang= for the language.")
+def ai_report_summary(kind: str, request: Request, lang: str = "en", user=Depends(require("aicte_officer", "auditor")),
+                      conn=Depends(get_conn)):
+    _lang(lang)
+    if kind not in REPORT_TASKS:
+        raise HTTPException(404, "Unknown report")
+    auth.throttle("ai:" + user["id"], 20, 60)
+    lv = ledger.verify(conn)
+    header, rows = ([], []) if kind == "ledger" else {"state-summary": reports.state_summary, "category-utilisation": reports.category_utilisation,
+                                                      "excess-case-file": reports.excess_case_file}[kind](conn)
+    facts = ai.report_facts(kind, header, rows, lv)
+    out = ai.generate(f"report-{kind}", facts, REPORT_TASKS[kind], ai.report_fallback(facts), max_tokens=500, lang=lang)
+    auth.audit(conn, user, "ai.report_summary", "report", kind, reason=out["source"], request=request)
+    conn.commit()
+    return out
+
+
 def _queue_entry(conn, institution_id: str) -> tuple[dict, str]:
     """The college's inspection-queue entry and its priority bucket (top 10% High, next 20% Medium, rest Low)."""
     queue = risk.inspection_queue(conn)
@@ -378,15 +418,16 @@ def _queue_entry(conn, institution_id: str) -> tuple[dict, str]:
 @app.post("/v1/ai/explain-institution/{institution_id}", response_model=AiSummary,
           description="Regulators: a short plain-language briefing on why a college ranks where it does in the inspection queue. "
                       "Advisory; built from aggregates only (no student data). Falls back to a rule-based summary.")
-def ai_explain_institution(institution_id: str, request: Request, user=Depends(require("aicte_officer", "auditor")),
+def ai_explain_institution(institution_id: str, request: Request, lang: str = "en", user=Depends(require("aicte_officer", "auditor")),
                            conn=Depends(get_conn)):
+    _lang(lang)
     auth.throttle("ai:" + user["id"], 20, 60)
     entry, priority = _queue_entry(conn, institution_id)
     facts = ai.institution_facts(entry, priority)
     out = ai.generate("explain-institution", facts,
                       "In 3 to 4 sentences, explain to an AICTE inspector why this college has this priority and what to check "
                       "first on a visit. Mention the weakest score parts and the most serious warning signs by their numbers.",
-                      ai.institution_fallback(facts))
+                      ai.institution_fallback(facts), lang=lang)
     auth.audit(conn, user, "ai.explain_institution", "institution", institution_id, reason=out["source"], request=request)
     conn.commit()
     return out
@@ -395,7 +436,8 @@ def ai_explain_institution(institution_id: str, request: Request, user=Depends(r
 @app.post("/v1/ai/inspection-note/{institution_id}", response_model=AiSummary,
           description="AICTE officer: a DRAFT inspection visit note (purpose, findings to verify, records to request, questions) "
                       "for the officer to edit. Advisory; aggregates and the officers' own decisions only.")
-def ai_inspection_note(institution_id: str, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+def ai_inspection_note(institution_id: str, request: Request, lang: str = "en", user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
+    _lang(lang)
     auth.throttle("ai:" + user["id"], 20, 60)
     entry, priority = _queue_entry(conn, institution_id)
     facts = ai.note_facts(entry, priority)
@@ -403,7 +445,7 @@ def ai_inspection_note(institution_id: str, request: Request, user=Depends(requi
                       "Draft an inspection visit note for an AICTE officer with these headings, each on its own line: Purpose of visit; "
                       "Findings to verify; Records to request; Questions for the principal. Use short dash bullets under each heading, "
                       "only the facts given, at most 220 words. Say what to verify, never conclude wrongdoing.",
-                      ai.note_fallback(facts), max_tokens=700)
+                      ai.note_fallback(facts), max_tokens=700, lang=lang)
     auth.audit(conn, user, "ai.inspection_note", "institution", institution_id, reason=out["source"], request=request)
     conn.commit()
     return out
@@ -431,7 +473,8 @@ def ai_map_columns(body: ColumnMapIn, request: Request, user=Depends(require("in
 @app.post("/v1/ai/upload-summary/{batch_id}", response_model=AiSummary,
           description="Institution: a short, ordered checklist of what to fix in its own upload. Advisory; built from problem "
                       "codes, counts and column names only (no row contents). Falls back to a rule-based checklist.")
-def ai_upload_summary(batch_id: int, request: Request, user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+def ai_upload_summary(batch_id: int, request: Request, lang: str = "en", user=Depends(require("institution_admin")), conn=Depends(get_conn)):
+    _lang(lang)
     auth.throttle("ai:" + user["id"], 20, 60)
     b = _own_batch(conn, user, batch_id)
     rows = conn.execute("SELECT row_no, code, severity, field, params FROM validation_issues WHERE batch_id=%s", (batch_id,)).fetchall()
@@ -439,7 +482,7 @@ def ai_upload_summary(batch_id: int, request: Request, user=Depends(require("ins
     out = ai.generate("upload-summary", facts,
                       "Write a short checklist (at most 5 numbered steps) telling the college's data officer what to fix first in "
                       "this upload and how, most serious first. Then one sentence on what happens to rows sent to AICTE.",
-                      ai.upload_fallback(facts))
+                      ai.upload_fallback(facts), lang=lang)
     auth.audit(conn, user, "ai.upload_summary", "upload_batch", batch_id, reason=out["source"], request=request)
     conn.commit()
     return out

@@ -1,6 +1,6 @@
 // Shared-student network (AICTE only): colleges that list the same students. Counts only, never student data.
 // Each group of linked colleges gets its own tile (readable names), plus a table of the biggest overlaps.
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Share2 } from "lucide-react";
 import { getJson, type S } from "./api/client";
 import { Badge, Button, Card, Empty, ErrorNote, go, Loading, Table, Td, usePoll } from "./ui";
@@ -21,6 +21,8 @@ function groups(nodes: string[], edges: S["NetworkEdge"][]) {
 export function NetworkCard() {
   const q = usePoll(() => getJson<S["NetworkOut"]>("/v1/network"), 60000);
   const [sel, setSel] = useState<S["NetworkEdge"] | null>(null);
+  const [hover, setHover] = useState<string | null>(null);
+  const graph = useRef<HTMLDivElement>(null);
   const data = q.data;
 
   const view = useMemo(() => {
@@ -52,9 +54,10 @@ export function NetworkCard() {
       {q.error && !data ? <ErrorNote>{q.error}</ErrorNote> : !data || !view ? <Loading /> : view.gs.length === 0 ? (
         <Empty>No colleges share more than a few students.</Empty>
       ) : (<>
-        <p className="mb-3 text-[14px] text-mute">Each box is one group of linked colleges. Click a line for its numbers; hover a dot for the full name.</p>
+        <p className="mb-3 text-[14px] text-mute">Each box is one group of linked colleges. Click a line for its numbers; point at a dot for the college's full name.</p>
+        <div ref={graph} className="relative">
         <svg viewBox={`0 0 ${COLS * TILE_W} ${view.height}`} className="h-auto w-full rounded-xl border border-line" role="img"
-          aria-label={`${view.gs.length} groups of colleges sharing students`}>
+          aria-label={`${view.gs.length} groups of colleges sharing students`} onClick={(ev) => ev.target === ev.currentTarget && setSel(null)}>
           {view.gs.map((g, gi) => (
             <rect key={gi} x={(gi % COLS) * TILE_W + 6} y={Math.floor(gi / COLS) * TILE_H + 6} width={TILE_W - 12} height={TILE_H - 12} rx={12}
               fill="rgba(255,255,255,0.02)" stroke={g.some((id) => node(id)?.ring) ? "rgba(212,175,55,0.45)" : "rgba(255,255,255,0.06)"} />
@@ -64,7 +67,7 @@ export function NetworkCard() {
             if (!a || !b) return null;
             const on = sel?.inst_a === e.inst_a && sel?.inst_b === e.inst_b;
             return (
-              <g key={`${e.inst_a}-${e.inst_b}`} onClick={() => setSel(e)} className="cursor-pointer">
+              <g key={`${e.inst_a}-${e.inst_b}`} onClick={() => setSel(on ? null : e)} className="cursor-pointer">
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={on ? "var(--color-champagne)" : e.active_shared >= 5 ? "#f87171" : "var(--color-gold)"}
                   strokeWidth={Math.min(7, 1.5 + e.weight / 5)} strokeOpacity={0.9} />
@@ -74,8 +77,9 @@ export function NetworkCard() {
           {[...view.pos.entries()].map(([id, p]) => {
             const n = node(id)!;
             return (
-              <g key={id} transform={`translate(${p.x},${p.y})`}>
-                <title>{`${n.name} (${n.state}) · ${n.active.toLocaleString("en-IN")} students`}</title>
+              <g key={id} transform={`translate(${p.x},${p.y})`} className="cursor-default"
+                onMouseEnter={() => setHover(id)} onMouseLeave={() => setHover((h) => (h === id ? null : h))}>
+                <circle r={16} fill="transparent" />
                 <circle r={n.ring ? 10 : 8} fill="var(--color-raised)" strokeWidth={n.ring ? 3 : 2}
                   stroke={n.ring ? "var(--color-gold)" : blocking.has(id) ? "#f87171" : "var(--color-mute)"} />
                 <text x={p.dx > 0.3 ? 15 : p.dx < -0.3 ? -15 : 0} y={p.dy > 0.5 ? 26 : p.dy < -0.5 ? -15 : 4}
@@ -85,23 +89,43 @@ export function NetworkCard() {
             );
           })}
         </svg>
+        {(() => {
+          // Floating cards, positioned in % of the SVG box so they track its responsive size.
+          const W = COLS * TILE_W, H = view.height;
+          const at = (x: number, y: number) => ({ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%`,
+            transform: `translate(${x > W * 0.66 ? "-100%" : x < W * 0.33 ? "0" : "-50%"}, ${y > H / 2 ? "calc(-100% - 14px)" : "14px"})` });
+          const hn = hover ? node(hover) : null, hp = hover ? view.pos.get(hover) : null;
+          const a = sel && view.pos.get(sel.inst_a), b = sel && view.pos.get(sel.inst_b);
+          return (<>
+            {hn && hp && (
+              <div role="tooltip" style={at(hp.x, hp.y)} className="pointer-events-none absolute z-20 w-64 rounded-xl border border-white/10 bg-[#16171b]/95 p-3 text-[13.5px] shadow-2xl backdrop-blur">
+                <p className="font-semibold text-ink">{hn.name}</p>
+                <p className="mt-0.5 text-mute">{hn.state} · {hn.active.toLocaleString("en-IN")} students</p>
+                {hn.ring && <p className="mt-1 text-gold">Part of a suspected group</p>}
+                {blocking.has(hn.id) && <p className="mt-1 text-red-300">Possible seat blocking</p>}
+              </div>
+            )}
+            {sel && a && b && (
+              <div style={at((a.x + b.x) / 2, (a.y + b.y) / 2)} className="absolute z-30 w-72 rounded-xl border border-gold/40 bg-[#16171b]/95 p-4 text-[14px] shadow-2xl backdrop-blur" aria-live="polite">
+                <button type="button" onClick={() => setSel(null)} aria-label="Close" className="absolute right-2 top-1.5 px-1.5 text-lg leading-none text-mute hover:text-ink">×</button>
+                <p className="pr-5 font-semibold text-ink">{name(sel.inst_a)} and {name(sel.inst_b)}</p>
+                <ul className="mt-1.5 space-y-0.5 text-slate-700">
+                  <li>{sel.active_shared} students listed as active at both right now</li>
+                  <li>{sel.historical_shared} enrolled at both in the last 3 years</li>
+                  <li>{sel.carousel} moved from one to the other and back</li>
+                </ul>
+                <Button variant="secondary" className="mt-3" onClick={() => go("/aicte/cases")}>Go to duplicate cases</Button>
+              </div>
+            )}
+          </>);
+        })()}
+        </div>
         <div className="mt-3 flex flex-wrap gap-4 text-[13px] text-mute">
           <span><span className="mr-1.5 inline-block h-2 w-4 align-middle" style={{ background: "var(--color-gold)" }} />share several students</span>
           <span><span className="mr-1.5 inline-block h-2 w-4 align-middle bg-red-400" />5+ students active at both right now (possible seat blocking)</span>
           <span>gold ring and gold box: a suspected group</span>
         </div>
 
-        {sel && (
-          <div className="mt-4 rounded-xl border border-gold/40 bg-gold/[0.05] p-4 text-[14.5px]">
-            <p className="font-semibold text-ink">{name(sel.inst_a)} and {name(sel.inst_b)}</p>
-            <ul className="mt-1.5 space-y-0.5 text-slate-700">
-              <li>{sel.active_shared} students listed as active at both colleges right now</li>
-              <li>{sel.historical_shared} students enrolled at both in the last 3 years</li>
-              <li>{sel.carousel} students who moved from one to the other and back</li>
-            </ul>
-            <Button variant="secondary" className="mt-3" onClick={() => go("/aicte/cases")}>Go to duplicate cases</Button>
-          </div>
-        )}
 
         {rings.length > 0 && (
           <ul className="mt-5 space-y-2">
@@ -120,7 +144,7 @@ export function NetworkCard() {
         <h3 className="mb-2 mt-6 font-display text-[16px] font-bold text-ink">Biggest overlaps</h3>
         <Table head={["College", "College", "Active at both now", "Shared in last 3 years"]}>
           {top.map((e) => (
-            <tr key={`${e.inst_a}-${e.inst_b}`} className="cursor-pointer hover:bg-white/[0.02]" onClick={() => setSel(e)}>
+            <tr key={`${e.inst_a}-${e.inst_b}`} className="cursor-pointer hover:bg-white/[0.02]" onClick={() => { setSel(e); graph.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>
               <Td wrap className="min-w-56 text-ink">{name(e.inst_a)}</Td>
               <Td wrap className="min-w-56 text-ink">{name(e.inst_b)}</Td>
               <Td className={`tabular-nums ${e.active_shared >= 5 ? "font-semibold text-critical-text" : ""}`}>{e.active_shared}</Td>

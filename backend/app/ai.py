@@ -26,6 +26,11 @@ SYSTEM = ("You explain data-quality findings on India's AICTE student-enrolment 
           "headings or tables, no greeting.")
 LABEL_AI = "AI-generated summary (Gemini). Advisory only: check the numbers above before acting."
 LABEL_RULES = "Automatic summary from the platform's own rules."
+# Languages Gemini may answer in (major scheduled Indian languages + English). Codes match backend/i18n/<code>.json.
+LANGS = {"en": "English", "hi": "Hindi", "bn": "Bengali", "mr": "Marathi", "te": "Telugu", "ta": "Tamil", "gu": "Gujarati",
+         "kn": "Kannada", "ml": "Malayalam", "or": "Odia", "pa": "Punjabi", "as": "Assamese", "ur": "Urdu"}
+SCRIPTS = {"hi": "Devanagari", "bn": "Bengali", "mr": "Devanagari", "te": "Telugu", "ta": "Tamil", "gu": "Gujarati", "kn": "Kannada",
+           "ml": "Malayalam", "or": "Odia", "pa": "Gurmukhi", "as": "Assamese (Bengali-Assamese)", "ur": "Perso-Arabic (Nastaliq)"}
 
 _cache: dict[str, tuple[float, str]] = {}
 _lock = threading.Lock()
@@ -57,9 +62,13 @@ def _call(facts: dict, task: str, json_out: bool = False, max_tokens: int = 400)
         return None
 
 
-def generate(purpose: str, facts: dict, task: str, fallback: str, max_tokens: int = 400) -> dict:
+def generate(purpose: str, facts: dict, task: str, fallback: str, max_tokens: int = 400, lang: str = "en") -> dict:
     """{text, source: gemini|rules, model, cached, label}. `facts` must come from the allow-listed builders below."""
-    key = crypto.sha256_hex(json.dumps([purpose, model(), facts], sort_keys=True).encode())
+    if lang != "en":
+        task += (f" Write the whole answer in {LANGS[lang]} using its native {SCRIPTS[lang]} script, never in Latin letters; keep "
+                 "numbers, codes and the words APAAR and AICTE as they are.")
+        max_tokens = int(max_tokens * 1.8)  # Indic scripts take more tokens
+    key = crypto.sha256_hex(json.dumps([purpose, model(), lang, facts], sort_keys=True).encode())
     with _lock:
         hit = _cache.get(key)
     if hit and time.time() - hit[0] < CACHE_TTL:
@@ -232,7 +241,8 @@ def map_columns(headers: list[str], columns: list[str]) -> dict:
 def translate_catalogue(entries: dict, language: str) -> dict | None:
     """{code: {title, template, fix_hint}} -> the same shape in `language`, or None. Message templates only, no data."""
     raw = _call({"messages": entries},
-                f"Translate every title, template and fix_hint into {language} for college data officers. Keep exactly unchanged: "
+                f"Translate every title, template and fix_hint into {language}, written in its native script (never Latin letters), "
+                "for college data officers. Keep exactly unchanged: "
                 "the {field} and {detail} placeholders, column names with underscores, codes in capitals (e.g. REFUSED, SN_FN_OCI_CIWG), "
                 "formats like YYYY-MM-DD, the letters Y and N, and the words APAAR, AICTE, DigiLocker, MOCK. "
                 "Reply ONLY with JSON in the same shape.", json_out=True, max_tokens=8000)
@@ -243,3 +253,58 @@ def translate_catalogue(entries: dict, language: str) -> dict | None:
     if isinstance(out, dict) and set(out) == {"messages"}:  # the model may echo the wrapper it was given
         out = out["messages"]
     return out if isinstance(out, dict) else None
+
+
+# ---------- AICTE reports & integrity (aggregates only) ----------
+def report_facts(kind: str, header: list[str], rows: list[dict], ledger_status: dict) -> dict:
+    """Compact, allow-listed aggregates of a national report: totals and the top rows by the report's key measure.
+    Institution names and counts only; no student rows (the reports themselves carry none)."""
+    if kind == "state-summary":
+        keep = ("state", "institutions", "approved_intake", "active_enrolments", "fill_pct", "excess_seats", "open_duplicate_cases",
+                "apaar_coverage_pct")
+        return {"report": "state summary", "states": [{k: r.get(k) for k in keep} for r in rows][:40]}
+    if kind == "category-utilisation":
+        by: dict[str, dict] = {}
+        for r in rows:
+            if ":" in r["category_code"]:
+                continue
+            t = by.setdefault(r["category_code"], {"category": r["category_code"], "cap": 0, "filled": 0, "programmes_over_cap": 0})
+            t["cap"] += r["cap"] or 0
+            t["filled"] += r["filled"] or 0
+            t["programmes_over_cap"] += 1 if (r["excess"] or 0) > 0 else 0
+        top = sorted((r for r in rows if (r["excess"] or 0) > 0), key=lambda r: -r["excess"])[:10]
+        return {"report": "category-quota utilisation", "by_category": list(by.values()),
+                "largest_overshoots": [{"institution": r["institution"], "state": r["state"], "programme": r["programme_code"],
+                                        "category": r["category_code"], "filled": r["filled"], "cap": r["cap"]} for r in top]}
+    if kind == "excess-case-file":
+        per: dict[str, dict] = {}
+        for r in rows:
+            t = per.setdefault(r["institution_id"], {"institution": r["institution"], "state": r["state"], "over_cap_rows": 0,
+                                                     "still_over_cap": r["current_over_cap"] != "none (resolved since upload)"})
+            t["over_cap_rows"] += 1
+        worst = sorted(per.values(), key=lambda t: -t["over_cap_rows"])
+        return {"report": "excess-admission case file", "over_cap_rows": len(rows), "institutions": len(per),
+                "still_over_cap": sum(t["still_over_cap"] for t in per.values()), "worst_institutions": worst[:12],
+                "ledger_consistent": ledger_status.get("ok")}
+    # ledger
+    return {"report": "seat ledger integrity", "consistent": ledger_status.get("ok"), "entries": ledger_status.get("entries"),
+            "checkpoint_ok": ledger_status.get("checkpoint_ok"), "problems": len(ledger_status.get("problems") or [])}
+
+
+def report_fallback(facts: dict) -> str:
+    r = facts["report"]
+    if r == "state summary":
+        st = sorted(facts["states"], key=lambda s: -(s.get("excess_seats") or 0))
+        worst = [s for s in st if s.get("excess_seats")][:3]
+        return (f"{len(facts['states'])} states in the report. "
+                + ("Most seats over the limit: " + ", ".join(f"{s['state']} (+{s['excess_seats']})" for s in worst) + "." if worst
+                   else "No state has seats over the limit."))
+    if r == "category-quota utilisation":
+        return "By seat category: " + "; ".join(f"{c['category']}: {c['filled']:,} of {c['cap']:,} seats, {c['programmes_over_cap']} "
+                                                   "programme(s) over cap" for c in facts["by_category"]) + "."
+    if r == "excess-admission case file":
+        return (f"{facts['over_cap_rows']} admissions over the limit at {facts['institutions']} institution(s); "
+                f"{facts['still_over_cap']} are still over the limit. Seat ledger "
+                + ("consistent." if facts["ledger_consistent"] else "NOT consistent: check before using this as evidence."))
+    return (f"Seat ledger: {facts['entries']:,} entries, " + ("no tampering found." if facts["consistent"]
+            else f"{facts['problems']} problem(s) found: investigate before relying on the numbers."))

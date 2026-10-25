@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, ArrowLeft, CheckCircle2, Layers, ShieldAlert, Wrench, XCircle } from "lucide-react";
 import { ApiError, download, getJson, type S } from "../api/client";
-import { AiBox } from "../ai";
+import { AiBox, LangSelect, useLang } from "../ai";
 import { Button, Card, ErrorNote, fmtTime, go, Loading, PageHeader, Stat } from "../ui";
 
 type Sev = "error" | "warning" | "flag";
@@ -24,7 +24,7 @@ export default function BatchDetail({ id }: { id: number }) {
   const [error, setError] = useState<string | null>(null);
   const [sev, setSev] = useState<Sev | "all">("all");
   const [selected, setSelected] = useState<string | null>(null);
-  const [lang, setLang] = useState<"en" | "hi">("en");
+  const [lang, setLang] = useLang();
 
   async function loadPage(after: number) {
     const page = await getJson<S["IssuesPage"]>(`/v1/batches/${id}/issues?cursor=${after}&limit=1000&lang=${lang}`);
@@ -83,12 +83,7 @@ export default function BatchDetail({ id }: { id: number }) {
 
       <Card title="Problems found, by type" actions={issues.length > 0 && (
         <div className="flex flex-wrap items-center gap-3">
-        <div role="group" aria-label="Language" className="flex gap-1 rounded-full border border-line p-0.5">
-          {([["en", "English"], ["hi", "हिन्दी"]] as const).map(([k, l]) => (
-            <button key={k} type="button" onClick={() => setLang(k)} aria-pressed={lang === k} lang={k}
-              className={`rounded-full px-3 py-1 text-[13px] font-semibold ${lang === k ? "bg-gold/15 text-champagne" : "text-slate-600 hover:text-ink"}`}>{l}</button>
-          ))}
-        </div>
+        <LangSelect value={lang} onChange={setLang} label="Message language" />
         <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
           {(["all", ...ORDER] as const).map((s) => (
             <button key={s} type="button" onClick={() => setSev(s)} aria-pressed={sev === s}
@@ -176,14 +171,14 @@ function Detail({ items }: { items: S["Issue"][] }) {
         </span>
         <span className="font-mono text-[12.5px] text-slate-500" title="Validation code">{first.code}</span>
       </div>
-      <h3 id={`g-${first.code}`} className="mt-2.5 font-display text-[20px] font-bold text-ink">{first.title}</h3>
+      <h3 dir="auto" id={`g-${first.code}`} className="mt-2.5 font-display text-[20px] font-bold text-ink">{first.title}</h3>
       <p className="mt-1 text-[14.5px] text-slate-600">
         {rows.length === 1 && rows[0] === 0 ? "Applies to the whole upload." : `${rows.length} row${rows.length === 1 ? "" : "s"} affected.`} {s.meaning}
       </p>
 
       <div className="mt-4 flex gap-3 rounded-xl bg-white/[0.04] px-4 py-3">
         <Wrench className="mt-0.5 h-4 w-4 shrink-0 text-gold" aria-hidden />
-        <p className="text-[15px] leading-relaxed text-ink"><span className="font-semibold">How to fix: </span>{first.fix_hint}</p>
+        <p dir="auto" className="text-[15px] leading-relaxed text-ink"><span className="font-semibold">How to fix: </span>{first.fix_hint}</p>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -216,7 +211,7 @@ function Detail({ items }: { items: S["Issue"][] }) {
         )}
       </div>
       <p className="mt-2 text-[12.5px] text-mute">Row numbers count from the first data row of your file (the header is not counted).
-        Hindi messages are machine-translated and awaiting review.</p>
+        Translations are machine-made and awaiting review by native speakers.</p>
     </section>
   );
 }

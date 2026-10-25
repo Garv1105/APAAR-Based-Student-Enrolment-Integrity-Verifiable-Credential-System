@@ -1,0 +1,104 @@
+{
+ "_locale": "bn",
+ "_note": "Machine-translated into Bengali with Gemini; review by a native speaker before production use. Fields that failed the checks stay in English.",
+ "E001": {
+  "title": "একটি প্রয়োজনীয় ক্ষেত্র অনুপস্থিত বা অচল",
+  "template": "Field '{field}' is missing or not valid: {detail}",
+  "fix_hint": "ক্ষেত্রটি পূরণ করুন; তারিখ YYYY-MM-DD আকারে, এবং ফ্ল্যাগ Y বা N দিন।"
+ },
+ "E101": {
+  "title": "APAAR ID অনুপস্থিত, কোনো কারণ দেওয়া হয়নি",
+  "template": "APAAR ID is blank and no reason code was given",
+  "fix_hint": "১২-সংখ্যার APAAR ID লিখুন, অথবা apaar_reason-এ REFUSED, NOT_GENERATED বা PENDING সেট করুন।"
+ },
+ "E101W": {
+  "title": "এখনও কোনো APAAR ID নেই (কারণ দেওয়া হয়েছে)",
+  "template": "No APAAR ID ({detail}). Row accepted with a provisional ID and counted toward intake",
+  "fix_hint": "APAAR ID তৈরি হয়ে গেলে রেকর্ডটি আপডেট করুন।"
+ },
+ "E102": {
+  "title": "APAAR ID ১২ সংখ্যার নয়",
+  "template": "APAAR ID must be exactly 12 digits",
+  "fix_hint": "স্পেস বা ড্যাশ সরিয়ে ফেলুন এবং সংখ্যার হিসাব চেক করুন।"
+ },
+ "E103": {
+  "title": "রেজিস্ট্রিতে APAAR ID পাওয়া যায়নি",
+  "template": "APAAR ID not found in the APAAR registry (MOCK)",
+  "fix_hint": "শিক্ষার্থীর APAAR কার্ড বা DigiLocker দিয়ে ID চেক করুন।"
+ },
+ "E104": {
+  "title": "নাম বা জন্মতারিখ APAAR-এর সাথে মেলে না",
+  "template": "{detail} does not match the APAAR registry (MOCK) after normalisation",
+  "fix_hint": "APAAR রেকর্ডের সাথে মিল রেখে নাম বা জন্মতারিখ ঠিক করুন।"
+ },
+ "E105": {
+  "title": "ছাত্রের ID অনুপস্থিত",
+  "template": "Institution student ID is blank",
+  "fix_hint": "শিক্ষার্থীর রোল বা রেজিস্ট্রেশন নম্বর লিখুন; এটি APAAR ID-সহ সার্টিফিকেটে প্রিন্ট করা থাকে।"
+ },
+ "E205": {
+  "title": "ছাত্রের ID ইতিমধ্যে ব্যবহৃত হচ্ছে",
+  "template": "Student ID is already used by {detail}",
+  "fix_hint": "প্রতিষ্ঠানের মধ্যে প্রতিটি ছাত্রের ID অনন্য হতে হবে। ID ঠিক করুন, অথবা আবার আপলোড করার পরিবর্তে বিদ্যমান রেকর্ড আপডেট করুন।"
+ },
+ "E201": {
+  "title": "এই ফাইলে একই ছাত্র দুবার আছে",
+  "template": "Same student already appears in row {detail} of this file",
+  "fix_hint": "পুনরাবৃত্তি হওয়া সারিটি সরিয়ে ফেলুন।"
+ },
+ "E202": {
+  "title": "ছাত্রের ভর্তি এখানে ইতিমধ্যে সম্পন্ন হয়েছে",
+  "template": "Student already has an active enrolment at this institution for this year",
+  "fix_hint": "আবার আপলোড করার পরিবর্তে বিদ্যমান রেকর্ড ঠিক করতে এনরোলমেন্ট আপডেট (PATCH) ব্যবহার করুন।"
+ },
+ "E203": {
+  "title": "ছাত্র অন্য প্রতিষ্ঠানেও ভর্তি আছে",
+  "template": "A record in this batch needs AICTE review",
+  "fix_hint": "এখন কোনো পদক্ষেপের প্রয়োজন নেই। আপনার মতামতের প্রয়োজন হলে AICTE যোগাযোগ করবে।"
+ },
+ "E301": {
+  "title": "অনুমোদিত আসনসীমা অতিক্রম করেছে",
+  "template": "Regular seats filled ({detail}) exceed AICTE approved intake",
+  "fix_hint": "অনুমোদিত সীমার বেশি ভর্তি হয়েছে কিনা চেক করুন। AICTE পর্যালোচনার জন্য চিহ্নিত করা হয়েছে।"
+ },
+ "E302": {
+  "title": "বিভাগের কোটা অতিক্রম করেছে",
+  "template": "Supernumerary cap exceeded for {detail}",
+  "fix_hint": "এই ভর্তির আসন বিভাগ চেক করুন। AICTE পর্যালোচনার জন্য চিহ্নিত করা হয়েছে।"
+ },
+ "E303": {
+  "title": "ঘোষিত আসনসীমা AICTE অনুমোদনের সাথে মেলে না",
+  "template": "Declared intake {detail} differs from the AICTE registry; the registry value is used",
+  "fix_hint": "আপনার সর্বশেষ AICTE অনুমোদন চিঠি (EOA) থেকে আসনসীমা ব্যবহার করুন।"
+ },
+ "E304": {
+  "title": "প্রতিষ্ঠান এই বছর অনুমোদিত নয়",
+  "template": "{detail}",
+  "fix_hint": "আপনার EOA-তে এই শিক্ষাবর্ষের জন্য অনুমোদিত প্রোগ্রামগুলিই কেবল আপলোড করুন।"
+ },
+ "E401": {
+  "title": "আসন বিভাগ ছাত্রের বিবরণের সাথে মেলে না",
+  "template": "{detail}",
+  "fix_hint": "NRI, OCI বা FN-এর মধ্যে মাত্র একটি সেট করুন এবং ছাত্রের স্থিতি অনুযায়ী আসন বিভাগ মেলান।"
+ },
+ "E402": {
+  "title": "বয়স অস্বাভাবিক মনে হচ্ছে",
+  "template": "Age {detail} at admission is outside 16-35",
+  "fix_hint": "জন্মতারিখ চেক করুন।"
+ },
+ "E403": {
+  "title": "ভর্তির উইন্ডোর বাইরের তারিখ",
+  "template": "Admission date {detail} is outside the admission window",
+  "fix_hint": "ভর্তির তারিখ চেক করুন।"
+ },
+ "E404": {
+  "title": "ভুল বছরে পার্শ্ব প্রবেশ (Lateral entry)",
+  "template": "Lateral entry is only valid in year 2 (got year {detail})",
+  "fix_hint": "পার্শ্ব প্রবেশের শিক্ষার্থীদের জন্য year_of_study-এ 2 সেট করুন।"
+ },
+ "E501": {
+  "title": "ডেডলাইনের পরে পরিবর্তন করা হয়েছে",
+  "template": "Change made after the submission deadline; recorded in the seat ledger",
+  "fix_hint": "ডেডলাইনের পরের পরিবর্তনগুলি AICTE দেখতে পায়। সহায়ক নথিপত্র সংরক্ষণ করুন।"
+ }
+}

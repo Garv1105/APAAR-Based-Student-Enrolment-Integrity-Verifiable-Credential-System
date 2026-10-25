@@ -4,15 +4,40 @@ import { ClipboardCopy, Download, FileText, Sparkles, Wand2 } from "lucide-react
 import { ApiError, sendJson, type S } from "./api/client";
 import { Button, ErrorNote } from "./ui";
 
+/** Languages the AI summaries and upload messages support, each named in its own script. */
+export const LANGUAGES: [string, string][] = [
+  ["en", "English"], ["hi", "हिन्दी"], ["bn", "বাংলা"], ["mr", "मराठी"], ["te", "తెలుగు"], ["ta", "தமிழ்"], ["gu", "ગુજરાતી"],
+  ["kn", "ಕನ್ನಡ"], ["ml", "മലയാളം"], ["or", "ଓଡ଼ିଆ"], ["pa", "ਪੰਜਾਬੀ"], ["as", "অসমীয়া"], ["ur", "اردو"],
+];
+const LANG_KEY = "vp.lang";
+/** Language choice, remembered in this browser only (a convenience; works without storage). */
+export function useLang(): [string, (l: string) => void] {
+  const [lang, setLang] = useState(() => { try { return localStorage.getItem(LANG_KEY) || "en"; } catch { return "en"; } });
+  return [lang, (l: string) => { setLang(l); try { localStorage.setItem(LANG_KEY, l); } catch { /* storage blocked */ } }];
+}
+export function LangSelect({ value, onChange, label = "Language" }: { value: string; onChange: (l: string) => void; label?: string }) {
+  return (
+    <label className="inline-flex items-center gap-1.5 text-[12.5px] text-slate-500">
+      <span className="sr-only">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={label}
+        className="rounded-lg border border-slate-300 bg-surface px-2 py-1 text-[13px] text-ink focus:border-gold focus:outline-none">
+        {LANGUAGES.map(([k, n]) => <option key={k} value={k} lang={k}>{n}</option>)}
+      </select>
+    </label>
+  );
+}
+const withLang = (path: string, lang: string) => `${path}${path.includes("?") ? "&" : "?"}lang=${lang}`;
+
 export function AiBox({ path, cta, title }: { path: string; cta: string; title: string }) {
   const [out, setOut] = useState<S["AiSummary"] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lang, setLang] = useLang();
 
   async function run() {
     setBusy(true);
     setError(null);
-    try { setOut(await sendJson<S["AiSummary"]>(path, "POST")); }
+    try { setOut(await sendJson<S["AiSummary"]>(withLang(path, lang), "POST")); }
     catch (e) { setError(e instanceof ApiError ? (e.status === 429 ? "Too many requests. Try again in a minute." : e.text) : "The service is unreachable."); }
     finally { setBusy(false); }
   }
@@ -21,12 +46,15 @@ export function AiBox({ path, cta, title }: { path: string; cta: string; title: 
     <div className="rounded-2xl border border-gold/25 bg-gold/[0.04] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 font-display text-[16px] font-bold text-ink"><Sparkles className="h-4 w-4 text-gold" aria-hidden />{title}</p>
-        <Button variant={out ? "ghost" : "secondary"} disabled={busy} onClick={run}>{busy ? "Thinking…" : out ? "Refresh" : cta}</Button>
+        <span className="flex items-center gap-2">
+          <LangSelect value={lang} onChange={setLang} label="Answer language" />
+          <Button variant={out ? "ghost" : "secondary"} disabled={busy} onClick={run}>{busy ? "Thinking…" : out ? "Refresh" : cta}</Button>
+        </span>
       </div>
       <div aria-live="polite">
         {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
         {out && (<>
-          <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-ink">{out.text}</p>
+          <p dir="auto" className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-ink">{out.text}</p>
           <p className="mt-2 text-[12.5px] text-mute">{out.source === "gemini" ? "✦ " : ""}{out.label}</p>
         </>)}
       </div>
@@ -41,12 +69,13 @@ export function NoteDraft({ institutionId, name }: { institutionId: string; name
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [lang, setLang] = useLang();
 
   async function run() {
     setBusy(true);
     setError(null);
     try {
-      const out = await sendJson<S["AiSummary"]>(`/v1/ai/inspection-note/${encodeURIComponent(institutionId)}`, "POST");
+      const out = await sendJson<S["AiSummary"]>(withLang(`/v1/ai/inspection-note/${encodeURIComponent(institutionId)}`, lang), "POST");
       setText(out.text);
       setLabel(out.label);
     } catch (e) { setError(e instanceof ApiError ? e.text : "The service is unreachable."); } finally { setBusy(false); }
@@ -61,12 +90,15 @@ export function NoteDraft({ institutionId, name }: { institutionId: string; name
     <div className="rounded-2xl border border-line bg-white/[0.02] p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="flex items-center gap-2 font-display text-[16px] font-bold text-ink"><FileText className="h-4 w-4 text-gold" aria-hidden />Inspection note</p>
-        <Button variant={text ? "ghost" : "secondary"} disabled={busy} onClick={run}>{busy ? "Drafting…" : text ? "Draft again" : "Draft a visit note"}</Button>
+        <span className="flex items-center gap-2">
+          <LangSelect value={lang} onChange={setLang} label="Note language" />
+          <Button variant={text ? "ghost" : "secondary"} disabled={busy} onClick={run}>{busy ? "Drafting…" : text ? "Draft again" : "Draft a visit note"}</Button>
+        </span>
       </div>
       {error && <div className="mt-3"><ErrorNote>{error}</ErrorNote></div>}
       {text !== null && (<>
         <label className="sr-only" htmlFor={`note-${institutionId}`}>Inspection note draft</label>
-        <textarea id={`note-${institutionId}`} value={text} onChange={(e) => setText(e.target.value)} rows={12}
+        <textarea dir="auto" id={`note-${institutionId}`} value={text} onChange={(e) => setText(e.target.value)} rows={12}
           className="mt-3 block w-full rounded-lg border border-slate-300 px-3 py-2 font-mono text-[13.5px] leading-relaxed" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}>

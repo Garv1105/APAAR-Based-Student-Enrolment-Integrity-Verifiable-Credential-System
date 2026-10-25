@@ -116,6 +116,11 @@ def mask_apaar(apaar: str) -> str:
 
 # ---------- signing ----------
 def jcs(obj) -> bytes:
+    # Fast path for flat dicts of ASCII keys and str/int/bool/None values (ledger states): there JCS is exactly sorted-key
+    # compact JSON. rfc8785 is pure Python and ~30x slower, which made a full ledger verify take ~25 s on 58k rows.
+    if isinstance(obj, dict) and all(isinstance(k, str) and k.isascii() for k in obj) and all(
+            v is None or isinstance(v, (str, bool)) or (isinstance(v, int) and abs(v) < 2**53) for v in obj.values()):
+        return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
     return rfc8785.dumps(obj)
 
 

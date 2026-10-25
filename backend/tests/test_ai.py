@@ -110,14 +110,44 @@ def test_map_columns_suggests_and_refuses_data(client, monkeypatch):
     assert r.json()["source"] == "gemini" and got == {"Name of Student": "student_name", "Branch": "programme_code", "Year": "year_of_study"}
 
 
-def test_hindi_messages_keep_placeholders_and_codes():
-    from app.i18n import catalogue, render
-    en, hi = catalogue("en"), catalogue("hi")
+def test_every_language_keeps_placeholders_and_codes():
+    from app.i18n import DIR, catalogue, render
+    en = catalogue("en")
     keep = __import__("re").compile(r"\{[a-z]+\}|\b[a-z]+_[a-z_]+\b|\b[A-Z][A-Z_]{2,}\b|YYYY-MM-DD")
-    for code, e in en.items():
-        if code.startswith("_"):
-            continue
-        for f in ("title", "template", "fix_hint"):
-            assert hi[code][f].strip(), (code, f)
-            assert set(keep.findall(e[f])) <= set(keep.findall(hi[code][f])), (code, f)
-    assert "R-17" in render("E205", {"detail": "R-17"}, "hi")["message"]
+    locales = sorted(p.stem for p in DIR.glob("*.json") if p.stem != "en")
+    assert set(ai.LANGS) - {"en"} <= set(locales)                                   # a catalogue for every AI language
+    for loc in locales:
+        cat = catalogue(loc)
+        for code, e in en.items():
+            if code.startswith("_"):
+                continue
+            for f in ("title", "template", "fix_hint"):
+                assert cat[code][f].strip(), (loc, code, f)
+                assert set(keep.findall(e[f])) <= set(keep.findall(cat[code][f])), (loc, code, f)
+        assert "R-17" in render("E205", {"detail": "R-17"}, loc)["message"]
+
+
+def test_report_summaries_for_regulators(client, monkeypatch):
+    upload(client, "inst-b", "B1.csv")
+    h = login(client, "aicte")
+    for kind, word in (("state-summary", "states"), ("category-utilisation", "seat category"),
+                       ("excess-case-file", "admissions over the limit"), ("ledger", "Seat ledger")):
+        r = client.post(f"/v1/ai/report-summary/{kind}", headers=h)
+        assert r.status_code == 200 and r.json()["source"] == "rules" and word in r.json()["text"], (kind, r.text)
+    assert client.post("/v1/ai/report-summary/nope", headers=h).status_code == 404
+    assert client.post("/v1/ai/report-summary/ledger", headers=login(client, "auditor")).status_code == 200
+    assert client.post("/v1/ai/report-summary/ledger", headers=login(client, "inst-b")).status_code == 403
+    seen = []
+    monkeypatch.setattr(ai, "enabled", lambda: True)
+    monkeypatch.setattr(ai, "_call", lambda facts, task, **k: (seen.append((json.dumps(facts), task)), "ok")[1])
+    r = client.post("/v1/ai/report-summary/excess-case-file?lang=ta", headers=h)
+    facts, task = seen[0]
+    assert r.json()["source"] == "gemini" and "Tamil" in task and "Latin" in task
+    assert not re.search(r"\d{12}", facts) and "row_no" not in facts                 # aggregates only
+
+
+def test_unknown_language_is_rejected(client):
+    h = login(client, "aicte")
+    r = client.post("/v1/ai/report-summary/ledger?lang=xx", headers=h)
+    assert r.status_code == 422 and r.headers["content-type"].startswith("application/problem+json")
+    assert client.get("/v1/ai/languages").json()["ur"] == "Urdu"

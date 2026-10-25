@@ -101,3 +101,10 @@ def test_keys_from_environment_are_read_only(monkeypatch):
                 assert crypto.KEYS_ENV in str(e)
     finally:
         monkeypatch.setattr(crypto, "_keys", None)  # later tests reload the test key file
+
+
+def test_jcs_fast_path_matches_rfc8785():
+    import rfc8785
+    for obj in ({"b": 1, "a": None, "c": "x\"\\n\t\u0001é₹😀", "d": True, "e": -7, "f": 2**53 - 1},
+                {"enrolment_id": 5, "status": "active", "ended_on": None}, {}, {"z": "", "Z": "", "_": "", "1": ""}):
+        assert crypto.jcs(obj) == rfc8785.dumps(obj), obj

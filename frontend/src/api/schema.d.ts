@@ -411,6 +411,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ai/languages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ai Languages
+         * @description Languages the AI summaries can answer in (code -> name).
+         */
+        get: operations["ai_languages_v1_ai_languages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ai/report-summary/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ai Report Summary
+         * @description Regulators: plain-language summary of a national report (state-summary, category-utilisation, excess-case-file) or of the seat-ledger check (ledger). Aggregates only; advisory; ?lang= for the language.
+         */
+        post: operations["ai_report_summary_v1_ai_report_summary__kind__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ai/explain-institution/{institution_id}": {
         parameters: {
             query?: never;
@@ -3524,9 +3564,64 @@ export interface operations {
             };
         };
     };
-    ai_explain_institution_v1_ai_explain_institution__institution_id__post: {
+    ai_languages_v1_ai_languages_get: {
         parameters: {
             query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    ai_report_summary_v1_ai_report_summary__kind__post: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
+            header?: never;
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ai_explain_institution_v1_ai_explain_institution__institution_id__post: {
+        parameters: {
+            query?: {
+                lang?: string;
+            };
             header?: never;
             path: {
                 institution_id: string;
@@ -3557,7 +3652,9 @@ export interface operations {
     };
     ai_inspection_note_v1_ai_inspection_note__institution_id__post: {
         parameters: {
-            query?: never;
+            query?: {
+                lang?: string;
+            };
             header?: never;
             path: {
                 institution_id: string;
@@ -3621,7 +3718,9 @@ export interface operations {
     };
     ai_upload_summary_v1_ai_upload_summary__batch_id__post: {
         parameters: {
-            query?: never;
+            query?: {
+                lang?: string;
+            };
             header?: never;
             path: {
                 batch_id: number;

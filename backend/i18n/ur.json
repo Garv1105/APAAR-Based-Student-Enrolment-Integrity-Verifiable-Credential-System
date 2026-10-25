@@ -1,0 +1,104 @@
+{
+ "_locale": "ur",
+ "_note": "Machine-translated into Urdu with Gemini; review by a native speaker before production use. Fields that failed the checks stay in English.",
+ "E001": {
+  "title": "ایک مطلوبہ فیلڈ غائب ہے یا درست نہیں ہے",
+  "template": "Field '{field}' is missing or not valid: {detail}",
+  "fix_hint": "Fill the field; dates as YYYY-MM-DD, flags as Y or N."
+ },
+ "E101": {
+  "title": "APAAR ID غائب ہے، کوئی وجہ نہیں بتائی گئی",
+  "template": "APAAR ID is blank and no reason code was given",
+  "fix_hint": "Enter the 12-digit APAAR ID, or set apaar_reason to REFUSED, NOT_GENERATED or PENDING."
+ },
+ "E101W": {
+  "title": "ابھی تک کوئی APAAR ID نہیں ہے (وجہ بتائی گئی ہے)",
+  "template": "No APAAR ID ({detail}). Row accepted with a provisional ID and counted toward intake",
+  "fix_hint": "Update the record with the APAAR ID once it is generated."
+ },
+ "E102": {
+  "title": "APAAR ID بارہ ہندسوں کی نہیں ہے",
+  "template": "APAAR ID must be exactly 12 digits",
+  "fix_hint": "Remove spaces or dashes and check the number of digits."
+ },
+ "E103": {
+  "title": "رجسٹری میں APAAR ID نہیں ملی",
+  "template": "APAAR ID not found in the APAAR registry (MOCK)",
+  "fix_hint": "Check the ID with the student's APAAR card or DigiLocker."
+ },
+ "E104": {
+  "title": "نام یا تاریخ پیدائش APAAR سے مختلف ہے",
+  "template": "{detail} does not match the APAAR registry (MOCK) after normalisation",
+  "fix_hint": "Correct the name or date of birth to match the APAAR record."
+ },
+ "E105": {
+  "title": "طالب علم کی آئی ڈی غائب ہے",
+  "template": "Institution student ID is blank",
+  "fix_hint": "Enter the student's roll or registration number; it is printed on certificates with the APAAR ID."
+ },
+ "E205": {
+  "title": "طالب علم کی آئی ڈی پہلے ہی استعمال میں ہے",
+  "template": "Student ID is already used by {detail}",
+  "fix_hint": "Each student ID must be unique within the institution. Correct the ID, or update the existing record instead of uploading it again."
+ },
+ "E201": {
+  "title": "اس فائل میں ایک ہی طالب علم دو بار ہے",
+  "template": "Same student already appears in row {detail} of this file",
+  "fix_hint": "Remove the repeated row."
+ },
+ "E202": {
+  "title": "طالب علم یہاں پہلے ہی داخلہ لے چکا ہے",
+  "template": "Student already has an active enrolment at this institution for this year",
+  "fix_hint": "Use the enrolment update (PATCH) to correct the existing record instead of uploading it again."
+ },
+ "E203": {
+  "title": "طالب علم دوسرے ادارے میں بھی داخل ہے",
+  "template": "A record in this batch needs AICTE review",
+  "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."
+ },
+ "E301": {
+  "title": "منظور شدہ داخلہ سے زیادہ",
+  "template": "Regular seats filled ({detail}) exceed AICTE approved intake",
+  "fix_hint": "Check for admissions beyond the approved intake. Flagged for AICTE review."
+ },
+ "E302": {
+  "title": "کیٹیگری کوٹہ سے زیادہ",
+  "template": "Supernumerary cap exceeded for {detail}",
+  "fix_hint": "Check the seat category of these admissions. Flagged for AICTE review."
+ },
+ "E303": {
+  "title": "اعلان کردہ داخلہ AICTE کی منظوری سے مختلف ہے",
+  "template": "Declared intake {detail} differs from the AICTE registry; the registry value is used",
+  "fix_hint": "Use the intake from your latest AICTE approval letter (EOA)."
+ },
+ "E304": {
+  "title": "ادارے کو اس سال منظوری نہیں ملی",
+  "template": "{detail}",
+  "fix_hint": "Upload only programmes approved for this academic year in your EOA."
+ },
+ "E401": {
+  "title": "سیٹ کیٹیگری طالب علم کی تفصیلات سے میل نہیں کھاتی",
+  "template": "{detail}",
+  "fix_hint": "Set only one of NRI, OCI or FN, and match the seat category to the student's status."
+ },
+ "E402": {
+  "title": "عمر غیر متوقع معلوم ہوتی ہے",
+  "template": "Age {detail} at admission is outside 16-35",
+  "fix_hint": "Check the date of birth."
+ },
+ "E403": {
+  "title": "داخلے کی تاریخ داخلے کے ونڈو سے باہر ہے",
+  "template": "Admission date {detail} is outside the admission window",
+  "fix_hint": "Check the admission date."
+ },
+ "E404": {
+  "title": "غلط سال میں لیٹرل انٹری",
+  "template": "Lateral entry is only valid in year 2 (got year {detail})",
+  "fix_hint": "Set year_of_study to 2 for lateral entry students."
+ },
+ "E501": {
+  "title": "آخری تاریخ کے بعد تبدیل کیا گیا",
+  "template": "Change made after the submission deadline; recorded in the seat ledger",
+  "fix_hint": "Post-deadline changes are visible to AICTE. Keep supporting documents."
+ }
+}

@@ -118,6 +118,8 @@ def test_access_matrix(client, dbconn):
         ("POST", "/v1/ai/explain-institution/1-0000000001", {}, expect(REG)),
         ("POST", f"/v1/ai/upload-summary/{bid}", {}, expect({"inst-a": 200}, 404)),
         ("POST", "/v1/ai/inspection-note/1-0000000001", {}, expect({"aicte": 200})),
+        ("POST", "/v1/ai/report-summary/ledger", {}, expect(REG)),
+        ("GET", "/v1/ai/languages", {}, {u: 200 for u in USERS}),
         ("POST", "/v1/ai/map-columns", {"json": {"headers": ["Name of Student"]}}, expect({"inst-a": 200, "inst-b": 200})),
         ("POST", "/v1/access-requests/999999/decide", {"json": {"decision": "rejected", "reason": "access matrix test"}},
          expect({"aicte": 404})),

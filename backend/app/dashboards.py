@@ -1,5 +1,18 @@
 """Dashboard aggregates (PRD §14). Plain SQL over live tables; counters are the intake source."""
+import time
+
 from . import ledger
+
+_LEDGER_OK: tuple[float, bool] | None = None
+
+
+def _ledger_ok(conn) -> bool:
+    """Dashboard badge only. ponytail: 60 s per-process cache, because a full verify reads every ledger entry and enrolment
+    (about 3 s at 58k rows) and the dashboard polls every 30 s. GET /v1/ledger/verify always re-checks."""
+    global _LEDGER_OK
+    if _LEDGER_OK is None or time.monotonic() - _LEDGER_OK[0] > 60:
+        _LEDGER_OK = (time.monotonic(), ledger.verify(conn)["ok"])
+    return _LEDGER_OK[1]
 from .ingest import NOTICE, batch_out, current_year
 
 
@@ -69,5 +82,5 @@ def aicte(conn) -> dict:
                    "batches": one("SELECT count(*) n FROM upload_batches"),
                    "post_deadline_mutations": one("SELECT count(*) n FROM anomaly_flags WHERE type='E501'")},
         "excess_ranking": excess, "category_mix": mix, "by_state": by_state, "open_cases": open_cases,
-        "upload_compliance": compliance, "ledger_ok": ledger.verify(conn)["ok"],
+        "upload_compliance": compliance, "ledger_ok": _ledger_ok(conn),
     }

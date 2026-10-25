@@ -867,6 +867,78 @@
     ]
    }
   },
+  "/v1/ai/languages": {
+   "get": {
+    "summary": "Ai Languages",
+    "description": "Languages the AI summaries can answer in (code -> name).",
+    "operationId": "ai_languages_v1_ai_languages_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/ai/report-summary/{kind}": {
+   "post": {
+    "summary": "Ai Report Summary",
+    "description": "Regulators: plain-language summary of a national report (state-summary, category-utilisation, excess-case-file) or of the seat-ledger check (ledger). Aggregates only; advisory; ?lang= for the language.",
+    "operationId": "ai_report_summary_v1_ai_report_summary__kind__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "kind",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Kind"
+      }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "en",
+       "title": "Lang"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AiSummary"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/ai/explain-institution/{institution_id}": {
    "post": {
     "summary": "Ai Explain Institution",
@@ -885,6 +957,16 @@
       "schema": {
        "type": "string",
        "title": "Institution Id"
+      }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "en",
+       "title": "Lang"
       }
      }
     ],
@@ -930,6 +1012,16 @@
       "schema": {
        "type": "string",
        "title": "Institution Id"
+      }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "en",
+       "title": "Lang"
       }
      }
     ],
@@ -1019,6 +1111,16 @@
       "schema": {
        "type": "integer",
        "title": "Batch Id"
+      }
+     },
+     {
+      "name": "lang",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "en",
+       "title": "Lang"
       }
      }
     ],
