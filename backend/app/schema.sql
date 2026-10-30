@@ -146,6 +146,8 @@ CREATE TABLE IF NOT EXISTS duplicate_cases (
   resolved_at   timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE duplicate_cases ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'exact' CHECK (kind IN ('exact','fuzzy'));
+CREATE INDEX IF NOT EXISTS students_dob_bucket_idx ON students (bi_dob_bucket);
 
 CREATE TABLE IF NOT EXISTS anomaly_flags (
   id             bigserial PRIMARY KEY,

@@ -56,6 +56,11 @@
   "template": "A record in this batch needs AICTE review",
   "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."
  },
+ "E204": {
+  "title": "طالب علم دوسرے ادارے میں بھی داخل ہے",
+  "template": "A record in this batch needs AICTE review",
+  "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."
+ },
  "E301": {
   "title": "منظور شدہ داخلہ سے زیادہ",
   "template": "Regular seats filled ({detail}) exceed AICTE approved intake",

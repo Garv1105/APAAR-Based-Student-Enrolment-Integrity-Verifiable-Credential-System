@@ -15,7 +15,9 @@ def case_out(conn, case: dict, user: dict) -> dict:
     regulator = user["role"] in ("aicte_officer", "auditor")
     batch = None if regulator or not ids else conn.execute("SELECT batch_id FROM enrolments WHERE id=%s", (ids[0],)).fetchone()["batch_id"]
     return {"id": case["id"], "status": case["status"], "created_at": case["created_at"], "enrolment_ids": ids,
-            "notice": f"Case #{case['id']}: duplicate enrolment across institutions" if regulator else NOTICE.format(batch=batch, case=case["id"]),
+            "notice": (f"Case #{case['id']}: " + ("possible duplicate (no APAAR; name, date of birth and guardian match)"
+                                                  if case.get("kind") == "fuzzy" else "duplicate enrolment across institutions"))
+            if regulator else NOTICE.format(batch=batch, case=case["id"]),
             "resolution_note": case["resolution_note"] if regulator else None, "resolved_at": case["resolved_at"]}
 
 
@@ -59,10 +61,11 @@ def resolve(conn, user: dict, case_id: int, body: dict, request=None) -> dict:
 
 def unmask(conn, user: dict, case_id: int, reason: str, request=None) -> dict:
     case = _get(conn, case_id)
-    s = conn.execute("SELECT * FROM students WHERE id=%s", (case["student_id"],)).fetchone()
-    person = {"name": crypto.decrypt("students", "name", s["id"], s["name_enc"]), "apaar_status": s["apaar_status"],
-              "apaar_id": crypto.decrypt("students", "apaar", s["id"], s["apaar_enc"]) if s["apaar_enc"] else None}
-    detail = [person | {"enrolment_id": e["id"], "institution_id": e["institution_id"], "institution": e["institution"],
+    def person(sid: int) -> dict:
+        s = conn.execute("SELECT * FROM students WHERE id=%s", (sid,)).fetchone()
+        return {"name": crypto.decrypt("students", "name", s["id"], s["name_enc"]), "apaar_status": s["apaar_status"],
+                "apaar_id": crypto.decrypt("students", "apaar", s["id"], s["apaar_enc"]) if s["apaar_enc"] else None}
+    detail = [person(e["student_id"]) | {"enrolment_id": e["id"], "institution_id": e["institution_id"], "institution": e["institution"],
                         "programme_id": e["programme_id"], "institution_student_id": e["institution_student_id"],
                         "status": e["status"], "admission_date": e["admission_date"].isoformat(), "batch_id": e["batch_id"]}
               for e in conn.execute(

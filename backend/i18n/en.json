@@ -11,6 +11,7 @@
   "E201": {"title": "Same student twice in this file", "template": "Same student already appears in row {detail} of this file", "fix_hint": "Remove the repeated row."},
   "E202": {"title": "Student already enrolled here", "template": "Student already has an active enrolment at this institution for this year", "fix_hint": "Use the enrolment update (PATCH) to correct the existing record instead of uploading it again."},
   "E203": {"title": "Student also enrolled at another institution", "template": "A record in this batch needs AICTE review", "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."},
+  "E204": {"title": "Possible match at another institution", "template": "A record in this batch needs AICTE review", "fix_hint": "No action needed now. AICTE will contact you if the case needs your input."},
   "E301": {"title": "Over the approved intake", "template": "Regular seats filled ({detail}) exceed AICTE approved intake", "fix_hint": "Check for admissions beyond the approved intake. Flagged for AICTE review."},
   "E302": {"title": "Over the category quota", "template": "Supernumerary cap exceeded for {detail}", "fix_hint": "Check the seat category of these admissions. Flagged for AICTE review."},
   "E303": {"title": "Declared intake differs from AICTE approval", "template": "Declared intake {detail} differs from the AICTE registry; the registry value is used", "fix_hint": "Use the intake from your latest AICTE approval letter (EOA)."},

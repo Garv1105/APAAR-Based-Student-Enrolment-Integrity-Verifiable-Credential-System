@@ -6,7 +6,7 @@ from psycopg.types.json import Jsonb
 from . import anomaly, crypto, ledger, webhooks
 from .auth import audit
 from .mocks import apaar_registry
-from .validation import Ctx, counter_keys, student_id_key, validate_batch
+from .validation import Ctx, counter_keys, issue, probable_same_person, student_id_key, validate_batch
 
 NOTICE = "A record in batch #{batch} needs AICTE review (case #{case})"
 
@@ -65,9 +65,11 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
                   programmes=progs, seat_categories=cats, registry_lookup=apaar_registry().lookup,
                   own_active_bi=own, other_active_bi=other, own_active_student_ids=own_sids, counters=dict(counters))
         outcomes = validate_batch(rows, ctx)
+        for k in sorted({crypto.dob_bucket(o["data"]["dob"].isoformat()) for o in outcomes if o["accepted"]}):
+            conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (f"dob:{k}",))
 
         issues = [(b["id"], i["row_no"], i["code"], i["severity"], i["field"], Jsonb(i["params"])) for o in outcomes for i in o["issues"]]
-        new_cases = []
+        new_cases, compared = [], 0
         for o in outcomes:
             if not o["accepted"]:
                 continue
@@ -83,6 +85,17 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
             ledger.append(conn, inst_id, "enrolment.created", e)
             if any(i["code"] == "E203" for i in o["issues"]):
                 new_cases.append(_open_case(conn, sid, year["code"]))
+            else:
+                others, n = _fuzzy_matches(conn, sid, d, o["bi"] is not None, year["code"])
+                compared += n
+                if others:
+                    i = issue(o["row_no"], "E204", "student_name")
+                    o["issues"].append(i)
+                    issues.append((b["id"], i["row_no"], i["code"], i["severity"], i["field"], Jsonb(i["params"])))
+                    new_cases.append(conn.execute("SELECT open_fuzzy_case(%s, %s) id", (e["id"], others)).fetchone()["id"])
+        if compared:
+            audit(conn, user, "duplicates.fuzzy_compare", "upload_batch", b["id"], request=request,
+                  reason=f"{compared} candidate record(s) decrypted server-side for duplicate matching")
         _store_batch_features(conn, b["id"], outcomes, progs, year["deadline"], b["created_at"])
         if issues:
             with conn.cursor() as cur:
@@ -139,6 +152,19 @@ def _student_id(conn, d: dict, o: dict) -> int:
          enc("guardian_name", d["guardian_name"]) if d["guardian_name"] else None,
          crypto.dob_bucket(d["dob"].isoformat()), crypto.name_phonetic(d["student_name"])))
     return sid
+
+
+def _fuzzy_matches(conn, sid: int, d: dict, has_apaar: bool, year: str) -> tuple[list[int], int]:
+    me = {"name": d["student_name"], "dob": d["dob"].isoformat(), "guardian": d["guardian_name"]}
+    rows = conn.execute("SELECT * FROM fuzzy_candidates(%s, %s, %s, %s, %s)",
+                        (sid, crypto.dob_bucket(me["dob"]), crypto.name_phonetic(me["name"]), has_apaar, year)).fetchall()
+    hits = []
+    for c in rows:
+        dec = lambda col, v: crypto.decrypt("students", col, c["student_id"], v) if v else None  # noqa: E731
+        other = {"name": dec("name", c["name_enc"]), "dob": dec("dob", c["dob_enc"]), "guardian": dec("guardian_name", c["guardian_name_enc"])}
+        if probable_same_person(me, other):
+            hits.append(c["enrolment_id"])
+    return hits, len(rows)
 
 
 def _open_case(conn, student_id: int, year: str) -> int:

@@ -3,6 +3,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
+import jellyfish
 from rapidfuzz import fuzz
 
 from . import crypto
@@ -11,6 +12,49 @@ from .contracts import APAAR_REASONS, REQUIRED_COLUMNS
 
 NAME_MATCH_THRESHOLD = 85
 AGE_RANGE = (16, 35)
+TOKEN_SIMILARITY = 0.92
+NAME_ALIASES = {"mohd": "mohammed", "md": "mohammed", "muhammad": "mohammed", "mohammad": "mohammed", "muhammed": "mohammed"}
+TRANSLITERATION = [("ksh", "x"), ("ks", "x"), ("au", "o"), ("ou", "o"), ("ow", "o"), ("th", "t"), ("dh", "d"), ("bh", "b"),
+                   ("kh", "k"), ("gh", "g"), ("ph", "f"), ("sh", "s"), ("ck", "k"), ("w", "v"), ("ee", "i"), ("oo", "u"),
+                   ("y", "i"), ("z", "j"), ("q", "k")]
+
+
+def _fold(token: str) -> str:
+    token = NAME_ALIASES.get(token, token)
+    for a, b in TRANSLITERATION:
+        token = token.replace(a, b)
+    return re.sub(r"(.)\1+", r"\1", token)
+
+
+def _tokens_match(a: str, b: str) -> bool:
+    a, b = _fold(a), _fold(b)
+    return a == b or (a[0] == b[0] and (jellyfish.jaro_winkler_similarity(a, b) >= TOKEN_SIMILARITY
+                                         or a.replace("a", "") == b.replace("a", "")))
+
+
+def names_match(a: str, b: str) -> bool:
+    full_a, full_b = ([t for t in crypto.normalise_name(n).split() if len(t) > 1] for n in (a, b))
+    init_a, init_b = ({t for t in crypto.normalise_name(n).split() if len(t) == 1} for n in (a, b))
+    if init_a and init_b and not init_a & init_b:
+        return False
+    short, long_ = sorted((full_a, full_b), key=len)
+    if len(short) < 2:
+        return False
+    free = list(long_)
+    for t in short:
+        hit = next((u for u in free if _tokens_match(t, u)), None)
+        if hit is None:
+            return False
+        free.remove(hit)
+    return True
+
+
+def probable_same_person(a: dict, b: dict) -> bool:
+    if a["dob"] != b["dob"] or not names_match(a["name"], b["name"]):
+        return False
+    if a.get("guardian") and b.get("guardian"):
+        return names_match(a["guardian"], b["guardian"])
+    return True
 
 
 def issue(row_no: int, code: str, field_: str | None = None, detail: str = "") -> dict:

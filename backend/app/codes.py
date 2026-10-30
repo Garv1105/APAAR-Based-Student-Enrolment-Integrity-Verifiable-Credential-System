@@ -10,6 +10,7 @@ CODES = {
     "E201": ("DUPLICATE_IN_FILE", "error"),
     "E202": ("DUPLICATE_IN_INSTITUTION", "error"),
     "E203": ("CROSS_INSTITUTION_DUPLICATE", "flag"),
+    "E204": ("PROBABLE_DUPLICATE_FUZZY", "flag"),
     "E301": ("EXCESS_OVER_APPROVED_INTAKE", "flag"),
     "E302": ("CATEGORY_CAP_EXCEEDED", "flag"),
     "E303": ("INTAKE_DECLARATION_MISMATCH", "flag"),

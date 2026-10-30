@@ -54,7 +54,7 @@ How far each PS requirement has got, with the evidence in the test suite:
 |---|---|---|
 | 1. Secure upload/API keyed by APAAR, and updates | ✅ Backend | CSV and JSON batch upload, `Idempotency-Key`, `PATCH` withdraw/migrate/correct |
 | 2. Approved intake, enrolment, supernumerary, NRI/OCI/FN fields | ✅ | Approved intake comes from the registry only. FN/OCI/CIWG supernumerary pool at 15% of intake, with a 1/3 CIWG sub-cap |
-| 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | ✅ | 19 validation codes (incl. student-ID E105/E205), one unit test each. Labelled scenario passes 455/455 rows through the API |
+| 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | ✅ | 20 validation codes (incl. student-ID E105/E205), one unit test each. Fuzzy matching (E204) catches the same student at two colleges when one record has no APAAR Labelled scenario passes 455/455 rows through the API |
 | 4. Real-time dashboards (AICTE + institutions) | ✅ | Institution and AICTE web dashboards that refresh every 3 s by polling (no SSE push yet) |
 | 5. Secure verification for stakeholders | ✅ | `POST /v1/verify`: VALID / REVOKED / SUSPENDED / UNTRUSTED_ISSUER / TAMPERED / EXPIRED. Employer access is consent-gated. AICTE and the auditor get masked data. Verifier web page |
 | 6. Verifiable student records | ✅ | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the **official W3C test vectors**. Trust registry (MOCK) and Bitstring Status Lists |
@@ -214,6 +214,7 @@ Rules run in layers: schema → format → referential → registry (mock) → b
 | E205 | Student ID already used in this file or by an active enrolment at the same institution (case- and space-insensitive) | error |
 | E201 / E202 | Duplicate within the file / already enrolled at this institution | error |
 | E203 | Active enrolment at another institution (neutral notice to both sides) | flag |
+| E204 | Probable same student at another institution when one side has no APAAR: same date of birth, matching name and guardian (spelling variants, initials, dropped middle names allowed). Sent to AICTE for review, never auto-confirmed | flag |
 | E301 / E302 | Regular seats over approved intake / supernumerary cap or CIWG sub-cap exceeded | flag |
 | E303 | Declared intake differs from the AICTE registry | flag |
 | E304 | Institution not approved, or programme not approved this year | error |
@@ -262,6 +263,7 @@ The live demo runs on **Vercel** (region `sin1`) with **Neon Postgres**. [`verce
 What is implemented and tested:
 - **Institution isolation in the database.** The app connects as `app_user`, which isn't the owner, isn't a superuser and has no `BYPASSRLS`. Every institution-scoped table uses `FORCE ROW LEVEL SECURITY`. Cross-institution checks (duplicate lookup, shared person rows, case opening, ledger appends) run only through narrow `SECURITY DEFINER` functions that check the caller's role and institution. Tests confirm with raw SQL that institution B sees none of A's rows and can't write to them.
 - **Field encryption.** APAAR ID, name, DOB and guardian name use AES-256-GCM, with the associated data bound to `table|column|row_id`. Lookups use separate HMAC-SHA256 blind indexes, and APAAR is displayed masked (`XXXX-XXXX-0042`).
+- **Fuzzy matching on encrypted data.** Records without an APAAR are compared across institutions using blind indexes only: a DOB bucket and sound-alike name keys narrow the search to a handful of candidates, which a `SECURITY DEFINER` function returns still encrypted. Only those candidates are decrypted, inside the server, and the comparison is logged in the audit trail. A match opens a case for AICTE review and is never confirmed automatically; the uploading institution sees only a neutral notice.
 - **Seat ledger.** Each enrolment create/update is hash-chained, and AICTE signs checkpoints with Ed25519. Verification also compares live rows against their last ledger event. A silent edit, delete or history rewrite is detected, and a test proves it.
 - **Auth and roles.** Passwords are hashed with Argon2. JWTs are HS256. A role guard protects every endpoint, and an access-matrix test covers every endpoint × every role, including wrong-institution access.
 - **Audit log.** Uploads, record reads, exports and updates are logged with actor, role, reason and request id.
@@ -286,6 +288,8 @@ cd backend
 ..\.venv\Scripts\python.exe -m pytest -q tests          # all tests (uses a separate 'apaar_test' database)
 ..\.venv\Scripts\python.exe -m pytest -s tests/test_eval.py   # per-code precision/recall table
 ..\.venv\Scripts\python.exe data/gen.py --seed 42       # regenerate the synthetic dataset (deterministic)
+..\.venv\Scripts\python.exe ../synthetic/generate.py --out ../data/world --seed 7 --students 50000 --institutions 60
+..\.venv\Scripts\python.exe data/eval_fuzzy.py ../data/world  # score fuzzy duplicate matching (E204)
 ```
 
 **Synthetic dataset:** 450 rows across 5 upload files and 4 institutions, plus scripted withdrawals, migrations and a post-deadline edit. Every row has labelled expected codes, and the dataset includes legitimate-move controls that must **not** be flagged.
@@ -305,6 +309,8 @@ cd backend
 Every "false positive" sits on a programme the generator deliberately over-filled (an E301/E302 programme fault). It is real over-admission, but the labels record it as a programme fault rather than as an anomaly. There are only 5–10 labelled positives per rule, so treat these as early evidence on synthetic data, not as measured field accuracy. `tests/test_anomaly.py` re-runs this check on the demo preset on every test run.
 
 **How to read that number.** The rules and the labels were written by the same team, so it shows the rules implement the specification. It does **not** measure real-world detection accuracy. Four codes (E201, E301, E302, E303) are labelled by re-applying the counting rule, so for those it is a consistency check rather than independent ground truth.
+
+**Fuzzy duplicates (E204), scored against independent labels.** The teammate's generator plants students who appear at a second college without an APAAR and with a changed name (spelling variant, added initial, dropped middle name or swapped order), plus pairs that must **not** match, such as twins (same DOB and guardian, different first name). `backend/data/eval_fuzzy.py` reads the generator's messy CSV and Excel files with its own reference parser and runs the same matching function the upload pipeline uses. On three worlds (seeds 7, 11 and 42; up to 51,000 rows and 60 institutions) it finds **15 of 15** labelled pairs in each, with **no** false matches and no must-not-match pair flagged. Fifteen pairs per world is a small sample, so this shows the rules work on the planted variants, not field accuracy.
 
 ## Repository layout
 
@@ -334,7 +340,7 @@ Every "false positive" sits on a programme the generator deliberately over-fille
 - **Rejected rows don't count yet.** Rows rejected with errors don't count toward intake until they are corrected. Dashboards show the rejected-row total so they can't silently disappear.
 - **AI is advisory and on the free tier.** Answers may be imperfect, and Google may use free-tier prompts (inputs are synthetic aggregates only). Re-decide the tier before real data.
 - **Machine translations.** The 12 Indian-language catalogues are unreviewed, and the interface itself is English only.
-- **Latin script only.** Name matching doesn't handle Indic scripts, and fuzzy (no-APAAR) duplicate matching is deferred.
+- **Latin script only.** Name matching doesn't handle Indic scripts.
 - **No migrations.** Schema changes need `app.seed --reset`.
 - **Passkey consent (P1).** Knowing a student's DOB no longer gets anyone in. Students and guardians register WebAuthn passkeys using one-time activation codes from the institution, and consent approval needs a passkey assertion bound to that request's terms.
   - **Code delivery:** in the prototype the institution hands codes over in person; production delivers them via DigiLocker or the registered mobile number.

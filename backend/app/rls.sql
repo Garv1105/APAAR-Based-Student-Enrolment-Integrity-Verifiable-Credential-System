@@ -286,6 +286,42 @@ BEGIN
   RETURN cid;
 END $$;
 
+CREATE OR REPLACE FUNCTION fuzzy_candidates(p_student bigint, p_bucket int, p_phon text[], p_has_apaar boolean, p_year text)
+RETURNS TABLE (enrolment_id bigint, student_id bigint, name_enc bytea, dob_enc bytea, guardian_name_enc bytea)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF app_role() <> 'institution_admin' THEN RAISE EXCEPTION 'fuzzy_candidates: not allowed'; END IF;
+  IF p_year <> (SELECT max(code) FROM academic_years) THEN RAISE EXCEPTION 'fuzzy_candidates: not the open year'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id
+                 WHERE e.student_id = p_student AND e.academic_year = p_year AND e.status = 'active' AND p.institution_id = app_inst()) THEN
+    RAISE EXCEPTION 'fuzzy_candidates: caller has no active enrolment for this student';
+  END IF;
+  RETURN QUERY SELECT e.id, s.id, s.name_enc, s.dob_enc, s.guardian_name_enc
+    FROM students s JOIN enrolments e ON e.student_id = s.id JOIN programmes p ON p.id = e.programme_id
+    WHERE s.bi_dob_bucket = p_bucket AND s.bi_name_phon && p_phon AND s.id <> p_student
+      AND (NOT p_has_apaar OR s.apaar_bi IS NULL)
+      AND e.academic_year = p_year AND e.status = 'active' AND p.institution_id <> app_inst()
+    ORDER BY e.id LIMIT 50;
+END $$;
+
+CREATE OR REPLACE FUNCTION open_fuzzy_case(p_enrolment bigint, p_others bigint[]) RETURNS bigint
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_student bigint; v_year text; cid bigint;
+BEGIN
+  IF app_role() <> 'institution_admin' THEN RAISE EXCEPTION 'open_fuzzy_case: not allowed'; END IF;
+  SELECT e.student_id, e.academic_year INTO v_student, v_year FROM enrolments e JOIN programmes p ON p.id = e.programme_id
+   WHERE e.id = p_enrolment AND e.status = 'active' AND p.institution_id = app_inst();
+  IF v_student IS NULL THEN RAISE EXCEPTION 'open_fuzzy_case: not an active enrolment of the caller'; END IF;
+  IF coalesce(array_length(p_others, 1), 0) = 0 OR EXISTS (
+       SELECT 1 FROM unnest(p_others) o LEFT JOIN enrolments e ON e.id = o LEFT JOIN programmes p ON p.id = e.programme_id
+       WHERE e.id IS NULL OR e.status <> 'active' OR e.academic_year <> v_year OR p.institution_id = app_inst()) THEN
+    RAISE EXCEPTION 'open_fuzzy_case: other enrolments must be active at other institutions';
+  END IF;
+  INSERT INTO duplicate_cases (student_id, enrolment_ids, status, kind)
+  VALUES (v_student, (SELECT array_agg(x ORDER BY x) FROM unnest(p_others || p_enrolment) x), 'flagged', 'fuzzy') RETURNING id INTO cid;
+  RETURN cid;
+END $$;
+
 CREATE OR REPLACE FUNCTION ledger_append(p_inst text, p_event text, p_entity bigint, p_payload_hash text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE last record; v_seq bigint; v_prev text; v_ts text;
@@ -549,7 +585,8 @@ BEGIN
 END $$;
 
 REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
-  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
+  open_duplicate_case(bigint, text), fuzzy_candidates(bigint, int, text[], boolean, text), open_fuzzy_case(bigint, bigint[]),
+  ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
   request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint),
@@ -559,7 +596,8 @@ REVOKE ALL ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text)
   activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint),
   shared_student_edges(text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], text), student_id_by_bi(text),
-  open_duplicate_case(bigint, text), ledger_append(text, text, bigint, text), student_login_lookup(text),
+  open_duplicate_case(bigint, text), fuzzy_candidates(bigint, int, text[], boolean, text), open_fuzzy_case(bigint, bigint[]),
+  ledger_append(text, text, bigint, text), student_login_lookup(text),
   allocate_status_index(text), set_credential_status(text, text, boolean), log_verification(text, text, text, text),
   consent_credential(bigint), revoke_enrolment_credentials(bigint),
   request_consent(text, text, text[], int, text, text), my_consent_requests(), own_correction_count(), apply_case_resolution(bigint, bigint),

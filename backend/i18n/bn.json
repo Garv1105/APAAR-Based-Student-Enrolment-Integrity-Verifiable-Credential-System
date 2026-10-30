@@ -56,6 +56,11 @@
   "template": "A record in this batch needs AICTE review",
   "fix_hint": "এখন কোনো পদক্ষেপের প্রয়োজন নেই। আপনার মতামতের প্রয়োজন হলে AICTE যোগাযোগ করবে।"
  },
+ "E204": {
+  "title": "ছাত্র অন্য প্রতিষ্ঠানেও ভর্তি আছে",
+  "template": "A record in this batch needs AICTE review",
+  "fix_hint": "এখন কোনো পদক্ষেপের প্রয়োজন নেই। আপনার মতামতের প্রয়োজন হলে AICTE যোগাযোগ করবে।"
+ },
  "E301": {
   "title": "অনুমোদিত আসনসীমা অতিক্রম করেছে",
   "template": "Regular seats filled ({detail}) exceed AICTE approved intake",
