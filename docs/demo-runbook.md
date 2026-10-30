@@ -1,4 +1,4 @@
-# Demo runbook (T8.2), about 6 minutes
+# Demo runbook (about 6 minutes)
 
 All data is synthetic, and the APAAR registry, AICTE registry and staff logins are MOCK. Say so at the start; the yellow banner shows it too.
 Staff password: `demo`. Student: Asha Joshi, APAAR `328865551724`. She signs in with a **passkey**: the demo seed prints her one-time activation code.
@@ -35,13 +35,13 @@ Reset between takes with `demo_snapshot.py restore` (step 3). Sign out of both w
 | | W1 sign-in page | **Activate and register passkey** with APAAR `328865551724` + the printed code, confirm with Windows Hello, then **Sign in with passkey** | Student portal | "The DOB no longer gets anyone in. The institution hands the student a one-time code, and the student registers a passkey." |
 | | W1 student | **Consent requests**: **Approve with passkey** | Request approved | "The passkey signs exactly this request: its verifier, fields and expiry." |
 | | W1 `employer` | **Fetch & verify credential** | **VALID**, with only the 4 approved fields. Also click **Download JSON** (used in step 7) | "W3C VC 2.0, eddsa-jcs-2022, checked against the official W3C test vectors." |
-| | W1 `inst-a` | **Student records and credentials**: search `328865551724`, then **Certificate & QR** | Certificate with APAAR ID + student ID + QR (Req 10) | |
+| | W1 `inst-a` | **Student records and credentials**: search `328865551724`, then **Certificate & QR** | Certificate with APAAR ID + student ID + QR | |
 | 6 | W1 `inst-a` | Same record: **Withdraw**, then confirm | Enrolment withdrawn | |
 | | W1 `employer` | **Fetch & verify credential** again | **REVOKED** | "Withdrawal flips a bit in the public status list; the verifier's check reveals nothing to us." |
 | 7 | W2 `aicte` | **Verify a credential**: **Try a forged credential (DEMO)** | **UNTRUSTED ISSUER** | "Issuers must be in AICTE's registry, which blocks fake universities." |
 | | W2 `aicte` | Same page: **Load JSON file** (downloaded in step 5), change one letter of the name, **Verify now** | **TAMPERED** (the signature check fails before the status check) | "Change one character and the signature breaks." |
 | 8 | W2 `aicte` dashboard | Totals | Post-deadline changes: 1 (a backdated withdrawal, E501); ledger verified | "A backdated deletion after the deadline is flagged and can't be hidden in the ledger." |
-| | W1 student (Asha) | **Who accessed my data** | Credential issued; consent request and grant; employer verifications; withdrawal | "The student sees every access (D6). An AICTE unmask shows up the same way, with its reason, for the student in that case." |
+| | W1 student (Asha) | **Who accessed my data** | Credential issued; consent request and grant; employer verifications; withdrawal | "The student sees every access. An AICTE unmask shows up the same way, with its reason, for the student in that case." |
 
 ## Fallbacks
 - **API not reachable:** check the uvicorn window, then rerun `app.demo --live`.

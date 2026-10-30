@@ -320,7 +320,7 @@ export interface paths {
         };
         /**
          * Shared Student Network
-         * @description A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.
+         * @description Shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.
          */
         get: operations["shared_student_network_v1_network_get"];
         put?: never;
@@ -360,7 +360,7 @@ export interface paths {
         };
         /**
          * Rules Performance
-         * @description A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.
+         * @description Per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.
          */
         get: operations["rules_performance_v1_rules_performance_get"];
         put?: never;
@@ -380,7 +380,7 @@ export interface paths {
         };
         /**
          * Anomalies Peer Status
-         * @description A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.
+         * @description Peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.
          */
         get: operations["anomalies_peer_status_v1_anomalies_peer_status_get"];
         put?: never;
@@ -622,7 +622,7 @@ export interface paths {
         put?: never;
         /**
          * Resolve Case
-         * @description AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; under_investigation suspends them. Audited; visible to the student (D6).
+         * @description AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; under_investigation suspends them. Audited; visible to the student.
          */
         post: operations["resolve_case_v1_cases__case_id__resolve_post"];
         delete?: never;
@@ -642,7 +642,7 @@ export interface paths {
         put?: never;
         /**
          * Unmask Case
-         * @description AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).
+         * @description AICTE officer: both sides of a case in clear. The reason is audited and shown to the student.
          */
         post: operations["unmask_case_v1_cases__case_id__unmask_post"];
         delete?: never;
@@ -1128,7 +1128,7 @@ export interface paths {
         };
         /**
          * Credential Certificate
-         * @description Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.
+         * @description Printable certificate data: the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.
          */
         get: operations["credential_certificate_v1_credentials_certificate_get"];
         put?: never;
@@ -1208,7 +1208,7 @@ export interface paths {
         };
         /**
          * Registry Issuers
-         * @description Public trust registry (MOCK, D4).
+         * @description Public trust registry (MOCK).
          */
         get: operations["registry_issuers_v1_registry_issuers_get"];
         put?: never;
@@ -1422,7 +1422,7 @@ export interface paths {
         };
         /**
          * Student Access Log
-         * @description D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).
+         * @description Transparency log: every recorded access to the student's data (reads, exports, verifications, consents).
          */
         get: operations["student_access_log_v1_students_me_access_log_get"];
         put?: never;
@@ -1722,29 +1722,29 @@ export interface components {
             label: string;
             /**
              * Flag Key
-             * @description A4: stable identity of the flag (regulator views)
+             * @description stable identity of the flag (regulator views)
              */
             flag_key?: string | null;
             /**
              * Weight
-             * @description A4: current weight of this rule in the inspection queue
+             * @description current weight of this rule in the inspection queue
              */
             weight?: number | null;
             /**
              * Severity
-             * @description A4: severity mapped to 0..1, comparable across rules
+             * @description severity mapped to 0..1, comparable across rules
              */
             severity?: number | null;
             /**
              * Review
-             * @description A4: latest inspector review (decision, reason, reviewer, reviewed_at)
+             * @description latest inspector review (decision, reason, reviewer, reviewed_at)
              */
             review?: {
                 [key: string]: unknown;
             } | null;
             /**
              * Suppressed
-             * @description A4: dismissed and the primary evidence hasn't changed by more than 20%
+             * @description dismissed and the primary evidence hasn't changed by more than 20%
              * @default false
              */
             suppressed: boolean;
@@ -1836,7 +1836,7 @@ export interface components {
             created_at: string;
             /**
              * Notice
-             * @description Neutral text: names no other institution (F4)
+             * @description Neutral text: names no other institution
              */
             notice: string;
             /**
@@ -1878,7 +1878,7 @@ export interface components {
         CaseUnmask: {
             /**
              * Reason
-             * @description Recorded in the audit log and shown to the student (D6)
+             * @description Recorded in the audit log and shown to the student
              */
             reason: string;
         };
@@ -1990,7 +1990,7 @@ export interface components {
             batches: number;
             /**
              * Activation Reissues
-             * @description activation codes reissued (insider-impersonation signal, P1)
+             * @description activation codes reissued (insider-impersonation signal)
              * @default 0
              */
             activation_reissues: number;
@@ -2295,7 +2295,7 @@ export interface components {
             batches: components["schemas"]["BatchOut"][];
             /**
              * Open Notices
-             * @description neutral case notices, no other-institution data (F4)
+             * @description neutral case notices, no other-institution data
              */
             open_notices: string[];
             /**

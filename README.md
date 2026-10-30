@@ -1,21 +1,12 @@
 # VidyaPramaan: APAAR-Based Student Enrolment Integrity & Verifiable Credential System
 
-Prototype for **Smart India Hackathon problem statement SIH26263**: an APAAR ID-based student data management and verification platform for AICTE-approved institutions.
-
-> *Every seat accounted for, every record verifiable, without moving more personal data than necessary.*
+Prototype for Smart India Hackathon problem statement SIH26263: an APAAR ID-based student data management and verification platform for AICTE-approved institutions.
 
 **Live demo:** https://vidyapramaan.vercel.app (synthetic data; demo users below, password `demo`)
 
-Institutions upload student-level records keyed by **APAAR ID**. The platform validates every row deterministically, enforces approved intake and supernumerary caps from the AICTE registry, detects duplicate enrolment within and across institutions, keeps a tamper-evident seat ledger, and gives AICTE and institutions live monitoring data.
+Institutions upload student-level records keyed by APAAR ID. The platform validates every row deterministically, enforces approved intake and supernumerary caps from the AICTE registry, detects duplicate enrolment within and across institutions, keeps a tamper-evident seat ledger, and gives AICTE and institutions live monitoring data.
 
-> **Prototype status: read this first.**
-> - All student data is **synthetic**.
-> - The APAAR registry, the AICTE approval (EOA) registry, OTP and the identity provider are **mocks**, labelled `MOCK` in API responses.
-> - There is **no** integration with real APAAR, ABC, DigiLocker or AICTE systems.
-> - The design follows the principles of the DPDP Act 2023. It has **not** been assessed for compliance.
-> - The full flow is built and tested, from upload and validation through monitoring to verifiable credentials, consent and certificates, in both the backend and the web UI, including reports and anomaly detection. Real-system integrations remain mocks (see [Status](#status)).
-
----
+> **Prototype.** All student data is synthetic. The APAAR registry, the AICTE approval (EOA) registry, OTP and the identity provider are mocks, labelled `MOCK` in API responses, and there is no integration with real APAAR, ABC, DigiLocker or AICTE systems. The design follows the DPDP Act 2023 principles but has not been assessed for compliance.
 
 ## Contents
 - [The problem](#the-problem)
@@ -33,8 +24,6 @@ Institutions upload student-level records keyed by **APAAR ID**. The platform va
 - [Known limitations](#known-limitations)
 - [Documents](#documents)
 
----
-
 ## The problem
 
 AICTE gets detailed student data only from PGDM institutions. Other approved institutions mostly report totals ("480 enrolled"). From totals alone, AICTE can't detect excess admission, double enrolment across institutions, or unverifiable records.
@@ -48,23 +37,23 @@ Institution → Student Data Upload → APAAR Validation → Data Verification
 
 ## Status
 
-How far each PS requirement has got, with the evidence in the test suite:
+Coverage of the problem statement's requirements:
 
 | PS requirement | Status | Evidence |
 |---|---|---|
-| 1. Secure upload/API keyed by APAAR, and updates | ✅ Backend | CSV and JSON batch upload, `Idempotency-Key`, `PATCH` withdraw/migrate/correct |
-| 2. Approved intake, enrolment, supernumerary, NRI/OCI/FN fields | ✅ | Approved intake comes from the registry only. FN/OCI/CIWG supernumerary pool at 15% of intake, with a 1/3 CIWG sub-cap |
-| 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | ✅ | 20 validation codes (incl. student-ID E105/E205), one unit test each. Fuzzy matching (E204) catches the same student at two colleges when one record has no APAAR Labelled scenario passes 455/455 rows through the API |
-| 4. Real-time dashboards (AICTE + institutions) | ✅ | Institution and AICTE web dashboards that refresh every 3 s by polling (no SSE push yet) |
-| 5. Secure verification for stakeholders | ✅ | `POST /v1/verify`: VALID / REVOKED / SUSPENDED / UNTRUSTED_ISSUER / TAMPERED / EXPIRED. Employer access is consent-gated. AICTE and the auditor get masked data. Verifier web page |
-| 6. Verifiable student records | ✅ | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the **official W3C test vectors**. Trust registry (MOCK) and Bitstring Status Lists |
-| 7. Integration/API | ✅ | REST API + OpenAPI, public status lists, DID documents, signed registry snapshot; signed webhooks (Standard Webhooks, retries, SSRF guard) and an ERP connector CLI (`tools/erp_connector/`) |
-| 8. Security, privacy, auth, RBAC, audit, consent | ✅ | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent with OTP (MOCK), guardian path for under-18s (MOCK, self-asserted). Student transparency log |
-| 9. Reports | ✅ | CSV reports, all safe against spreadsheet-formula injection and audited: accreditation pack (per institution), state summary, category-quota utilisation, excess-admission case file (each over-cap row with batch/row evidence and the ledger checkpoint), plus the per-batch error report. Institutions get their own data only (RLS) |
-| Innovation: anomaly detection, risk-based inspection (D3) | ✅ | Five explainable rules, each flag carrying its evidence numbers (enrolment spike by robust z, category-mix shift, DOB cluster, sequential APAAR run, deadline dump). Data Quality Score with visible weighted components. Inspection queue ranked by (100 − DQS) × enrolments. Scored against the teammate generator's independent labels (see Tests) |
-| Innovation: AI explanations (advisory only) | ✅ | Gemini explains colleges, reports and upload problems, drafts inspection notes and matches CSV columns. It sees aggregates only, every call is audited, and a rule-based answer appears when it is unavailable. See [AI assistant](#ai-assistant-gemini-optional) |
-| Innovation: Indian languages | ✅ | Upload messages and AI answers in English + 12 Indian languages (machine-translated; tests check every placeholder and code survives) |
-| 10. APAAR ID + student ID on certificates | ✅ | Printable certificate showing both IDs in full, with a QR holding the signed credential (`AV1:` + Base45(zlib), RFC 9285). Measured at 1,012 chars, which fits one QR at error-correction level M |
+| 1. Secure upload/API keyed by APAAR, and updates | Done | CSV and JSON batch upload, `Idempotency-Key`, `PATCH` withdraw/migrate/correct |
+| 2. Approved intake, enrolment, supernumerary, NRI/OCI/FN fields | Done | Approved intake comes from the registry only. FN/OCI/CIWG supernumerary pool at 15% of intake, with a 1/3 CIWG sub-cap |
+| 3. Duplicates, invalid/missing APAAR, excess intake, inconsistencies, cross-institution duplicates | Done | 20 validation codes (incl. student-ID E105/E205), one unit test each, including fuzzy matching (E204) for students without an APAAR. The labelled scenario passes 455/455 rows through the API |
+| 4. Real-time dashboards (AICTE + institutions) | Done | Institution and AICTE web dashboards that refresh every 3 s by polling (no SSE push yet) |
+| 5. Secure verification for stakeholders | Done | `POST /v1/verify`: VALID / REVOKED / SUSPENDED / UNTRUSTED_ISSUER / TAMPERED / EXPIRED. Employer access is consent-gated. AICTE and the auditor get masked data. Verifier web page |
+| 6. Verifiable student records | Done | W3C VC 2.0 Enrolment, Degree and consent-scoped Verification credentials, `eddsa-jcs-2022`. Byte-for-byte match with the official W3C test vectors. Trust registry (MOCK) and Bitstring Status Lists |
+| 7. Integration/API | Done | REST API + OpenAPI, public status lists, DID documents, signed registry snapshot; signed webhooks (Standard Webhooks, retries, SSRF guard) and an ERP connector CLI (`tools/erp_connector/`) |
+| 8. Security, privacy, auth, RBAC, audit, consent | Done | JWT, role guard, Postgres RLS, field encryption, audit log, seat ledger. Consent with OTP (MOCK), guardian path for under-18s (MOCK, self-asserted). Student transparency log |
+| 9. Reports | Done | CSV reports, all safe against spreadsheet-formula injection and audited: accreditation pack (per institution), state summary, category-quota utilisation, excess-admission case file (each over-cap row with batch/row evidence and the ledger checkpoint), plus the per-batch error report. Institutions get their own data only (RLS) |
+| Extra: anomaly detection and risk-based inspection | Done | Five explainable rules, each flag carrying its evidence numbers (enrolment spike by robust z, category-mix shift, DOB cluster, sequential APAAR run, deadline dump). Data Quality Score with visible weighted components. Inspection queue ranked by (100 − DQS) × enrolments. Scored against the teammate generator's independent labels (see Tests) |
+| Extra: AI explanations (advisory only) | Done | Gemini explains colleges, reports and upload problems, drafts inspection notes and matches CSV columns. It sees aggregates only, every call is audited, and a rule-based answer appears when it is unavailable. See [AI assistant](#ai-assistant-gemini-optional) |
+| Extra: Indian languages | Done | Upload messages and AI answers in English + 12 Indian languages (machine-translated; tests check every placeholder and code survives) |
+| 10. APAAR ID + student ID on certificates | Done | Printable certificate showing both IDs in full, with a QR holding the signed credential (`AV1:` + Base45(zlib), RFC 9285). Measured at 1,012 chars, which fits one QR at error-correction level M |
 
 ## Architecture
 
@@ -89,7 +78,7 @@ PostgreSQL 18: schema.sql + rls.sql (FORCE row-level security, SECURITY DEFINER 
 
 **Design rules:**
 - Validity, seat limits and duplicate detection are decided by deterministic code. No LLM decides anything; AI only explains.
-- Approved intake comes **only** from the AICTE registry, never from the upload. A mismatched declaration raises `E303`.
+- Approved intake comes only from the AICTE registry, never from the upload. A mismatched declaration raises `E303`.
 - Every accepted row counts toward intake, with or without an APAAR ID. Leaving out an APAAR never hides a student.
 - Cross-institution duplicate notices reveal nothing about the other institution.
 
@@ -134,7 +123,7 @@ npm run dev
 - **AICTE / auditor:** national totals, fill by state, excess-admission ranking, category mix, upload compliance, seat-ledger verify / sign checkpoint, the risk-based inspection queue (click a row for its DQS breakdown and flags), anomaly flags with evidence, and CSV reports. Split into pages: overview, seats & intake, duplicate cases, inspection priorities ("Explain this college" and "Draft a visit note"), shared students (graph of colleges listing the same students), institutions, accounts & access, and reports & integrity (AI summaries of each report and of the ledger check).
 - **Institution DQS:** each institution sees its own data quality score, what pulled it down, and any flags about it.
 - **Institution student records:** find a student by APAAR ID or student ID, issue an enrolment credential, mark the enrolment completed or withdrawn (withdrawal revokes their credentials), and suspend a credential or lift the suspension.
-- **Student / guardian** (passkey sign-in after a one-time activation code from the institution): enrolments, credential wallet, the consent inbox (approve with passkey, deny, revoke), a printable certificate with QR, and **who accessed my data**. A guardian passkey approves for students under 18. With `DEMO_MODE=true` the old MOCK APAAR + DOB sign-in and OTP `123456` also work.
+- **Student / guardian** (passkey sign-in after a one-time activation code from the institution): enrolments, credential wallet, the consent inbox (approve with passkey, deny, revoke), a printable certificate with QR, and who accessed my data. A guardian passkey approves for students under 18. With `DEMO_MODE=true` the old MOCK APAAR + DOB sign-in and OTP `123456` also work.
 - **Verifier** (`employer`): request consent for specific fields, fetch and verify the consent-scoped credential, a verify tool (paste JSON or the certificate QR text), and a forged-credential demo.
 - **University registrar** (`univ`): award degree credentials to affiliated institutions' students whose enrolment is completed.
 - **Verify a credential:** available from the header for AICTE, the auditor, institutions and the registrar.
@@ -156,7 +145,7 @@ On first run, the app generates:
 
 Both files are gitignored. For a production deployment, keys belong in a KMS/HSM.
 
-`app.seed --reset` **drops and rebuilds** the demo database. Use it after any schema change, because there are no migrations.
+`app.seed --reset` drops and rebuilds the demo database. Use it after any schema change, because there are no migrations.
 
 ### Demo users (MOCK identity provider; password `demo`)
 
@@ -203,14 +192,14 @@ Errors use `application/problem+json`. The contract source is [`backend/app/cont
 
 ## Validation rules
 
-Rules run in layers: schema → format → referential → registry (mock) → business rules → duplicates → intake engine. **Errors** block the row, **warnings** let it through, and **flags** let it through but raise it for AICTE review.
+Rules run in layers: schema → format → referential → registry (mock) → business rules → duplicates → intake engine. Errors block the row, warnings let it through, and flags let it through but raise it for AICTE review.
 
 | Code | Meaning | Severity |
 |---|---|---|
 | E001 | Field missing or not parseable | error |
 | E101 / E101W | APAAR missing with no reason / with REFUSED, NOT_GENERATED or PENDING (row still counted) | error / warning |
 | E102 / E103 / E104 | Bad APAAR format / not in registry / name or DOB mismatch | error / error / warning |
-| E105 | Institution student ID blank (it is printed on certificates, Req 10) | error |
+| E105 | Institution student ID blank (it is printed on certificates) | error |
 | E205 | Student ID already used in this file or by an active enrolment at the same institution (case- and space-insensitive) | error |
 | E201 / E202 | Duplicate within the file / already enrolled at this institution | error |
 | E203 | Active enrolment at another institution (neutral notice to both sides) | flag |
@@ -238,14 +227,14 @@ Gemini explains; it never decides. Every call goes through [`backend/app/ai.py`]
 | Upload rejected for missing columns → **column matching** | Institution | Suggests template columns for the file's header names; the user confirms each match |
 
 - **Inputs are allow-listed aggregates:** codes, counts, percentages, labels and institution names. Never student names, DOB, APAAR, guardians or row contents. Column matching sends header names only and refuses anything that looks like data.
-- **Free tier (owner's decision).** Google may use free-tier prompts, which is acceptable only because the inputs are synthetic aggregates. Re-decide before any real data.
+- **Free tier.** Google may use free-tier prompts, which is acceptable only because the inputs are synthetic aggregates. Re-decide before any real data.
 - **Always works:** with no key, an error, a timeout or a rate limit, a rule-based summary is shown, labelled as such. Answers are cached for 6 h per input.
 - **Audited:** each request logs its purpose and source (Gemini or rules), never the prompt.
 - **Settings:** `GEMINI_API_KEY` (sent in a header, never a URL) and `GEMINI_MODEL` (default `gemini-3.5-flash-lite`). Tests stub the model and never call the network.
 
 ## Languages
 
-Upload messages, fix hints and every AI answer come in **English + 12 Indian languages**: Hindi, Bengali, Marathi, Telugu, Tamil, Gujarati, Kannada, Malayalam, Odia, Punjabi, Assamese and Urdu (`GET /v1/ai/languages`; AI endpoints take `?lang=`). The picker remembers the choice in the browser.
+Upload messages, fix hints and every AI answer come in English + 12 Indian languages: Hindi, Bengali, Marathi, Telugu, Tamil, Gujarati, Kannada, Malayalam, Odia, Punjabi, Assamese and Urdu (`GET /v1/ai/languages`; AI endpoints take `?lang=`). The picker remembers the choice in the browser.
 
 - Catalogues were machine-translated with `tools/translate_i18n.py --locale <code> --language <name>`. Tests check that every placeholder, code and column name survives in each language. Where a translation failed those checks, the English text was kept (Assamese E104, four Telugu fix hints).
 - AI answers must use the language's own script, not Latin transliteration.
@@ -253,9 +242,9 @@ Upload messages, fix hints and every AI answer come in **English + 12 Indian lan
 
 ## Deployment
 
-The live demo runs on **Vercel** (region `sin1`) with **Neon Postgres**. [`vercel.json`](vercel.json) builds `frontend/` as static files and routes `/v1`, `/status`, `/dids` and `/healthz` to one Python function ([`api/index.py`](api/index.py)) that serves the FastAPI app. A push to `main` deploys.
+The live demo runs on Vercel (region `sin1`) with Neon Postgres. [`vercel.json`](vercel.json) builds `frontend/` as static files and routes `/v1`, `/status`, `/dids` and `/healthz` to one Python function ([`api/index.py`](api/index.py)) that serves the FastAPI app. A push to `main` deploys.
 
-- Use Neon's **direct (unpooled)** connection URL: the pooler drops the per-connection role settings that row-level security depends on.
+- Use Neon's direct (unpooled) connection URL: the pooler drops the per-connection role settings that row-level security depends on.
 - Serverless instances can't write a key file, so [`tools/deploy_keys.py`](tools/deploy_keys.py) builds the complete key set once and it is stored in the `APAAR_KEYS_JSON` environment variable. Key files and secrets are never committed.
 
 ## Security and privacy model
@@ -279,8 +268,6 @@ What is implemented and tested:
   - **No APAAR existence oracle.** A verifier's consent request gets the same response whether or not the APAAR is registered. Unmatched requests simply stay pending, exactly like unanswered ones. Requests are rate-limited (20/hour per verifier) and audit-logged. Verifiers never see `student_id`, even at the SQL level.
 - **Crypto against standard vectors.** The primitives are checked against RFC 8032 (Ed25519), RFC 4231 (HMAC), the McGrew–Viega GCM vectors and the RFC 8785 (JCS) example.
 
-Security reviews of the RLS, credential and consent changes found no high-severity issues. All medium findings are fixed.
-
 ## Tests and evaluation
 
 ```powershell
@@ -292,11 +279,11 @@ cd backend
 ..\.venv\Scripts\python.exe data/eval_fuzzy.py ../data/world  # score fuzzy duplicate matching (E204)
 ```
 
-**Synthetic dataset:** 450 rows across 5 upload files and 4 institutions, plus scripted withdrawals, migrations and a post-deadline edit. Every row has labelled expected codes, and the dataset includes legitimate-move controls that must **not** be flagged.
+**Synthetic dataset:** 450 rows across 5 upload files and 4 institutions, plus scripted withdrawals, migrations and a post-deadline edit. Every row has labelled expected codes, and the dataset includes legitimate-move controls that must not be flagged.
 
-**Result:** every row-level code scores precision and recall of **1.000**, both in memory and through the full API + Postgres pipeline.
+**Result:** every row-level code scores precision and recall of 1.000, both in memory and through the full API + Postgres pipeline. The rules and these labels were written by the same team, so this shows the rules implement the specification; it does not measure real-world accuracy. Four codes (E201, E301, E302, E303) are labelled by re-applying the counting rule, so for those it is a consistency check.
 
-**Anomaly rules (D3), scored against independent labels.** The teammate's generator (`synthetic/`) labels anomalies, and it was written by a different author than the rules. `backend/data/eval_anomalies.py` reads its messy files with the generator's own reference parser, builds the same aggregate features the platform computes at upload, and runs the exact functions the API uses. Five seeds × 30 institutions (834 programmes, 150 institutions):
+**Anomaly rules, scored against independent labels.** The teammate's generator (`synthetic/`) labels anomalies, and it was written by a different author than the rules. `backend/data/eval_anomalies.py` reads its messy files with the generator's own reference parser, builds the same aggregate features the platform computes at upload, and runs the exact functions the API uses. Five seeds × 30 institutions (834 programmes, 150 institutions):
 
 | Rule | TP | FP | of which on planted over-admissions | FN | Precision (strict) | Precision (over-admission flags counted as explained) | Recall |
 |---|---|---|---|---|---|---|---|
@@ -308,9 +295,7 @@ cd backend
 
 Every "false positive" sits on a programme the generator deliberately over-filled (an E301/E302 programme fault). It is real over-admission, but the labels record it as a programme fault rather than as an anomaly. There are only 5–10 labelled positives per rule, so treat these as early evidence on synthetic data, not as measured field accuracy. `tests/test_anomaly.py` re-runs this check on the demo preset on every test run.
 
-**How to read that number.** The rules and the labels were written by the same team, so it shows the rules implement the specification. It does **not** measure real-world detection accuracy. Four codes (E201, E301, E302, E303) are labelled by re-applying the counting rule, so for those it is a consistency check rather than independent ground truth.
-
-**Fuzzy duplicates (E204), scored against independent labels.** The teammate's generator plants students who appear at a second college without an APAAR and with a changed name (spelling variant, added initial, dropped middle name or swapped order), plus pairs that must **not** match, such as twins (same DOB and guardian, different first name). `backend/data/eval_fuzzy.py` reads the generator's messy CSV and Excel files with its own reference parser and runs the same matching function the upload pipeline uses. On three worlds (seeds 7, 11 and 42; up to 51,000 rows and 60 institutions) it finds **15 of 15** labelled pairs in each, with **no** false matches and no must-not-match pair flagged. Fifteen pairs per world is a small sample, so this shows the rules work on the planted variants, not field accuracy.
+**Fuzzy duplicates (E204), scored against independent labels.** The teammate's generator plants students who appear at a second college without an APAAR and with a changed name (spelling variant, added initial, dropped middle name or swapped order), plus pairs that must not match, such as twins (same DOB and guardian, different first name). `backend/data/eval_fuzzy.py` reads the generator's messy CSV and Excel files with its own reference parser and runs the same matching function the upload pipeline uses. On three worlds (seeds 7, 11 and 42; up to 51,000 rows and 60 institutions) it finds 15 of 15 labelled pairs in each, with no false matches and no must-not-match pair flagged. Fifteen pairs per world is a small sample, so this shows the rules work on the planted variants, not field accuracy.
 
 ## Repository layout
 
@@ -325,9 +310,9 @@ Every "false positive" sits on a programme the generator deliberately over-fille
 ├── frontend/               React + TypeScript + Vite web app
 │   └── src/                pages/, components/, api/ (typed client + generated schema)
 ├── api/index.py            Vercel entry point for the FastAPI app
-├── synthetic/              independent synthetic-data generator used to score the anomaly rules
+├── synthetic/              independent synthetic-data generator used to score anomaly and fuzzy matching
 ├── tools/                  translation, deploy keys, world loading, ERP connector
-├── docs/                   PRD, demo runbook
+├── docs/                   demo runbook
 ├── vercel.json             deployment config
 └── requirements.txt        pinned Python dependencies
 ```
@@ -342,7 +327,7 @@ Every "false positive" sits on a programme the generator deliberately over-fille
 - **Machine translations.** The 12 Indian-language catalogues are unreviewed, and the interface itself is English only.
 - **Latin script only.** Name matching doesn't handle Indic scripts.
 - **No migrations.** Schema changes need `app.seed --reset`.
-- **Passkey consent (P1).** Knowing a student's DOB no longer gets anyone in. Students and guardians register WebAuthn passkeys using one-time activation codes from the institution, and consent approval needs a passkey assertion bound to that request's terms.
+- **Passkey consent.** Students and guardians register WebAuthn passkeys using one-time activation codes from the institution, and consent approval needs a passkey assertion bound to that request's terms.
   - **Code delivery:** in the prototype the institution hands codes over in person; production delivers them via DigiLocker or the registered mobile number.
   - **Insider risk:** every new passkey waits `PASSKEY_FIRST_COOLDOWN_HOURS` (default 24) before its first consent approval, and a reissued code always waits 24 h. The student sees a notice and the reason, and AICTE sees a per-institution reissue count.
   - **Demo setting:** `python -m app.demo --live` writes `PASSKEY_FIRST_COOLDOWN_HOURS=0` to `backend/.env`, so the first passkey can approve on stage.
@@ -355,5 +340,6 @@ Every "false positive" sits on a programme the generator deliberately over-fille
 - **Local key file.** Keys sit in a local file, not a KMS/HSM.
 
 ## Documents
-- [`APAAR_SIH_PRD.md`](docs/APAAR_SIH_PRD.md): problem statement, design, sources
 - [`demo-runbook.md`](docs/demo-runbook.md): step-by-step demo script
+- [`synthetic/README.md`](synthetic/README.md): the synthetic data generator
+- [`tools/erp_connector/README.md`](tools/erp_connector/README.md): ERP connector walkthrough

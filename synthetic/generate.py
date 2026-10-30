@@ -911,7 +911,7 @@ class Generator:
                 "accepted": "false if any code has severity 'error' (row must be blocked).",
                 "duplicate_groups": "the member uploaded later (by upload_at, then row) carries the code; "
                                     "any validator that flags the group on either member may be scored as a hit.",
-                "intake_counting": "counted rows = accepted AND active; rows without APAAR but with a reason count (F10).",
+                "intake_counting": "counted rows = accepted AND active; rows without APAAR but with a reason count.",
                 "severity": SEVERITY,
             },
             "rows": truth_rows,

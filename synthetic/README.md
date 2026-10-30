@@ -1,6 +1,6 @@
 # Synthetic dataset generator
 
-This generator creates fake institution uploads for the APAAR platform, together with a matching set of fake registries. It also writes **an answer key** (`ground_truth.json`) recording every problem planted in the data, so you can measure exactly what the platform catches and what it misses (T7.2).
+This generator creates fake institution uploads for the APAAR platform, together with a matching set of fake registries. It also writes an answer key (`ground_truth.json`) recording every problem planted in the data, so you can measure exactly what the platform catches and what it misses.
 
 All data is invented. APAAR IDs are random 12-digit numbers starting with `9` (configurable). Use the data only in dev and test environments.
 
@@ -24,13 +24,13 @@ Options:
 | Option | What it does |
 |---|---|
 | `--faults <yaml>` | Change fault rates and counts (default `synthetic/faults.yaml`) |
-| `--seat-config rules/apaar_rules/seat_categories.yaml` | Use the verified Handbook caps from T0.4 |
+| `--seat-config <yaml>` | Override the seat caps with values checked against the AICTE Handbook |
 | `--seed` | Same seed, byte-identical output |
 | `--out` | Must be an empty or new folder |
 
 > **Before the evaluation counts:**
 > - The caps marked `verify: true` in `faults.yaml` (TFW 5%, lateral entry 10%) are **placeholders**. The FN/OCI/CIWG 15% pool and the CIWG one-third share come from reference [S1].
-> - Once T0.4 is done, run with `--seat-config`.
+> - Once the Handbook caps are checked, pass them with `--seat-config`.
 > - Also replace the admission window and reporting deadline with the real calendar.
 
 ## What it writes
@@ -61,7 +61,7 @@ data/
 | **Programmes** | Code (`BE-CSE`), short form (`CSE`) or full name. `aicte_institutions.json` lists aliases. |
 | **Names** | UPPER / Title case, honorifics (`Mr.`, `Kum.`), stray spaces, middle initials. |
 | **CSV files** | `,` or `;` delimiters, with or without a UTF-8 BOM. |
-| **Hostile header** | One institution (B in the demo) has a **prompt-injection header** to test the Gemini mapping guardrails (T2.7). |
+| **Hostile header** | One institution (B in the demo) has a **prompt-injection header** to test the Gemini column-matching guardrails. |
 
 `manifest.json` records each file's exact dialect. Use it to debug the parser. **Don't** let the platform read it, because a real institution won't send one.
 
@@ -102,16 +102,13 @@ data/
 - every duplicate group
 - every programme-level cap breach
 
-It also checks that no APAAR ID is reused anywhere outside a recorded group or negative. Run it after changing `faults.yaml` or the generator. It doubles as a reference parser for T2.1.
+It also checks that no APAAR ID is reused anywhere outside a recorded group or negative. Run it after changing `faults.yaml` or the generator. It doubles as a reference parser for the evaluation scripts.
 
-## Using it in the plan
+## How the platform uses it
 
-| Task | Use |
-|---|---|
-| T0.11 | Seed the mock adapters from `registry/*` |
-| T2.1–T2.7, T3.x | Use `data_demo/` files as test fixtures |
-| T7.2 | `scripts/evaluate.py` runs `uploads/` through the real pipeline in `upload_at` order, applies `mutations.json`, and scores precision/recall per code and per anomaly against `ground_truth.json`. Count negatives as false positives if they raise a code they must not |
-| T8.1 | `--preset demo` matches reference §18: A clean, B messy, C anomalies, plus cross-institution duplicates between A and B |
+- `backend/data/eval_anomalies.py` and `backend/data/eval_fuzzy.py` score the anomaly rules and fuzzy duplicate matching against `ground_truth.json`, reading the files with `selfcheck.py`'s parser.
+- `tools/load_world.py` uploads a generated world through the API in `upload_at` order (used for the live demo data).
+- `--preset demo` gives a small set: A clean, B messy, C anomalies, plus cross-institution duplicates between A and B.
 
 ## Deliberately not included
 

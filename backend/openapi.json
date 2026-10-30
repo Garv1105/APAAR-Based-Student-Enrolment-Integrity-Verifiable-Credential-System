@@ -699,7 +699,7 @@
   "/v1/network": {
    "get": {
     "summary": "Shared Student Network",
-    "description": "A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.",
+    "description": "Shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.",
     "operationId": "shared_student_network_v1_network_get",
     "responses": {
      "200": {
@@ -794,7 +794,7 @@
   "/v1/rules/performance": {
    "get": {
     "summary": "Rules Performance",
-    "description": "A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.",
+    "description": "Per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.",
     "operationId": "rules_performance_v1_rules_performance_get",
     "responses": {
      "200": {
@@ -818,7 +818,7 @@
   "/v1/anomalies/peer-status": {
    "get": {
     "summary": "Anomalies Peer Status",
-    "description": "A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.",
+    "description": "Peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.",
     "operationId": "anomalies_peer_status_v1_anomalies_peer_status_get",
     "responses": {
      "200": {
@@ -1312,7 +1312,7 @@
   "/v1/cases/{case_id}/resolve": {
    "post": {
     "summary": "Resolve Case",
-    "description": "AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; under_investigation suspends them. Audited; visible to the student (D6).",
+    "description": "AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; under_investigation suspends them. Audited; visible to the student.",
     "operationId": "resolve_case_v1_cases__case_id__resolve_post",
     "security": [
      {
@@ -1367,7 +1367,7 @@
   "/v1/cases/{case_id}/unmask": {
    "post": {
     "summary": "Unmask Case",
-    "description": "AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).",
+    "description": "AICTE officer: both sides of a case in clear. The reason is audited and shown to the student.",
     "operationId": "unmask_case_v1_cases__case_id__unmask_post",
     "security": [
      {
@@ -2544,7 +2544,7 @@
   "/v1/credentials/certificate": {
    "get": {
     "summary": "Credential Certificate",
-    "description": "Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.",
+    "description": "Printable certificate data: the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.",
     "operationId": "credential_certificate_v1_credentials_certificate_get",
     "security": [
      {
@@ -2720,7 +2720,7 @@
   "/v1/registry/issuers": {
    "get": {
     "summary": "Registry Issuers",
-    "description": "Public trust registry (MOCK, D4).",
+    "description": "Public trust registry (MOCK).",
     "operationId": "registry_issuers_v1_registry_issuers_get",
     "responses": {
      "200": {
@@ -3117,7 +3117,7 @@
   "/v1/students/me/access-log": {
    "get": {
     "summary": "Student Access Log",
-    "description": "D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).",
+    "description": "Transparency log: every recorded access to the student's data (reads, exports, verifications, consents).",
     "operationId": "student_access_log_v1_students_me_access_log_get",
     "responses": {
      "200": {
@@ -3838,7 +3838,7 @@
        }
       ],
       "title": "Flag Key",
-      "description": "A4: stable identity of the flag (regulator views)"
+      "description": "stable identity of the flag (regulator views)"
      },
      "weight": {
       "anyOf": [
@@ -3850,7 +3850,7 @@
        }
       ],
       "title": "Weight",
-      "description": "A4: current weight of this rule in the inspection queue"
+      "description": "current weight of this rule in the inspection queue"
      },
      "severity": {
       "anyOf": [
@@ -3862,7 +3862,7 @@
        }
       ],
       "title": "Severity",
-      "description": "A4: severity mapped to 0..1, comparable across rules"
+      "description": "severity mapped to 0..1, comparable across rules"
      },
      "review": {
       "anyOf": [
@@ -3875,12 +3875,12 @@
        }
       ],
       "title": "Review",
-      "description": "A4: latest inspector review (decision, reason, reviewer, reviewed_at)"
+      "description": "latest inspector review (decision, reason, reviewer, reviewed_at)"
      },
      "suppressed": {
       "type": "boolean",
       "title": "Suppressed",
-      "description": "A4: dismissed and the primary evidence hasn't changed by more than 20%",
+      "description": "dismissed and the primary evidence hasn't changed by more than 20%",
       "default": false
      }
     },
@@ -4024,7 +4024,7 @@
      "notice": {
       "type": "string",
       "title": "Notice",
-      "description": "Neutral text: names no other institution (F4)"
+      "description": "Neutral text: names no other institution"
      },
      "enrolment_ids": {
       "items": {
@@ -4129,7 +4129,7 @@
       "maxLength": 300,
       "minLength": 10,
       "title": "Reason",
-      "description": "Recorded in the audit log and shown to the student (D6)"
+      "description": "Recorded in the audit log and shown to the student"
      }
     },
     "type": "object",
@@ -4379,7 +4379,7 @@
      "activation_reissues": {
       "type": "integer",
       "title": "Activation Reissues",
-      "description": "activation codes reissued (insider-impersonation signal, P1)",
+      "description": "activation codes reissued (insider-impersonation signal)",
       "default": 0
      }
     },
@@ -5122,7 +5122,7 @@
       },
       "type": "array",
       "title": "Open Notices",
-      "description": "neutral case notices, no other-institution data (F4)"
+      "description": "neutral case notices, no other-institution data"
      },
      "rejected_rows_total": {
       "type": "integer",

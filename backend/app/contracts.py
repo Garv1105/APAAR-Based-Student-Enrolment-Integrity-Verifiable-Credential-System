@@ -130,7 +130,7 @@ class InstitutionDashboard(BaseModel):
     name: str
     programmes: list[ProgrammeSeats]
     batches: list[BatchOut]
-    open_notices: list[str] = Field(description="neutral case notices, no other-institution data (F4)")
+    open_notices: list[str] = Field(description="neutral case notices, no other-institution data")
     rejected_rows_total: int = Field(description="rows rejected with errors across all batches (not counted toward intake until resubmitted)")
     apaar_coverage: dict[str, int]
 
@@ -178,7 +178,7 @@ class ComplianceRow(BaseModel):
     status: str
     last_upload: datetime | None
     batches: int
-    activation_reissues: int = Field(0, description="activation codes reissued (insider-impersonation signal, P1)")
+    activation_reissues: int = Field(0, description="activation codes reissued (insider-impersonation signal)")
 
 
 class AicteDashboard(BaseModel):
@@ -200,11 +200,11 @@ class AnomalyFlag(BaseModel):
     evidence: dict = Field(description="the numbers that triggered the rule")
     explanation: str
     label: str = Field(description="always: risk indicator for review, not proof of misconduct")
-    flag_key: str | None = Field(None, description="A4: stable identity of the flag (regulator views)")
-    weight: float | None = Field(None, description="A4: current weight of this rule in the inspection queue")
-    severity: float | None = Field(None, description="A4: severity mapped to 0..1, comparable across rules")
-    review: dict | None = Field(None, description="A4: latest inspector review (decision, reason, reviewer, reviewed_at)")
-    suppressed: bool = Field(False, description="A4: dismissed and the primary evidence hasn't changed by more than 20%")
+    flag_key: str | None = Field(None, description="stable identity of the flag (regulator views)")
+    weight: float | None = Field(None, description="current weight of this rule in the inspection queue")
+    severity: float | None = Field(None, description="severity mapped to 0..1, comparable across rules")
+    review: dict | None = Field(None, description="latest inspector review (decision, reason, reviewer, reviewed_at)")
+    suppressed: bool = Field(False, description="dismissed and the primary evidence hasn't changed by more than 20%")
 
 
 class NetworkNode(BaseModel):
@@ -353,7 +353,7 @@ class CaseOut(BaseModel):
     id: int
     status: str
     created_at: datetime
-    notice: str = Field(description="Neutral text: names no other institution (F4)")
+    notice: str = Field(description="Neutral text: names no other institution")
     enrolment_ids: list[int] = Field(description="Institutions: only their own enrolments in the case. Regulators: all")
     resolution_note: str | None = Field(None, description="Regulators only")
     resolved_at: datetime | None = None
@@ -368,7 +368,7 @@ class CaseResolve(BaseModel):
 
 
 class CaseUnmask(BaseModel):
-    reason: str = Field(min_length=10, max_length=300, description="Recorded in the audit log and shown to the student (D6)")
+    reason: str = Field(min_length=10, max_length=300, description="Recorded in the audit log and shown to the student")
 
 
 class ConsentRequestIn(BaseModel):

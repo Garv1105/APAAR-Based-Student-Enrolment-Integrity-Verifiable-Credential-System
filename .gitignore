@@ -9,15 +9,9 @@ frontend/dist/
 # synthetic/ generator output (root-anchored: backend/data/ holds tracked seed + fixtures)
 /data/
 /data_demo/
-.claude/settings.local.json
 
 .vercel
 .env*
 
-# local tooling and backups
-.agents/
-.claude/skills/
-skills-lock.json
+# local backups
 *.backup.json
-CLAUDE.md
-.claude/

@@ -313,7 +313,7 @@ def anomalies(request: Request, user=Depends(require("aicte_officer", "auditor")
 
 
 @app.get("/v1/network", response_model=NetworkOut,
-         description="A3 shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.")
+         description="Shared-student network (regulators): colleges, edge COUNTS of shared students, rings. No student data.")
 def shared_student_network(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
     out = risk.network_view(conn)
     auth.audit(conn, user, "network.read", "network", out["academic_year"], request=request)
@@ -333,13 +333,13 @@ def review_flag(flag_key: str, body: FlagReviewIn, request: Request, idempotency
 
 
 @app.get("/v1/rules/performance", response_model=RulePerformance,
-         description="A4: per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.")
+         description="Per-rule precision (Beta(1,1) prior, 90% interval) and queue weight, plus per-reviewer dismissal rates.")
 def rules_performance(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
     return risk.rules_performance(conn)
 
 
 @app.get("/v1/anomalies/peer-status", response_model=PeerStatus,
-         description="A1 peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.")
+         description="Peer comparisons: how many ran, how many flagged, how many were skipped for lack of peers.")
 def anomalies_peer_status(user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
     return risk.peer_status(conn)
 
@@ -523,13 +523,13 @@ def list_cases(status: str | None = None, user=Depends(require("institution_admi
 
 @app.post("/v1/cases/{case_id}/resolve", response_model=CaseOut,
           description="AICTE officer. confirmed_duplicate revokes the credentials of every enrolment except keep_enrolment_id; "
-                      "under_investigation suspends them. Audited; visible to the student (D6).")
+                      "under_investigation suspends them. Audited; visible to the student.")
 def resolve_case(case_id: int, body: CaseResolve, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
     return cases.resolve(conn, user, case_id, body.model_dump(), request)
 
 
 @app.post("/v1/cases/{case_id}/unmask", response_model=CaseOut,
-          description="AICTE officer: both sides of a case in clear. The reason is audited and shown to the student (D6).")
+          description="AICTE officer: both sides of a case in clear. The reason is audited and shown to the student.")
 def unmask_case(case_id: int, body: CaseUnmask, request: Request, user=Depends(require("aicte_officer")), conn=Depends(get_conn)):
     return cases.unmask(conn, user, case_id, body.reason, request)
 
@@ -745,7 +745,7 @@ def list_credentials(request: Request, enrolment_id: int | None = None,
 
 
 @app.get("/v1/credentials/certificate", response_model=CertificateOut,
-         description="Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.")
+         description="Printable certificate data: the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.")
 def credential_certificate(id: str, request: Request,
                            user=Depends(require_person("institution_admin", "university_registrar", "student", "guardian")), conn=Depends(get_conn)):
     row = conn.execute("SELECT * FROM credentials WHERE id=%s", (id,)).fetchone()
@@ -806,7 +806,7 @@ def status_list(list_id: str, conn=Depends(get_conn)):
     return JSONResponse(vc, headers={"Cache-Control": "public, max-age=60"})
 
 
-@app.get("/v1/registry/issuers", response_model=list[RegistryIssuer], description="Public trust registry (MOCK, D4).")
+@app.get("/v1/registry/issuers", response_model=list[RegistryIssuer], description="Public trust registry (MOCK).")
 def registry_issuers(conn=Depends(get_conn)):
     return [credentials.registry_entry(r) for r in conn.execute("SELECT * FROM issuer_registry ORDER BY did")]
 
@@ -906,7 +906,7 @@ def student_me(user=Depends(require_person("student", "guardian")), conn=Depends
 
 
 @app.get("/v1/students/me/access-log", response_model=list[AccessLogEntry],
-         description="D6 transparency: every recorded access to the student's data (reads, exports, verifications, consents).")
+         description="Transparency log: every recorded access to the student's data (reads, exports, verifications, consents).")
 def student_access_log(user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
     return conn.execute("SELECT ts, actor, role, action, reason, entity, entity_id FROM audit_logs WHERE student_id=%s "
                         "ORDER BY ts DESC LIMIT 500", (user["student_id"],)).fetchall()
