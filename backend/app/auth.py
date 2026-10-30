@@ -1,4 +1,3 @@
-"""JWT auth, role guard, audit log (PRD §6, §13). Identity provider is MOCK (seeded users)."""
 import hmac
 import threading
 import time
@@ -18,9 +17,9 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def login(conn, user_id: str, password: str) -> dict | None:
-    u = conn.execute("SELECT * FROM login_lookup(%s)", (user_id,)).fetchone()  # users table itself is not granted
-    if not u or not u["password_hash"]:  # no password until the account is activated with an AICTE code
-        PasswordHasher().hash(password)  # same work as a real check
+    u = conn.execute("SELECT * FROM login_lookup(%s)", (user_id,)).fetchone()
+    if not u or not u["password_hash"]:
+        PasswordHasher().hash(password)
         return None
     try:
         PasswordHasher().verify(u["password_hash"], password)
@@ -32,7 +31,6 @@ def login(conn, user_id: str, password: str) -> dict | None:
 
 def issue_token(sub: str, role: str, display_name: str, *, institution_id=None, student_id=None, issuer_did=None,
                 scope: str | None = None, reissue: bool = False, code_id: int | None = None, ttl: timedelta = TOKEN_TTL) -> dict:
-    """scope='passkey_setup' marks a short-lived session that may only register a passkey (require() rejects it)."""
     now = datetime.now(timezone.utc)
     claims = {"sub": sub, "role": role, "inst": institution_id, "stu": student_id, "idid": issuer_did, "name": display_name,
               "iat": now, "exp": now + ttl}
@@ -46,9 +44,9 @@ LOGIN_MAX_FAILURES, LOGIN_WINDOW, LOGIN_MAX_KEYS = 5, 15 * 60, 100_000
 SETUP_TTL = timedelta(minutes=15)
 SETUP_EXPIRED = ("Your passkey setup session has expired. The activation code was already used, so ask your institution "
                  "for a new code.")
-_failures: dict[str, deque] = {}   # apaar blind index -> attempt timestamps (insertion-ordered: oldest key first)
+_failures: dict[str, deque] = {}
 _failures_lock = threading.Lock()
-_DUMMY_DOB = None  # ciphertext decrypted on a miss so unknown-APAAR and wrong-DOB paths do the same work
+_DUMMY_DOB = None
 
 
 class LoginThrottled(Exception):
@@ -56,10 +54,6 @@ class LoginThrottled(Exception):
 
 
 def _reserve_attempt(key: str, now: float, max_n: int = LOGIN_MAX_FAILURES, window: float = LOGIN_WINDOW) -> None:
-    """Count the attempt BEFORE the lookup (under the lock), so parallel guesses can't all slip past the limit.
-    Raises LoginThrottled when the key already has max_n attempts in the window. Keys are namespaced by caller
-    (APAAR blind index for sign-in, 'act:'/'apr:'/'ip:' prefixes for the passkey flows).
-    ponytail: in-process; a shared store if the API runs as several processes."""
     with _failures_lock:
         q = _failures.get(key)
         if q is not None:
@@ -68,18 +62,13 @@ def _reserve_attempt(key: str, now: float, max_n: int = LOGIN_MAX_FAILURES, wind
             if len(q) >= max_n:
                 raise LoginThrottled()
         else:
-            if len(_failures) >= LOGIN_MAX_KEYS:  # bounded memory: drop the oldest tracked APAAR
+            if len(_failures) >= LOGIN_MAX_KEYS:
                 _failures.pop(next(iter(_failures)))
             q = _failures[key] = deque()
         q.append(now)
 
 
 def student_login(conn, apaar_id: str, dob: str) -> dict | None:
-    """MOCK student sign-in: APAAR ID + date of birth. NOT real authentication (a DOB is not a secret):
-    production must use APAAR/DigiLocker authentication. The same None is returned for an unknown APAAR and
-    a wrong DOB (same work on both paths); 5 attempts per APAAR per 15 min, then LoginThrottled.
-    ponytail: in-process throttle; use a shared store (Redis / table) if the API runs as several processes;
-    add a per-IP throttle and backoff (instead of a hard lock) before anything real."""
     global _DUMMY_DOB
     if not (apaar_id.isdigit() and len(apaar_id) == 12):
         return None
@@ -93,7 +82,7 @@ def student_login(conn, apaar_id: str, dob: str) -> dict | None:
         stored = crypto.decrypt("students", "dob", row["id"], row["dob_enc"])
     if row is None or not hmac.compare_digest(stored.encode(), dob.strip().encode()):
         return None
-    with _failures_lock:  # success clears the APAAR's attempts
+    with _failures_lock:
         _failures.pop(key, None)
     return issue_token(f"student:{row['id']}", "student", f"Student ({crypto.mask_apaar(apaar_id)})", student_id=row["id"])
 
@@ -113,7 +102,7 @@ def current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -
     try:
         c = jwt.decode(cred.credentials, crypto.secret("k_jwt"), algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
-        try:  # signature still checked; only the expiry is ignored, to give setup sessions a useful message
+        try:
             c = jwt.decode(cred.credentials, crypto.secret("k_jwt"), algorithms=["HS256"], options={"verify_exp": False})
         except jwt.PyJWTError:
             raise HTTPException(401, "Invalid or expired token")
@@ -125,8 +114,6 @@ def current_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -
 
 
 def optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> dict | None:
-    """Caller identity for the RLS settings; None for anonymous or invalid tokens
-    (protected routes still reject those through require())."""
     try:
         return current_user(cred)
     except HTTPException:
@@ -135,7 +122,7 @@ def optional_user(cred: HTTPAuthorizationCredentials | None = Depends(_bearer)) 
 
 def require(*roles: str):
     def dep(user: dict = Depends(current_user)) -> dict:
-        if user["scope"]:  # a passkey-setup session can only register a passkey
+        if user["scope"]:
             raise HTTPException(403, "This session can only register a passkey")
         if user["role"] not in roles:
             raise HTTPException(403, f"Role '{user['role']}' cannot do this")

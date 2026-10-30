@@ -1,13 +1,3 @@
-"""Outbound webhooks (Req 7, PRD §12.1), Standard Webhooks v1 signing.
-
-- Events are written to webhook_deliveries (the outbox) in the same transaction as the change, through the
-  enqueue_event / enqueue_case_event SECURITY DEFINER functions. Payloads hold ids, counts, codes and statuses only.
-- A daemon thread polls the outbox every 2 s and delivers. Every attempt is re-signed with a fresh timestamp and the
-  same event id; failures back off 30 s, 2 m, 10 m, 1 h, 6 h, then the delivery is marked failed.
-- SSRF: https only (http://localhost only with WEBHOOK_ALLOW_LOCALHOST=true), every resolved IP must be public, the
-  request goes to the validated IP (Host header + TLS SNI keep the hostname), no redirects, 5 s timeout.
-- Response bodies are never read or stored.
-"""
 import ipaddress
 import json
 import socket
@@ -22,14 +12,14 @@ from psycopg.types.json import Jsonb
 
 from . import crypto, db
 
-EVENTS = {  # allowed payload keys per event (PII-free by construction)
+EVENTS = {
     "batch.validated": {"batch_id", "counts", "codes"},
     "case.opened": {"case_id"},
     "case.resolved": {"case_id", "status"},
     "credential.issued": {"credential_id", "type", "enrolment_id"},
     "credential.revoked": {"credential_id", "enrolment_id", "reason"},
 }
-BACKOFF = [30, 120, 600, 3600, 21600]  # seconds after failed attempt 1..5; the 6th failure is final
+BACKOFF = [30, 120, 600, 3600, 21600]
 MAX_ACTIVE = 5
 TIMEOUT = 5.0
 ROTATION_OVERLAP = timedelta(hours=24)
@@ -41,7 +31,6 @@ class UrlRejected(ValueError):
     pass
 
 
-# ---------- emitting ----------
 def _payload(event: str, data: dict) -> Jsonb:
     if extra := set(data) - EVENTS[event]:
         raise ValueError(f"webhook payload for {event} has non-allowlisted keys: {sorted(extra)}")
@@ -56,13 +45,11 @@ def emit_case(conn, event: str, case_id: int, **data) -> None:
     conn.execute("SELECT enqueue_case_event(%s, %s, %s)", (case_id, event, _payload(event, {"case_id": case_id, **data})))
 
 
-# ---------- SSRF guard ----------
 def _allow_localhost() -> bool:
     return (db._env("WEBHOOK_ALLOW_LOCALHOST") or "").lower() == "true"
 
 
 def resolve(url: str):
-    """Validate a webhook URL and return (parsed url, the IP to connect to). Raises UrlRejected."""
     u = urlsplit(url)
     if u.scheme not in ("https", "http") or not u.hostname or u.username or u.password or u.fragment:
         raise UrlRejected("URL must be https://host/path with no credentials or fragment")
@@ -85,15 +72,12 @@ def resolve(url: str):
 
 
 def _target(u, ip) -> tuple[str, dict, dict]:
-    """URL aimed at the validated IP, plus the Host header and TLS SNI that keep the original hostname
-    (so the certificate is still checked against it). Prevents DNS rebinding between check and connect."""
     netloc = (f"[{ip}]" if ip.version == 6 else str(ip)) + (f":{u.port}" if u.port else "")
     host_header = u.hostname + (f":{u.port}" if u.port else "")
     ext = {"sni_hostname": u.hostname} if u.scheme == "https" else {}
     return urlunsplit((u.scheme, netloc, u.path or "/", u.query, "")), {"host": host_header}, ext
 
 
-# ---------- delivery ----------
 def body_of(d: dict) -> bytes:
     return json.dumps({"id": str(d["event_id"]), "type": d["event_type"], "created_at": d["created_at"].isoformat(),
                        "data": d["payload"]}, separators=(",", ":"), sort_keys=True).encode()
@@ -108,7 +92,7 @@ def _secrets(d: dict, now: datetime) -> list[str]:
 
 def _send(client: httpx.Client, d: dict, now: datetime) -> tuple[int | None, str | None]:
     try:
-        u, ip = resolve(d["url"])  # re-checked at every attempt
+        u, ip = resolve(d["url"])
     except UrlRejected as e:
         return None, f"url rejected: {e}"
     body, ts, mid = body_of(d), int(now.timestamp()), str(d["event_id"])
@@ -123,7 +107,6 @@ def _send(client: httpx.Client, d: dict, now: datetime) -> tuple[int | None, str
 
 
 def dispatch_due(now: datetime | None = None, client: httpx.Client | None = None, limit: int = 20) -> int:
-    """Deliver up to `limit` due events. Returns the number of attempts made."""
     now = now or datetime.now(timezone.utc)
     own = client is None
     client = client or httpx.Client(timeout=TIMEOUT, follow_redirects=False)
@@ -161,7 +144,6 @@ def dispatch_due(now: datetime | None = None, client: httpx.Client | None = None
 
 
 def start_poller() -> threading.Thread | None:
-    """ponytail: one in-process poller; the outbox table makes it restart-safe. A worker process if throughput matters."""
     if (db._env("WEBHOOK_DISPATCH") or "on").lower() == "off":
         return None
 
@@ -169,7 +151,7 @@ def start_poller() -> threading.Thread | None:
         while True:
             try:
                 dispatch_due()
-            except Exception as e:  # keep polling; log the type only (no payloads)
+            except Exception as e:
                 print(f"webhook dispatcher: {type(e).__name__}")
             time.sleep(2)
 
@@ -178,7 +160,6 @@ def start_poller() -> threading.Thread | None:
     return t
 
 
-# ---------- endpoint management (institution_admin, own institution via RLS) ----------
 def endpoint_out(w: dict) -> dict:
     return {"id": w["id"], "url": w["url"], "events": w["events"], "active": w["active"], "secret_fp": w["secret_fp"],
             "created_at": w["created_at"],
@@ -189,7 +170,7 @@ def endpoint_out(w: dict) -> dict:
 def _get(conn, endpoint_id: int) -> dict:
     w = conn.execute("SELECT * FROM webhook_endpoints WHERE id=%s", (endpoint_id,)).fetchone()
     if w is None:
-        raise HTTPException(404, "Webhook not found")  # same answer for "not yours"
+        raise HTTPException(404, "Webhook not found")
     return w
 
 
@@ -205,7 +186,7 @@ def register(conn, user: dict, url: str, events: list[str], idem_key: str | None
         resolve(url)
     except UrlRejected as e:
         raise HTTPException(422, f"Webhook URL rejected: {e}") from None
-    conn.execute("SELECT pg_advisory_xact_lock(hashtextextended('webhooks:' || %s, 0))", (inst,))  # serialise the limit check
+    conn.execute("SELECT pg_advisory_xact_lock(hashtextextended('webhooks:' || %s, 0))", (inst,))
     if conn.execute("SELECT count(*) n FROM webhook_endpoints WHERE institution_id=%s AND active", (inst,)).fetchone()["n"] >= MAX_ACTIVE:
         raise HTTPException(409, f"At most {MAX_ACTIVE} active webhooks per institution")
     wid = conn.execute("SELECT nextval('webhook_endpoints_id_seq') id").fetchone()["id"]
@@ -246,7 +227,7 @@ def deliveries(conn, endpoint_id: int, cursor: int, limit: int) -> dict:
 
 def redeliver(conn, delivery_id: int) -> dict:
     d = conn.execute("SELECT d.*, w.active FROM webhook_deliveries d JOIN webhook_endpoints w ON w.id = d.endpoint_id "
-                     "WHERE d.id=%s", (delivery_id,)).fetchone()  # RLS: own institution's endpoints only
+                     "WHERE d.id=%s", (delivery_id,)).fetchone()
     if d is None:
         raise HTTPException(404, "Delivery not found")
     if not d["active"]:

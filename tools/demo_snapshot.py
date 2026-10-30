@@ -1,14 +1,3 @@
-"""Save and restore the LOCAL demo database, so a demo can be re-recorded without reloading the 300-college world.
-
-    cd backend
-    ..\\.venv\\Scripts\\python.exe ..\\tools\\demo_snapshot.py save       # once, when the data is how each take should start
-    ..\\.venv\\Scripts\\python.exe ..\\tools\\demo_snapshot.py restore    # before every re-take (a few seconds)
-    ..\\.venv\\Scripts\\python.exe ..\\tools\\demo_snapshot.py status
-
-The snapshot is a full Postgres copy (CREATE DATABASE ... TEMPLATE), so the seat ledger, counters, duplicate cases, audit
-rows and passkey activation codes all go back exactly; the ledger still verifies. Refuses any non-local database server.
-The running API needs no restart (it opens a connection per request); open browser tabs should sign in again.
-"""
 import argparse
 import sys
 import time
@@ -35,7 +24,6 @@ def exists(c, name: str) -> bool:
 
 
 def copy(c, src: str, dst: str) -> None:
-    """dst := copy of src. A template must have no other sessions: kick them (the API reconnects per request) and retry."""
     if exists(c, dst):
         c.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(dst)))
     for attempt in range(10):

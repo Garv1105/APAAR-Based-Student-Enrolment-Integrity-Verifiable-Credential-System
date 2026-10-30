@@ -1,5 +1,3 @@
-"""A1: peer-group baselines + Benjamini-Hochberg false-alarm control. Pure functions on in-memory fixtures
-(fixed seeds, so every run is identical); one API test on the 4-college test DB (insufficient peers)."""
 import json
 import random
 
@@ -16,7 +14,6 @@ def prog(i, *, code="CSE", state="KA", intake=120, fill=0.7, hist=None, fs=None,
 
 
 def steady(n, seed, **kw):
-    """n programmes whose fill moves a little around their own history (the null world)."""
     rng = random.Random(seed)
     out = []
     for i in range(n):
@@ -42,11 +39,9 @@ def test_fallback_picks_the_most_specific_level_with_8_peers():
 
 
 def test_benjamini_hochberg_textbook_example():
-    # Benjamini & Hochberg (1995), section 4: 15 p-values at q = 0.05 -> the 4 smallest are rejected
-    # (threshold i*q/m: rank 4 -> 0.0133 >= 0.0095; rank 5 -> 0.0167 < 0.0201; no larger rank qualifies)
     p = [0.0001, 0.0004, 0.0019, 0.0095, 0.0201, 0.0278, 0.0298, 0.0344, 0.0459, 0.3240, 0.4262, 0.5719, 0.6528, 0.7590, 1.000]
     assert stats.benjamini_hochberg(p, 0.05) == [True] * 4 + [False] * 11
-    assert stats.benjamini_hochberg(list(reversed(p)), 0.05) == [False] * 11 + [True] * 4   # order-independent
+    assert stats.benjamini_hochberg(list(reversed(p)), 0.05) == [False] * 11 + [True] * 4
     assert stats.benjamini_hochberg([0.5, 0.01], 0.05) == [False, True]
     assert abs(stats.normal_sf(1.96) - 0.025) < 1e-3
 
@@ -54,7 +49,7 @@ def test_benjamini_hochberg_textbook_example():
 def test_null_world_has_no_flags_and_one_planted_outlier_is_the_only_flag():
     world = steady(50, seed=7)
     assert peer.peer_flags(world, [])["flags"] == []
-    world.append(prog(99, fill=1.25, hist=[0.40, 0.40, 0.40]))     # fill growth +85% while peers move ~+2%
+    world.append(prog(99, fill=1.25, hist=[0.40, 0.40, 0.40]))
     out = peer.peer_flags(world, [])
     assert [f["institution_id"] for f in out["flags"]] == ["I099"]
     e = out["flags"][0]["evidence"]
@@ -68,23 +63,23 @@ def test_new_college_without_history_is_caught_by_the_peer_rule_only():
     assert [(f["institution_id"], f["evidence"]["metric"]) for f in out["flags"]] == [("I050", "fill_ratio")]
     history_rule = programme_flags({"institution_id": "I050", "programme": "CSE", "rows": 156, "fill": 1.30, "history_fills": [],
                                     "foreign": 0, "history_foreign": None, "max_dob_cluster": 0, "longest_apaar_run": 0})
-    assert history_rule == []                                       # the history rule can't judge a new college
+    assert history_rule == []
 
 
 def test_full_every_year_and_steady_high_foreign_share_are_not_flagged():
     world = steady(20, seed=3, fs=0.02, hfs=[0.02, 0.02, 0.02])
     world.append(prog(60, fill=1.0, hist=[1.0, 1.0, 1.0], fs=0.30, hfs=[0.30, 0.31, 0.29]))
-    assert peer.peer_flags(world, [])["flags"] == []                # full every year, foreign share steady at 30%
-    world.append(prog(61, fill=0.7, hist=[], fs=0.30, hfs=None))    # same 30% but no history: raw share is tested
+    assert peer.peer_flags(world, [])["flags"] == []
+    world.append(prog(61, fill=0.7, hist=[], fs=0.30, hfs=None))
     assert [(f["institution_id"], f["evidence"]["metric"]) for f in peer.peer_flags(world, [])["flags"]] == [("I061", "foreign_share")]
 
 
 def test_practical_gap_is_required_as_well_as_significance():
-    base = [prog(i, fill=0.70, hist=[0.70, 0.70, 0.70]) for i in range(10)]   # peers' growth exactly 0
+    base = [prog(i, fill=0.70, hist=[0.70, 0.70, 0.70]) for i in range(10)]
     small = peer.peer_flags(base + [prog(80, fill=0.80, hist=[0.70, 0.70, 0.70])], [])
-    assert small["tests"] == 11 and small["flags"] == []            # +10 pts: below MIN_GAP (15 pts)
+    assert small["tests"] == 11 and small["flags"] == []
     z, _, _ = stats.robust_z(0.10, [0.0] * 10, peer.FLOORS["fill_growth"])
-    assert stats.normal_sf(z) < 0.05                                # ...although a lone test would be "significant"
+    assert stats.normal_sf(z) < 0.05
     big = peer.peer_flags(base + [prog(80, fill=1.10, hist=[0.70, 0.70, 0.70])], [])
     assert [f["institution_id"] for f in big["flags"]] == ["I080"]
 
@@ -113,7 +108,7 @@ def test_institution_metrics_are_tested_once_per_institution():
 def test_small_world_reports_insufficient_peers_instead_of_flagging():
     out = peer.peer_flags([prog(i, fill=1.5 if i == 0 else 0.7) for i in range(4)],
                           [{"institution_id": "I000", "state": "KA", "total_intake": 100, "rejection_rate": 0.9, "late_share": 1.0}])
-    assert out["flags"] == [] and out["tests"] == 0 and out["insufficient"] == 6   # 4 programmes + 2 institution metrics
+    assert out["flags"] == [] and out["tests"] == 0 and out["insufficient"] == 6
 
 
 def test_peer_status_endpoint_on_the_4_college_db(client):

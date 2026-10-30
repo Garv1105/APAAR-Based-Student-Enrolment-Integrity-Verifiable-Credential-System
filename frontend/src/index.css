@@ -5,11 +5,10 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
-  /* landing page pairing */
+
   --font-manrope: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-inter: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  /* Redesign Design Tokens */
   --color-primary-blue: #2563ff;
   --color-accent-violet: #7c5cff;
   --color-accent-cyan: #38bdf8;
@@ -17,7 +16,6 @@
   --color-bg-dark: #0a1030;
   --color-text-muted: #9fb0d0;
 
-  /* Primary Deep Navy GovTech Palette */
   --color-gov-50: #f8fafc;
   --color-gov-100: #f1f5f9;
   --color-gov-200: #e2e8f0;
@@ -30,7 +28,6 @@
   --color-gov-900: #0f172a;
   --color-gov-950: #020617;
 
-  /* Electric Indigo Accents */
   --color-accent-50: #eef2ff;
   --color-accent-100: #e0e7ff;
   --color-accent-200: #c7d2fe;
@@ -43,7 +40,6 @@
   --color-accent-900: #312e81;
   --color-accent-950: #1e1b4b;
 
-  /* Semantic Status Colors */
   --color-success: #059669;
   --color-success-bg: #ecfdf5;
   --color-success-border: #a7f3d0;
@@ -64,7 +60,6 @@
   --color-flag-border: #ddd6fe;
   --color-flag-text: #5b21b6;
 
-  /* Backward Compatibility Aliases */
   --color-brand-50: #eef2ff;
   --color-brand-100: #e0e7ff;
   --color-brand-600: #4f46e5;
@@ -77,12 +72,10 @@
   --color-ok: #059669;
   --color-ok-bg: #ecfdf5;
 
-  /* Shadows */
   --shadow-premium: 0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
   --shadow-premium-hover: 0 12px 28px -4px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.06);
   --shadow-premium-lg: 0 20px 32px -6px rgba(15, 23, 42, 0.14), 0 8px 12px -3px rgba(15, 23, 42, 0.08);
 
-  /* Animations */
   --keyframes-fade-in: {
     from: { opacity: 0; }
     to: { opacity: 1; }
@@ -110,7 +103,6 @@ body {
   outline-offset: 2px;
 }
 
-/* Custom Scrollbars for Data Tables */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -126,7 +118,6 @@ body {
   background: #94a3b8;
 }
 
-/* Smooth micro-animations */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
@@ -145,16 +136,6 @@ body {
   animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-
-
-/* ===================================================================
-   Signed-in app theme: deep charcoal + restrained gold.
-   Scoped to .theme-gold (set by AppLayout) so the landing page keeps
-   its blue/violet look. Every Tailwind colour utility reads a CSS
-   variable, so remapping the scales here re-themes all pages at once:
-   slate/gov are inverted (low = dark surfaces, high = light text),
-   accent becomes gold, status colours become muted dark-mode tints.
-   =================================================================== */
 @theme {
   --font-display: "Manrope", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-app: "Inter", ui-sans-serif, system-ui, sans-serif;
@@ -221,10 +202,8 @@ body {
 .theme-gold input, .theme-gold select, .theme-gold textarea { color: var(--color-ink); }
 .theme-gold input::placeholder, .theme-gold textarea::placeholder { color: #6b7480; }
 
-/* Hairline gold rule used for section headers and the active nav item */
 .gold-rule { background: linear-gradient(90deg, rgb(212 175 55 / 0.55), rgb(212 175 55 / 0)); height: 1px; }
 
-/* Print: certificates and reports print on paper, not on charcoal */
 @media print {
   .theme-gold { background: #fff; color: #111; }
   .no-print { display: none !important; }
@@ -239,17 +218,12 @@ body {
   }
 }
 
-/* Map arcs draw in once (disabled by the reduced-motion rule above) */
 @keyframes arcDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
 .map-arc { stroke-dashoffset: 0; animation: arcDraw 1.4s cubic-bezier(.4,0,.2,1) both; }
 
-/* ===================================================================
-   Surfaces, light and motion (shared by landing and app)
-   =================================================================== */
 body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01", "ss03"; }
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* Glass surface for the signed-in app: translucent charcoal over the ambient backdrop */
 .glass {
   position: relative;
   background:
@@ -260,15 +234,14 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
   border: 1px solid transparent;
   box-shadow: 0 24px 48px -28px rgb(0 0 0 / 0.85);
 }
-/* glass edge: a 1px gradient border, brighter at the top like light catching an edge */
+
 .glass::after {
   content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1px; pointer-events: none;
   background: linear-gradient(170deg, rgb(255 255 255 / 0.24), rgb(255 255 255 / 0.06) 30%, rgb(255 255 255 / 0.03) 70%, rgb(212 175 55 / 0.16));
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
 }
-/* Pointer spotlight: a gold light centred on the cursor, drawn above the card content (screen blend keeps text
-   readable). --mx/--my are set by JS and registered below so the light glides after the pointer. */
+
 @property --mx { syntax: "<length>"; inherits: false; initial-value: 0px; }
 @property --my { syntax: "<length>"; inherits: false; initial-value: 0px; }
 .spotlight::before {
@@ -279,7 +252,6 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
 }
 .spotlight:hover::before { opacity: 1; }
 
-/* Ambient backdrop behind the glass (fixed, static) */
 .ambient-gold {
   background:
     radial-gradient(900px 560px at 88% -12%, rgb(212 175 55 / 0.17), transparent 62%),
@@ -294,17 +266,13 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
   mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 30%, transparent 75%);
 }
 
-/* Entrance: content rises in once, staggered with --d */
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-/* backwards (not both): after it ends, normal styles such as hover transforms apply again */
+
 .rise { animation: rise 640ms cubic-bezier(.2,.8,.2,1) backwards; animation-delay: var(--d, 0ms); }
 
-/* Map hub: pulses in place (fill-box keeps the scale centred on the circle, not the SVG origin) */
 @keyframes hubPulse { 0% { transform: scale(1); opacity: .55; } 100% { transform: scale(3.2); opacity: 0; } }
 .hub-pulse { transform-box: fill-box; transform-origin: center; animation: hubPulse 3.2s cubic-bezier(.2,.6,.3,1) infinite; }
 
-/* Landing backdrop (blue/violet, static) */
-/* premium dark blue: midnight-navy base, deep sapphire and indigo light, a faint gold warmth. Nothing bright. */
 .ambient-blue {
   background:
     radial-gradient(1100px 700px at 15% -15%, rgb(22 38 110 / 0.55), transparent 62%),
@@ -315,35 +283,26 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
 }
 @keyframes arcFade { from { opacity: 0; } to { opacity: 1; } }
 .arc-fade { animation: arcFade 1.2s ease-out both; }
-/* Live indicator: a soft ring breathes out from the dot */
+
 @keyframes livePulse { 0% { box-shadow: 0 0 0 0 rgb(63 182 139 / 0.55); } 100% { box-shadow: 0 0 0 7px rgb(63 182 139 / 0); } }
 .live-dot { animation: livePulse 2.4s ease-out infinite; }
 
-/* ===================================================================
-   Living backgrounds
-   =================================================================== */
-/* App: two soft lights drift slowly behind the glass so it visibly refracts */
 @keyframes driftA { 0% { transform: translate3d(0, 0, 0) scale(1); } 100% { transform: translate3d(-8vw, 6vh, 0) scale(1.15); } }
 @keyframes driftB { 0% { transform: translate3d(0, 0, 0) scale(1.1); } 100% { transform: translate3d(9vw, -7vh, 0) scale(0.95); } }
 .orb { position: absolute; border-radius: 9999px; filter: blur(80px); will-change: transform; }
 .orb-a { animation: driftA 38s ease-in-out infinite alternate; }
 .orb-b { animation: driftB 46s ease-in-out infinite alternate; }
 
-/* Landing: aurora bands drift and breathe */
 @keyframes aurora1 { 0% { transform: translate3d(-6%, -4%, 0) rotate(-8deg) scale(1); opacity: .55; } 100% { transform: translate3d(8%, 6%, 0) rotate(6deg) scale(1.18); opacity: .85; } }
 @keyframes aurora2 { 0% { transform: translate3d(6%, 4%, 0) rotate(10deg) scale(1.1); opacity: .5; } 100% { transform: translate3d(-8%, -6%, 0) rotate(-4deg) scale(.95); opacity: .8; } }
 .aurora-1 { animation: aurora1 26s ease-in-out infinite alternate; }
 .aurora-2 { animation: aurora2 32s ease-in-out infinite alternate; }
 
-/* Map details */
 @keyframes twinkle { 0%, 100% { opacity: var(--lo, .45); } 50% { opacity: 1; } }
 .city { animation: twinkle var(--t, 4s) ease-in-out infinite; animation-delay: var(--dl, 0s); }
 @keyframes scan { 0% { transform: translateY(-110%); } 100% { transform: translateY(110%); } }
 .scan { animation: scan 9s cubic-bezier(.45,0,.55,1) infinite; }
 
-/* ===================================================================
-   Public site (landing, sign-in, onboarding): charcoal + gold
-   =================================================================== */
 .btn-gold {
   background: linear-gradient(180deg, #f6dc94 0%, #e3c05a 48%, #c99a3c 100%);
   color: #14110a;
@@ -356,18 +315,14 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
   background: linear-gradient(180deg, #fbe7a1 0%, #e3c05a 45%, #b8892a 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
 }
-/* planet-edge horizon behind the hero (static) */
+
 .horizon {
   border-radius: 9999px;
   box-shadow: 0 -2px 0 0 rgb(240 205 110 / 0.35), 0 -40px 120px -10px rgb(212 175 55 / 0.28), inset 0 30px 80px -40px rgb(212 175 55 / 0.25);
 }
 
-/* ===================================================================
-   Landing (premium): glass, grain, shimmer, living backdrop
-   =================================================================== */
-/* Layered glass: translucent fill, top highlight, a gold-to-clear gradient edge and a cursor spotlight (--mx/--my). */
 .glass-premium {
-  /* no `position` here: unlayered CSS would override Tailwind's absolute/fixed; add `relative` where needed */
+
   isolation: isolate;
   background:
     linear-gradient(155deg, rgb(255 255 255 / 0.085) 0%, rgb(255 255 255 / 0.025) 38%, rgb(255 255 255 / 0.012) 100%),
@@ -392,13 +347,11 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
 .glass-premium:hover::after { opacity: 1; }
 .glass-premium.lift:hover { transform: translateY(-3px); box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 40px 70px -30px rgb(0 0 0 / 0.9), 0 0 40px -18px rgb(245 192 103 / 0.45); }
 
-/* Fine film grain (inline SVG noise), sits above the backdrop lights */
 .grain {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   opacity: 0.05; mix-blend-mode: overlay;
 }
 
-/* Slow light sweep across gold gradient text */
 @keyframes goldShimmer { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
 .gold-shimmer {
   background-image: linear-gradient(100deg, #EAB308 0%, #D4AF37 20%, #FDE68A 32%, #FDE047 40%, #D4AF37 55%, #EAB308 75%, #FDE68A 90%, #EAB308 100%);
@@ -406,7 +359,6 @@ body { text-rendering: optimizeLegibility; font-feature-settings: "cv11", "ss01"
   animation: goldShimmer 9s linear infinite;
 }
 
-/* Living backdrop lights */
 @keyframes driftC { 0% { transform: translate3d(0, 0, 0) scale(1); } 100% { transform: translate3d(-6vw, 8vh, 0) scale(1.2); } }
 .orb-c { animation: driftC 52s ease-in-out infinite alternate; }
 

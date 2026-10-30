@@ -1,12 +1,3 @@
-"""APAAR ERP connector: push a college ERP export to the platform and receive signed webhooks.
-
-    python connector.py push --mapping example/mapping.yaml example/erp_export.csv --user inst-a
-    python connector.py receive --port 8787
-
-The password comes from APAAR_PASSWORD or a prompt (never a command-line argument, which would show in the
-process list and shell history). The webhook secret comes from APAAR_WEBHOOK_SECRET or a prompt.
-Output is counts, codes and ids only: the connector never prints row data.
-"""
 import argparse
 import base64
 import csv
@@ -25,11 +16,10 @@ from pathlib import Path
 import httpx
 import yaml
 
-TOLERANCE = 300  # seconds; Standard Webhooks recommends 5 minutes
+TOLERANCE = 300
 MAX_BODY = 1_000_000
 
 
-# ---------- push ----------
 def load_rows(path: Path) -> list[dict]:
     raw = path.read_bytes()
     if path.suffix.lower() == ".json":
@@ -60,7 +50,6 @@ def map_rows(rows: list[dict], mapping: dict, header: list[str]) -> list[dict]:
 
 def push(path: Path, mapping_path: Path, api: str, user: str, password: str, client: httpx.Client | None = None) -> dict:
     mapping = yaml.safe_load(mapping_path.read_text(encoding="utf-8"))
-    # same export + same mapping = same key, so a re-run is a no-op on the server
     key = "erp-" + hashlib.sha256(path.read_bytes() + b"\0" + mapping_path.read_bytes()).hexdigest()[:48]
     c = client or httpx.Client(base_url=api, timeout=120)
     r = c.post("/v1/auth/login", json={"user_id": user, "password": password})
@@ -80,9 +69,7 @@ def push(path: Path, mapping_path: Path, api: str, user: str, password: str, cli
     return r.json()
 
 
-# ---------- receive ----------
 def verify(secret: str, headers: dict, body: bytes, now: int | None = None, seen: set | None = None) -> tuple[bool, str]:
-    """Standard Webhooks v1 check. `headers` keys are lower-case."""
     try:
         msg_id, ts, sigs = headers["webhook-id"], int(headers["webhook-timestamp"]), headers["webhook-signature"]
     except (KeyError, ValueError):
@@ -97,7 +84,7 @@ def verify(secret: str, headers: dict, body: bytes, now: int | None = None, seen
     if seen is not None:
         if msg_id in seen:
             return False, "replayed event id"
-        seen.add(msg_id)  # ponytail: in-memory; a real receiver keeps seen ids for at least the tolerance window
+        seen.add(msg_id)
     return True, "ok"
 
 
@@ -121,7 +108,7 @@ def make_server(port: int, secret: str, on_event=None, host: str = "127.0.0.1") 
             else:
                 print(f"{'VERIFIED' if ok else 'REJECTED'} {why}: " + (f"{event['type']} {json.dumps(event['data'])}" if ok else ""), flush=True)
 
-        def log_message(self, *a):  # quiet: no request lines in the console
+        def log_message(self, *a):
             pass
 
     return HTTPServer((host, port), Handler)

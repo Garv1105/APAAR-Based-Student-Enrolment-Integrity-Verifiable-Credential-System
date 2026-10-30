@@ -43,7 +43,6 @@ function Done({ title, children }: { title: string; children: ReactNode }) {
 const KINDS = [["institution", "Institution"], ["university", "University"], ["verifier", "Verifier"]] as const;
 type Kind = (typeof KINDS)[number][0];
 
-/** First password for an institution, university or verifier account, from the one-time code AICTE issued. */
 export function Activate() {
   const [kind, setKind] = useState<Kind>("institution");
   const [account, setAccount] = useState<Account | null>(null);
@@ -122,7 +121,6 @@ export function Activate() {
   );
 }
 
-/** Verifier organisations ask AICTE for an account; contact details are encrypted at rest and seen only by regulators. */
 export function RequestAccess() {
   const [f, setF] = useState({ organisation: "", contact_name: "", contact_email: "", purpose: "" });
   const [busy, setBusy] = useState(false);

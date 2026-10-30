@@ -1,5 +1,3 @@
-"""D3 glue: gathers aggregate features from the database (on the caller's RLS connection) and runs the pure
-rules / DQS in anomaly.py. Regulators see every institution; an institution sees only its own."""
 from collections import defaultdict
 
 import psycopg
@@ -12,7 +10,6 @@ from .ingest import current_year
 
 
 def programme_features(conn, year: str, institution_id: str | None = None) -> list[dict]:
-    """Per-programme inputs for the anomaly rules. institution_id limits it to one college (its own DQS view)."""
     progs = conn.execute("""
         WITH act AS (SELECT programme_id, count(*) n FROM enrolments WHERE academic_year = %(y)s AND status = 'active' GROUP BY 1),
              bf AS (SELECT programme_id, max(max_dob_cluster) dob, max(longest_apaar_run) run FROM batch_features GROUP BY 1),
@@ -48,7 +45,6 @@ def programme_features(conn, year: str, institution_id: str | None = None) -> li
 
 
 def peer_inputs(conn, year: str, feats: list[dict]) -> tuple[list[dict], list[dict]]:
-    """A1 inputs (regulator connection): programmes with submissions, and institution-level rates."""
     progs = [x for x in feats if x["rows"]]
     intake = defaultdict(float)
     for x in feats:
@@ -80,13 +76,12 @@ def peer_status(conn) -> dict:
             "fdr_q": anomaly.peer.FDR_Q, "note": note}
 
 
-CROSS_INSTITUTION = {"PEER_OUTLIER", "SHARED_STUDENT_RING", "SEAT_BLOCKING"}  # regulator-only; not part of the DQS
+CROSS_INSTITUTION = {"PEER_OUTLIER", "SHARED_STUDENT_RING", "SEAT_BLOCKING"}
 NETWORK_NOTE = ("historical_shared and carousel need multi-year enrolment and migration data; on the current single-year "
                 "data they are close to 0, so edges mostly reflect students active at two colleges.")
 
 
 def network_analysis(conn, year: str) -> tuple[dict, dict]:
-    """A3 (regulator connection): edge counts from shared_student_edges(), analysed by anomaly.network."""
     edges = [dict(e) for e in conn.execute("SELECT * FROM shared_student_edges(%s)", (year,))]
     active = {r["institution_id"]: r["n"] for r in conn.execute(
         "SELECT p.institution_id, count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id "
@@ -95,8 +90,6 @@ def network_analysis(conn, year: str) -> tuple[dict, dict]:
 
 
 def network_view(conn) -> dict:
-    """Regulators only. Small counts are not suppressed because regulators can already read the underlying rows (RLS);
-    if auditor access is ever narrowed to aggregates, suppress counts below 5 for auditors or drop them from /v1/network."""
     year = current_year(conn)["code"]
     res, active = network_analysis(conn, year)
     connected = {n for e in res["edges"] if e["kept"] for n in (e["inst_a"], e["inst_b"])}
@@ -108,8 +101,6 @@ def network_view(conn) -> dict:
 
 
 def flags(conn, regulator: bool = False, institution_id: str | None = None) -> list[dict]:
-    """Own-data rules for everyone; peer comparisons (A1) only on a regulator connection (they need every college's numbers).
-    institution_id (non-regulator only): compute just that college's programme flags."""
     year = current_year(conn)["code"]
     feats = programme_features(conn, year, None if regulator else institution_id)
     out = [f for x in feats if x["rows"] or x["max_dob_cluster"] or x["longest_apaar_run"]
@@ -126,7 +117,6 @@ def flags(conn, regulator: bool = False, institution_id: str | None = None) -> l
 
 
 def dqs_inputs_all(conn, year: str, institution_id: str | None = None) -> dict[str, dict]:
-    """DQS inputs for every institution that has uploaded (or just one), in a handful of grouped queries."""
     q = {"y": year, "i": institution_id}
     only = "(%(i)s::text IS NULL OR {col} = %(i)s)"
 
@@ -146,8 +136,6 @@ def dqs_inputs_all(conn, year: str, institution_id: str | None = None) -> dict[s
                       "AND c.category_code NOT LIKE '%%:%%' GROUP BY 1", "p.institution_id"),
         "late_rows": per("SELECT b.institution_id k, coalesce(sum(f.rows), 0) n FROM batch_features f JOIN upload_batches b "
                          "ON b.id = f.batch_id WHERE {only} AND f.minutes_before_deadline <= 1440 GROUP BY 1", "b.institution_id"),
-        # A4 fairness: an open case counts only against institutions whose enrolment was NOT submitted first
-        # (lowest enrolment id = earliest upload, observed by the platform, unlike the self-declared admission date)
         "open_cases": per("SELECT p.institution_id k, count(DISTINCT c.id) n FROM duplicate_cases c "
                           "JOIN enrolments e ON e.id = ANY(c.enrolment_ids) JOIN programmes p ON p.id = e.programme_id "
                           "WHERE {only} AND c.status IN ('flagged','under_investigation') AND NOT EXISTS ("
@@ -165,15 +153,12 @@ def dqs_inputs_all(conn, year: str, institution_id: str | None = None) -> dict[s
 
 
 def dqs_inputs(conn, institution_id: str, year: str, flag_count: int, updates: int, pre: dict | None = None) -> dict | None:
-    """pre: dqs_inputs_all() result, so a ranking of every institution doesn't query once per institution."""
     m = (pre if pre is not None else dqs_inputs_all(conn, year, institution_id)).get(institution_id)
     return None if m is None else {**m, "flags": flag_count, "updates": updates}
 
 
 def institution_view(conn, institution_id: str) -> dict:
-    """An institution's own DQS (RLS connection of that institution)."""
     year = current_year(conn)["code"]
-    # second guard: cross-institution flags (their evidence can name other colleges) never reach an institution
     fl = [f for f in flags(conn, institution_id=institution_id) if f["institution_id"] == institution_id and f["type"] not in CROSS_INSTITUTION]
     updates = conn.execute("SELECT own_correction_count() n").fetchone()["n"]
     m = dqs_inputs(conn, institution_id, year, len(fl), updates)
@@ -181,11 +166,10 @@ def institution_view(conn, institution_id: str) -> dict:
 
 
 def reviews(conn) -> list[dict]:
-    return conn.execute("SELECT * FROM flag_reviews ORDER BY reviewed_at, id").fetchall()  # RLS: regulators only
+    return conn.execute("SELECT * FROM flag_reviews ORDER BY reviewed_at, id").fetchall()
 
 
 def annotate(flag_list: list[dict], review_rows: list[dict], year: str) -> list[dict]:
-    """A4 (regulators): stable key, latest review, rule weight, severity, and whether a dismissal still hides it."""
     latest = anomaly.feedback.latest_per_flag(review_rows)
     weights = anomaly.feedback.rule_weights(review_rows)
     out = []
@@ -219,10 +203,9 @@ def review_flag(conn, user: dict, key: str, decision: str, reason: str, idem_key
                            "reviewer, idempotency_key, request_hash) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING *",
                            (key, f["type"], f["institution_id"], year, decision, reason, Jsonb(f["evidence"]), user["id"],
                             idem_key, request_hash)).fetchone()
-    except psycopg.errors.UniqueViolation:  # a concurrent request with the same Idempotency-Key won: replay it (or 422)
+    except psycopg.errors.UniqueViolation:
         conn.rollback()
         return review_flag(conn, user, key, decision, reason, idem_key, request_hash, request)
-    # free-text reason stays in flag_reviews (regulators only), not in the audit log
     audit(conn, user, f"flag.{decision}", "flag", key, reason=f"{f['type']} at {f['institution_id']}", request=request)
     conn.commit()
     return row, False
@@ -237,16 +220,15 @@ def rules_performance(conn) -> dict:
 
 
 def inspection_queue(conn) -> list[dict]:
-    """Regulator connection: every institution, ranked by risk = (100 - DQS) x active enrolments."""
     year = current_year(conn)["code"]
     review_rows = reviews(conn)
-    all_flags = [f for f in annotate(flags(conn, regulator=True), review_rows, year) if not f["suppressed"]]  # dismissed: hidden
+    all_flags = [f for f in annotate(flags(conn, regulator=True), review_rows, year) if not f["suppressed"]]
     updates = {r["institution_id"]: r["n"] for r in conn.execute(
         "SELECT institution_id, count(*) n FROM ledger_entries WHERE event_type = 'enrolment.updated' GROUP BY 1")}
     entries, pre = [], dqs_inputs_all(conn, year)
     for i in conn.execute("SELECT * FROM institutions ORDER BY id"):
         fl = [f for f in all_flags if f["institution_id"] == i["id"]]
-        own = [f for f in fl if f["type"] not in CROSS_INSTITUTION]  # DQS uses the institution's own data only (matches its own view)
+        own = [f for f in fl if f["type"] not in CROSS_INSTITUTION]
         m = dqs_inputs(conn, i["id"], year, len(own), updates.get(i["id"], 0), pre)
         entries.append({"institution_id": i["id"], "name": i["name"], "state": i["state"], "status": i["status"],
                         "active": m["active"] if m else 0, "dqs": anomaly.dqs(m) if m else None, "flags": fl})

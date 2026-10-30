@@ -1,13 +1,7 @@
 import { useId } from "react";
 import { INDIA_PATH, INDIA_VIEWBOX, project } from "./indiaGeo";
 
-/**
- * Monochrome gold map of India for the AICTE dashboard. Only states that appear in the API data get a node;
- * nothing is drawn for states with no reporting institutions. Outline: DataMeet India composite boundary
- * (CC BY 4.0), simplified; see indiaGeo.ts.
- */
 
-/** Administrative seats (approx.) used as node positions. */
 export const STATE_POS: Record<string, [number, number]> = {
   "Andhra Pradesh": [80.5, 16.5], "Arunachal Pradesh": [93.6, 27.1], Assam: [91.75, 26.15], Bihar: [85.1, 25.6], Chhattisgarh: [81.6, 21.25],
   Delhi: [77.2, 28.6], Goa: [73.85, 15.5], Gujarat: [72.6, 23.2], Haryana: [76.8, 30.7], "Himachal Pradesh": [77.2, 31.1],
@@ -17,7 +11,7 @@ export const STATE_POS: Record<string, [number, number]> = {
   Tripura: [91.28, 23.83], "Uttar Pradesh": [80.95, 26.85], Uttarakhand: [78.03, 30.32], "West Bengal": [88.36, 22.57],
   "Jammu and Kashmir": [74.8, 34.08], Ladakh: [77.58, 34.16], Puducherry: [79.83, 11.93], Chandigarh: [76.78, 30.73],
 };
-const HUB: [number, number] = [77.2, 28.6]; // AICTE, New Delhi
+const HUB: [number, number] = [77.2, 28.6];
 
 const px = ([lon, lat]: [number, number]) => project(lon, lat);
 const W = INDIA_VIEWBOX.w, H = INDIA_VIEWBOX.h;
@@ -46,7 +40,6 @@ export default function GoldIndiaMap({ states }: { states: MapState[] }) {
       <path d={INDIA_PATH} fill="#d4af37" fillOpacity="0.04" />
       <path d={INDIA_PATH} fill={`url(#dots-${uid})`} stroke="#d4af37" strokeOpacity="0.55" strokeWidth="0.9" strokeLinejoin="round" />
 
-      {/* arcs: each reporting state to AICTE, New Delhi */}
       {placed.map((s, i) => {
         const [x, y] = px(STATE_POS[s.state]);
         const mx = (x + hx) / 2, my = (y + hy) / 2;
@@ -60,7 +53,6 @@ export default function GoldIndiaMap({ states }: { states: MapState[] }) {
         );
       })}
 
-      {/* hub */}
       <circle cx={hx} cy={hy} r={18} fill={`url(#glow-${uid})`} />
       <circle cx={hx} cy={hy} r={5} fill="#0b0f14" stroke="#f7e08a" strokeWidth="1.5" />
       <circle cx={hx} cy={hy} r={1.8} fill="#f7e08a" />

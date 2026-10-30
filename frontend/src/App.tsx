@@ -12,7 +12,6 @@ import StudentHome from "./pages/Student";
 import VerifierHome from "./pages/Verifier";
 import { go, PageHeader } from "./ui";
 
-/** Tiny hash router: #/inst, #/inst/batch/12, #/aicte. */
 function useHash() {
   const [hash, setHash] = useState(() => window.location.hash.slice(1) || "/");
   useEffect(() => {

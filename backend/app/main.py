@@ -1,4 +1,3 @@
-"""FastAPI app. Run: `uvicorn app.main:app --reload` from backend/."""
 import csv
 import io
 import json
@@ -30,7 +29,7 @@ MAX_ROWS = 50_000
 
 @asynccontextmanager
 async def lifespan(_app):
-    webhooks.start_poller()  # off with WEBHOOK_DISPATCH=off (tests, demo seed)
+    webhooks.start_poller()
     yield
 
 
@@ -60,7 +59,6 @@ async def http_problem(_, exc: HTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_problem(_, exc: RequestValidationError):
-    # no 'input' (may hold PII) and no 'ctx' (may hold exception objects)
     return problem(422, "Request validation failed", [{k: e[k] for k in ("type", "loc", "msg") if k in e} for e in exc.errors()])
 
 
@@ -80,7 +78,6 @@ async def credential_problem(_, exc: credentials.CredentialError):
 
 
 def require_person(*roles: str):
-    """require() plus M3: a guardian acts only while the student is under 18 (checked on every request)."""
     def dep(user=Depends(require(*roles)), conn=Depends(get_conn)) -> dict:
         if user["role"] == "guardian" and not passkeys.is_minor(conn, user["student_id"]):
             raise HTTPException(403, "Guardian access ended: the student is 18 or over")
@@ -89,14 +86,11 @@ def require_person(*roles: str):
 
 
 def anon_conn():
-    """Anonymous connection for sign-in flows (the anonymous-only SECURITY DEFINER functions), even if a token is sent."""
     with db.app_connect(None) as conn:
         yield conn
 
 
 def get_conn(user=Depends(auth.optional_user)):
-    """Non-owner app_user connection with RLS settings for the caller.
-    ponytail: connection per request; add psycopg_pool if load testing shows connect cost matters"""
     with db.app_connect(user) as conn:
         yield conn
 
@@ -130,7 +124,6 @@ def student_login(body: StudentLoginIn, conn=Depends(get_conn)):
     return out
 
 
-# ---------- ingestion ----------
 @app.post("/v1/batches", response_model=BatchOut, status_code=201,
           description="CSV (multipart field 'file' or text/csv body) or JSON {rows:[...]}. Validation runs synchronously.")
 async def create_batch(request: Request, idempotency_key: str | None = Header(None),
@@ -222,7 +215,6 @@ def get_issues(batch_id: int, cursor: int = 0, limit: int = 200, lang: str = "en
 
 
 def csv_safe(v) -> str:
-    """Neutralise spreadsheet formula injection in exported cells."""
     s = "" if v is None else str(v)
     return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
 
@@ -247,7 +239,6 @@ def batch_report(batch_id: int, request: Request, lang: str = "en", user=Depends
                         f"batch-{batch_id}-issues.csv")
 
 
-# ---------- enrolments ----------
 @app.get("/v1/enrolments", response_model=list[EnrolmentOut],
          description="Institution: own enrolments. University registrar: its affiliated institutions' enrolments (RLS). "
                      "Lookup by APAAR or institution student id.")
@@ -272,7 +263,6 @@ def update_enrolment(enrolment_id: int, body: EnrolmentPatch, request: Request,
     return ingest.patch_enrolment(conn, user, enrolment_id, body.model_dump(exclude_none=True), request)
 
 
-# ---------- monitoring ----------
 @app.get("/v1/programmes/{programme_id}/seats", response_model=ProgrammeSeats)
 def seats(programme_id: str, user=Depends(require(*READERS)), conn=Depends(get_conn)):
     p = conn.execute("SELECT institution_id FROM programmes WHERE id=%s", (programme_id,)).fetchone()
@@ -313,7 +303,6 @@ def ledger_latest(conn=Depends(get_conn)):
     return {"checkpoint": cp, "public_key": crypto.public_multikey(crypto.signing_key(ledger.SIGNER))}
 
 
-# ---------- D3: anomalies, DQS, inspection queue ----------
 @app.get("/v1/anomalies", response_model=list[AnomalyFlag],
          description="Explainable anomaly flags with evidence (risk indicators for review, not proof of misconduct).")
 def anomalies(request: Request, user=Depends(require("aicte_officer", "auditor")), conn=Depends(get_conn)):
@@ -361,7 +350,6 @@ def inspection_queue(user=Depends(require("aicte_officer", "auditor")), conn=Dep
     return risk.inspection_queue(conn)
 
 
-# ---------- T-AI: plain-language explanations (Gemini free tier, allow-listed aggregates only; app/ai.py) ----------
 def _lang(lang: str) -> None:
     if lang not in ai.LANGS:
         raise HTTPException(422, f"Unsupported language; use one of: {', '.join(ai.LANGS)}")
@@ -403,7 +391,6 @@ def ai_report_summary(kind: str, request: Request, lang: str = "en", user=Depend
 
 
 def _queue_entry(conn, institution_id: str) -> tuple[dict, str]:
-    """The college's inspection-queue entry and its priority bucket (top 10% High, next 20% Medium, rest Low)."""
     queue = risk.inspection_queue(conn)
     entry = next((e for e in queue if e["institution_id"] == institution_id), None)
     if entry is None:
@@ -493,7 +480,6 @@ def own_dqs(user=Depends(require("institution_admin")), conn=Depends(get_conn)):
     return risk.institution_view(conn, user["institution_id"])
 
 
-# ---------- reports (Req 9) ----------
 @app.get("/v1/reports", description="Available reports for the caller's role.")
 def report_index(user=Depends(require("institution_admin", "aicte_officer", "auditor"))):
     allowed = ("accreditation", "category-utilisation") if user["role"] == "institution_admin" else tuple(reports.REPORTS)
@@ -520,7 +506,7 @@ def report_csv(kind: str, request: Request, institution_id: str | None = None,
     elif kind == "state-summary":
         header, rows = reports.state_summary(conn)
     elif kind == "category-utilisation":
-        header, rows = reports.category_utilisation(conn)  # RLS: an institution only sees its own counters
+        header, rows = reports.category_utilisation(conn)
     else:
         header, rows = reports.excess_case_file(conn)
     auth.audit(conn, user, "report.export", "report", kind, reason=institution_id, request=request)
@@ -528,7 +514,6 @@ def report_csv(kind: str, request: Request, institution_id: str | None = None,
     return csv_response(header, rows, f"{kind}.csv")
 
 
-# ---------- duplicate cases (Req 3, 8; PRD §10 steps 4-5) ----------
 @app.get("/v1/cases", response_model=list[CaseOut],
          description="Institutions: cases touching their own enrolments, neutral text, own enrolment ids only. Regulators: all.")
 def list_cases(status: str | None = None, user=Depends(require("institution_admin", "aicte_officer", "auditor")),
@@ -549,7 +534,6 @@ def unmask_case(case_id: int, body: CaseUnmask, request: Request, user=Depends(r
     return cases.unmask(conn, user, case_id, body.reason, request)
 
 
-# ---------- passkeys (P1, Req 5/8) ----------
 @app.get("/v1/auth/config", response_model=AuthConfig, description="Public: which sign-in paths are enabled.")
 def auth_config():
     return {"demo_mode": passkeys.demo_mode(), "rp_id": passkeys.rp_id()}
@@ -562,7 +546,6 @@ def activate(body: ActivateIn, request: Request, conn=Depends(anon_conn)):
     return passkeys.activate(conn, body.apaar_id, body.code, request.client.host if request.client else "unknown")
 
 
-# ---------- T-LANDING: public portal, account activation, verifier access requests ----------
 @app.get("/v1/public/stats", response_model=PublicStats,
          description="Public landing numbers: aggregates only; per-state student counts under 10 are withheld.")
 def public_stats(request: Request, conn=Depends(anon_conn)):
@@ -666,7 +649,6 @@ def consent_approve_options(consent_id: int, user=Depends(require_person("studen
     return consent.approve_options(conn, user, consent_id)
 
 
-# ---------- webhooks (Req 7) ----------
 @app.post("/v1/webhooks", response_model=WebhookCreated, status_code=201,
           description="Register an endpoint. The signing secret is returned once (Standard Webhooks). Max 5 active per "
                       "institution. Accepts Idempotency-Key.")
@@ -716,13 +698,12 @@ def redeliver_webhook(delivery_id: int, request: Request, user=Depends(require("
     return out
 
 
-# ---------- verifiable credentials (Req 5, 6, 10) ----------
 REGULATORS = ("aicte_officer", "auditor")
 
 
 def _credential_out(conn, row, user) -> dict:
     vc = credentials.stored_credential(conn, row)
-    if user["role"] in REGULATORS:  # masked by default (PRD §13): no name or student IDs, APAAR masked; full view needs unmask
+    if user["role"] in REGULATORS:
         s = {k: v for k, v in vc["credentialSubject"].items() if k not in ("name", "studentId", "provisionalId")}
         if "apaarId" in s:
             s["apaarId"] = crypto.mask_apaar(s["apaarId"])
@@ -756,7 +737,7 @@ def list_credentials(request: Request, enrolment_id: int | None = None,
                      conn=Depends(get_conn)):
     rows = conn.execute("SELECT * FROM credentials WHERE (%s::bigint IS NULL OR enrolment_id = %s) ORDER BY issued_at DESC LIMIT 200",
                         (enrolment_id, enrolment_id)).fetchall()
-    if user["role"] != "student":  # a student viewing their own wallet isn't an access by someone else (D6 log stays meaningful)
+    if user["role"] != "student":
         for r in rows:
             auth.audit(conn, user, "credential.read", "credential", r["id"], student_id=r["subject_student_id"], request=request)
         conn.commit()
@@ -767,7 +748,7 @@ def list_credentials(request: Request, enrolment_id: int | None = None,
          description="Printable certificate data (Req 10): the VC plus its offline QR ('AV1:' + Base45(zlib(VC))) as SVG.")
 def credential_certificate(id: str, request: Request,
                            user=Depends(require_person("institution_admin", "university_registrar", "student", "guardian")), conn=Depends(get_conn)):
-    row = conn.execute("SELECT * FROM credentials WHERE id=%s", (id,)).fetchone()  # RLS: issuer or subject only
+    row = conn.execute("SELECT * FROM credentials WHERE id=%s", (id,)).fetchone()
     if row is None:
         raise HTTPException(404, "Credential not found")
     vc = credentials.stored_credential(conn, row)
@@ -811,7 +792,6 @@ def verify_credential(body: VerifyIn, request: Request,
         raise HTTPException(422, "Give credential (JSON) or qr (AV1 text)")
     out = credentials.verify(conn, vc)
     cred_id = vc.get("id") if isinstance(vc.get("id"), str) else ""
-    # linked to the student only if this is exactly the stored credential (see log_verification)
     h = credentials.vc_hash(vc) if out["checks"]["signature_valid"] else None
     conn.execute("SELECT log_verification(%s, %s, %s, %s)", (cred_id, h, out["result"], request.state.request_id))
     conn.commit()
@@ -850,9 +830,8 @@ def demo_forged(user=Depends(require("verifier", "aicte_officer", "auditor"))):
     return credentials.forged_credential()
 
 
-# ---------- consent (Req 5, 8; D5) ----------
 def _consent_out(conn, k, user) -> dict:
-    cid = conn.execute("SELECT id FROM credentials WHERE consent_id=%s", (k["id"],)).fetchone()  # visible to the student only
+    cid = conn.execute("SELECT id FROM credentials WHERE consent_id=%s", (k["id"],)).fetchone()
     return consent.consent_out(k, cid["id"] if cid else None, user["role"])
 
 
@@ -871,7 +850,7 @@ def consent_request(body: ConsentRequestIn, request: Request, user=Depends(requi
 @app.get("/v1/consents", response_model=list[ConsentOut],
          description="Verifier: its own requests. Student: requests about them. Regulators: all.")
 def consent_list(user=Depends(require_person("verifier", "student", "guardian", "aicte_officer", "auditor")), conn=Depends(get_conn)):
-    if user["role"] == "verifier":  # never sees student_id (no "is this APAAR registered" signal)
+    if user["role"] == "verifier":
         return [consent.consent_out(k, None, "verifier") for k in consent.verifier_requests(conn)]
     rows = conn.execute("SELECT * FROM consents ORDER BY requested_at DESC LIMIT 200").fetchall()
     return [_consent_out(conn, k, user) for k in rows]
@@ -915,7 +894,6 @@ def consent_credential(consent_id: int, request: Request, user=Depends(require("
     return out["vc"]
 
 
-# ---------- student self-service (D6) ----------
 @app.get("/v1/students/me", response_model=StudentProfile)
 def student_me(user=Depends(require_person("student", "guardian")), conn=Depends(get_conn)):
     s = conn.execute("SELECT apaar_masked, provisional_id, apaar_status FROM students WHERE id=%s", (user["student_id"],)).fetchone()

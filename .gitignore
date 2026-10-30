@@ -19,3 +19,5 @@ frontend/dist/
 .claude/skills/
 skills-lock.json
 *.backup.json
+CLAUDE.md
+.claude/

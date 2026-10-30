@@ -2,7 +2,6 @@ import { useState } from "react";
 import { ArrowRight, Building2, FileWarning, GraduationCap, Landmark, BadgeCheck, UserRound, type LucideIcon } from "lucide-react";
 import { ApiError, login, studentLogin, type Session } from "../api/client";
 
-/** One-click sign-in to the seeded demo accounts (shown only when the API runs in demo mode). Synthetic data. */
 const ACCOUNTS: { key: string; tab: string; icon: LucideIcon; role: string; name: string; shows: string; go: () => Promise<Session> }[] = [
   { key: "inst-a", tab: "institution", icon: Building2, role: "Institution · clean data", name: "Kalyani Devi Hegde Institute of Technology, Hubballi",
     shows: "Upload, seats vs intake, data quality, student records and certificates", go: () => login("inst-a", "demo") },
@@ -18,7 +17,6 @@ const ACCOUNTS: { key: string; tab: string; icon: LucideIcon; role: string; name
     shows: "Credential wallet, consent inbox, certificate with QR, who accessed my data", go: () => studentLogin("328865551724", "2006-11-05") },
 ];
 
-/** Demo entries for the selected sign-in tab only. */
 export default function DemoAccess({ tab, onLogin }: { tab: string; onLogin: (s: Session) => void }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

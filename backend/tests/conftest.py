@@ -5,12 +5,11 @@ from pathlib import Path
 
 import pytest
 
-# Tests use a throwaway key file and a separate database so they never touch demo data.
 os.environ.setdefault("APAAR_KEY_FILE", str(Path(tempfile.mkdtemp()) / "keys.json"))
 os.environ.setdefault("APAAR_DB", "apaar_test")
-os.environ.setdefault("WEBHOOK_DISPATCH", "off")  # tests call webhooks.dispatch_due() themselves
-os.environ.setdefault("DEMO_MODE", "true")  # legacy suites use the MOCK DOB sign-in; passkey tests switch it off
-os.environ.pop("WORLD_DIR", None)  # a generated world is demo-only; tests use the repo registry
+os.environ.setdefault("WEBHOOK_DISPATCH", "off")
+os.environ.setdefault("DEMO_MODE", "true")
+os.environ.pop("WORLD_DIR", None)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
@@ -18,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 def _test_db():
     from app import db
     db.create_database()
-    with db.connect() as c:  # schema may have changed: rebuild
+    with db.connect() as c:
         c.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
     db.load_schema()
 
@@ -29,7 +28,7 @@ def client(_test_db):
 
     from app import auth, db, seed
     from app.main import app
-    auth._failures.clear()  # the sign-in throttle is process-wide; start each test clean
+    auth._failures.clear()
     with db.connect() as c:
         seed.reset(c)
         seed.seed(c)
@@ -51,7 +50,6 @@ def login(client, user_id):
 
 
 def dob_of(apaar):
-    """Date of birth uploaded for an APAAR in the synthetic files (what the MOCK student sign-in checks)."""
     import csv
     syn = Path(__file__).resolve().parent.parent / "data/synthetic"
     return next(r["dob"] for f in sorted(syn.glob("*.csv")) for r in csv.DictReader(open(f, encoding="utf-8"))
@@ -66,7 +64,6 @@ def student_headers(client, apaar):
 
 @pytest.fixture(autouse=True)
 def _no_real_gemini(monkeypatch):
-    """Tests never call Gemini, even when backend/.env has a key: the model call is stubbed (rule-based fallback)."""
     from app import ai
     monkeypatch.setattr(ai, "_call", lambda facts, task, **k: None)
     ai._cache.clear()

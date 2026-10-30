@@ -1,4 +1,3 @@
-"""One test per error code (PRD P2 exit criterion) plus false-positive controls."""
 import itertools
 import json
 from datetime import date
@@ -33,7 +32,6 @@ _SEQ = itertools.count(1)
 
 
 def row(**kw):
-    """A clean row; each call gets its own student ID (IDs must be unique per institution)."""
     r = {"apaar_id": "100000000001", "apaar_reason": "", "institution_student_id": f"DIT/CSE/{next(_SEQ):04d}",
          "student_name": "Asha Rao", "dob": "2008-03-14", "guardian_name": "Ramesh Rao",
          "programme_code": "CSE", "academic_year": "2026-27", "year_of_study": "1",
@@ -67,7 +65,7 @@ def test_name_noise_does_not_raise_e104(variant):
 def test_e001_schema():
     o = one(row(dob="14/03/2008"))
     assert codes(o) == {"E001"} and not o["accepted"]
-    assert missing_columns(["apaar_id"])  # batch-level header check
+    assert missing_columns(["apaar_id"])
 
 
 def test_e101_missing_apaar_no_reason():
@@ -79,7 +77,7 @@ def test_e101w_missing_apaar_with_reason_is_counted():
     c = ctx()
     o = validate_batch([row(apaar_id="", apaar_reason="REFUSED")], c)[0]
     assert codes(o) == {"E101W"} and o["accepted"] and o["apaar_status"] == "REFUSED"
-    assert c.counters[("1-0000000001:CSE", "REGULAR")] == 1  # F10: still counted
+    assert c.counters[("1-0000000001:CSE", "REGULAR")] == 1
 
 
 def test_e102_invalid_format():
@@ -116,7 +114,7 @@ def test_e105_missing_student_id():
 def test_e205_duplicate_student_id_in_file_and_institution():
     out = validate_batch([row(institution_student_id="DIT/CSE/0042"),
                           row(apaar_id="100000000002", student_name="Ravi Kumar", dob="2007-11-02",
-                              institution_student_id=" dit/cse/0042 ")], ctx())  # case/space-insensitive
+                              institution_student_id=" dit/cse/0042 ")], ctx())
     assert codes(out[0]) == set() and codes(out[1]) == {"E205"} and not out[1]["accepted"]
     assert out[1]["issues"][0]["params"]["detail"] == "row 1 of this file"
     c = ctx(own_active_student_ids={"dit/cse/0042"})
@@ -138,7 +136,7 @@ def test_e203_cross_institution_is_flag_and_accepted():
     c = ctx(other_active_bi={crypto.apaar_bi("100000000001")})
     o = one(row(), c)
     assert codes(o) == {"E203"} and o["accepted"]
-    assert o["issues"][0]["params"]["detail"] == ""  # F4: carries nothing about the other side
+    assert o["issues"][0]["params"]["detail"] == ""
 
 
 def test_every_code_has_english_template_and_fix_hint():
@@ -169,7 +167,7 @@ def test_e302_supernumerary_pool_and_ciwg_subcap():
     c = ctx(counters={("1-0000000001:CSE", "SN_FN_OCI_CIWG"): 4, ("1-0000000001:CSE", "SN_FN_OCI_CIWG:CIWG"): 3})
     assert codes(one(row(**sn, is_ciwg="Y"), c)) == {"E302"}
     c = ctx(counters={("1-0000000001:CSE", "SN_FN_OCI_CIWG"): 4, ("1-0000000001:CSE", "SN_FN_OCI_CIWG:CIWG"): 3})
-    assert codes(one(row(**sn, is_oci="Y"), c)) == set()  # sub-cap only applies to CIWG rows
+    assert codes(one(row(**sn, is_oci="Y"), c)) == set()
 
 
 def test_e303_declared_intake_mismatch_once_per_programme():

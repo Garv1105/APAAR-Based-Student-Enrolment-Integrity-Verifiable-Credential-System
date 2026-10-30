@@ -1,4 +1,3 @@
-"""T-WORLD: generated-world loading (foreign_filled seed, WORLD_DIR overlay) and the DEMO_MODE upload clock."""
 import json
 from datetime import datetime, timezone
 
@@ -6,7 +5,7 @@ from app import mocks, seed
 from conftest import login
 from test_api import _csv, pending_rows
 
-DEMO_TIME = "2026-11-15T22:30:00+05:30"  # 89 min 59 s before the 2026-27 deadline
+DEMO_TIME = "2026-11-15T22:30:00+05:30"
 
 
 def test_seed_loads_foreign_filled_and_tolerates_missing(dbconn):
@@ -32,8 +31,8 @@ def test_world_dir_overlays_registry_and_apaar_mock(tmp_path, monkeypatch):
     base = seed.load_registry()
     monkeypatch.setenv("WORLD_DIR", str(tmp_path))
     reg = seed.load_registry()
-    assert reg["academic_years"] == base["academic_years"]            # identical year not duplicated
-    assert reg["seat_categories"] == base["seat_categories"]          # empty world list keeps the repo's
+    assert reg["academic_years"] == base["academic_years"]
+    assert reg["seat_categories"] == base["seat_categories"]
     assert {"aicte", "inst-a", "inst-9-0000000001"} <= {u["id"] for u in reg["users"]}
     assert reg["trust_registry"]["host"] and len(reg["trust_registry"]["institutions"]) == len(base["trust_registry"]["institutions"]) + 1
     repo_person = json.loads((mocks.DATA / "apaar_registry.json").read_text())["people"][0]["apaar"]
@@ -62,7 +61,7 @@ def test_demo_upload_time_used_in_demo_mode(client, dbconn, monkeypatch):
 
 def test_demo_upload_time_rejects_bad_value_in_demo_mode(client, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "true")
-    for bad in ("tomorrow", "2026-11-15T22:30:00"):  # unparseable; no UTC offset
+    for bad in ("tomorrow", "2026-11-15T22:30:00"):
         r = _upload(client, login(client, "inst-b") | {"X-Demo-Upload-Time": bad})
         assert r.status_code == 422 and r.headers["content-type"].startswith("application/problem+json")
 
@@ -75,6 +74,6 @@ def test_demo_upload_time_ignored_and_audited_without_demo_mode(client, dbconn, 
     bid = r.json()["batch_id"]
     assert datetime.fromisoformat(r.json()["created_at"]) >= before
     f = dbconn.execute("SELECT minutes_before_deadline m FROM batch_features WHERE batch_id=%s", (bid,)).fetchone()
-    assert f["m"] > 1000  # real clock, not 90 minutes
+    assert f["m"] > 1000
     assert dbconn.execute("SELECT 1 FROM audit_logs WHERE action='batch.demo_clock_ignored' AND actor='inst-b'").fetchone()
     assert dbconn.execute("SELECT reason FROM audit_logs WHERE action='batch.upload' AND entity_id=%s", (str(bid),)).fetchone()["reason"] is None

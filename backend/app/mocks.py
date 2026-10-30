@@ -1,6 +1,3 @@
-"""MOCK government adapters (PRD §12.4). Replace these classes to go live.
-AICTE approvals (EOA intake, institution status) are the seeded registry tables in Postgres.
-"""
 import json
 import os
 from functools import lru_cache

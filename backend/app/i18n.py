@@ -1,4 +1,3 @@
-"""Render issue messages from backend/i18n/<locale>.json templates (English fallback)."""
 import json
 from functools import lru_cache
 from pathlib import Path

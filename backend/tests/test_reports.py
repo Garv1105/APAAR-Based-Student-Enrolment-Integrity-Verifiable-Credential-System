@@ -1,4 +1,3 @@
-"""Req 9 / T4.7: policy, accreditation, monitoring and regulatory reports (CSV, formula-injection safe)."""
 import csv
 import io
 
@@ -21,9 +20,9 @@ def load(client):
 def test_state_summary_numbers(client):
     load(client)
     rows = {r["state"]: r for r in get_csv(client, "aicte", "state-summary")}
-    mh = rows["Maharashtra"]   # B: CSE 120 + ME 60; excess = 5 regular (125/120) + 4 supernumerary (22/18)
+    mh = rows["Maharashtra"]
     assert mh["approved_intake"] == "180" and mh["excess_seats"] == "9" and mh["institutions"] == "1"
-    assert rows["Bihar"]["approved_institutions"] == "0" and rows["Bihar"]["active_enrolments"] == "0"   # closed D
+    assert rows["Bihar"]["approved_institutions"] == "0" and rows["Bihar"]["active_enrolments"] == "0"
     assert float(rows["Karnataka"]["apaar_coverage_pct"]) > 90
     dash = client.get("/v1/dashboard/aicte", headers=login(client, "aicte")).json()
     assert sum(int(r["active_enrolments"]) for r in rows.values()) == dash["totals"]["active_enrolments"]
@@ -43,7 +42,7 @@ def test_category_utilisation_scoped_by_rls(client):
 
 def test_accreditation_pack_own_institution_only(client):
     load(client)
-    b = get_csv(client, "inst-b", "accreditation", institution_id="1-0000000001")  # asking for A still returns B
+    b = get_csv(client, "inst-b", "accreditation", institution_id="1-0000000001")
     assert {r["institution_id"] for r in b} == {"1-0000000002"}
     cse = next(r for r in b if r["programme_code"] == "CSE")
     assert cse["excess_seats"] == "9" and cse["regular_filled"] == "125" and int(cse["open_duplicate_cases"]) >= 1
@@ -58,7 +57,7 @@ def test_excess_case_file_has_evidence_and_ledger_status(client):
     load(client)
     client.post("/v1/ledger/checkpoints", headers=login(client, "aicte"))
     rows = get_csv(client, "aicte", "excess-case-file")
-    assert len(rows) == 10 and {r["code"] for r in rows} == {"E301", "E302"}   # 5 + 5 flagged rows in B1
+    assert len(rows) == 10 and {r["code"] for r in rows} == {"E301", "E302"}
     assert all(r["institution"] == "Anandrao Kulkarni College of Engineering, Solapur" for r in rows)
     assert all(r["ledger_consistent"] == "True" and r["ledger_checkpoint_root"] for r in rows)
     assert "CSE REGULAR: 125/120 (+5)" in rows[0]["current_over_cap"]

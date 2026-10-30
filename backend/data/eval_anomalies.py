@@ -1,17 +1,3 @@
-r"""Score the D3 anomaly rules against the synthetic generator's labelled anomalies (ground_truth.json).
-
-    ..\.venv\Scripts\python.exe data/eval_anomalies.py <dataset dir>      (from backend/)
-
-The teammate's generator (synthetic/) writes messy uploads; they are read with its own reference parser
-(synthetic.selfcheck.read_batch + canon), turned into the same aggregate features the platform computes at
-upload, and run through app.anomaly — the exact functions the API uses. The labels were written by a
-different author than the rules, so this is an independent check of the rules (on synthetic data).
-
-Two precision figures are reported. "strict" counts every flag outside the anomaly labels as a false positive.
-"excess-explained" does not count spike / category-mix flags on programmes that the generator deliberately
-over-filled (E301/E302 programme faults): those flags point at real over-admission that the labels record
-as a programme fault rather than as an anomaly. Both are printed; neither is tuned away.
-"""
 import csv
 import json
 import sys

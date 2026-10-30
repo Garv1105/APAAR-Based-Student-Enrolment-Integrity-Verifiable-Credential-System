@@ -13,7 +13,6 @@ export const CATEGORY_LABEL: Record<string, string> = {
 
 const reducedMotion = () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/** Counts up to a new value; jumps straight there when the user prefers reduced motion. */
 export function AnimatedCounter({ value, duration = 0.6 }: { value: number; duration?: number }) {
   const [shown, setShown] = useState(value);
   const prev = useRef(value);
@@ -35,7 +34,6 @@ export function AnimatedCounter({ value, duration = 0.6 }: { value: number; dura
   return <span className="tabular-nums">{shown.toLocaleString()}</span>;
 }
 
-/** Fetch now and every `ms` while the tab is visible ("real-time" by polling). */
 export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +61,6 @@ export function usePoll<T>(fetcher: () => Promise<T>, ms = 3000) {
   return { data, error, updatedAt, refresh };
 }
 
-/** Page heading: small gold eyebrow, serif title, muted meta line, actions on the right. */
 export function PageHeader({ eyebrow, title, meta, actions }: { eyebrow?: ReactNode; title: ReactNode; meta?: ReactNode; actions?: ReactNode }) {
   return (
     <header className="rise flex flex-wrap items-end justify-between gap-4">
@@ -77,14 +74,12 @@ export function PageHeader({ eyebrow, title, meta, actions }: { eyebrow?: ReactN
   );
 }
 
-/** Moves the card's spotlight to the pointer (CSS reads --mx/--my). */
 const spot = (e: React.MouseEvent<HTMLElement>) => {
   const r = e.currentTarget.getBoundingClientRect();
   e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
   e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
 };
 
-/** Glass card. `delay` (ms) staggers its entrance on first render. */
 export function Card({ title, actions, children, className = "", id, icon, bodyClassName = "p-5", delay = 0 }: {
   title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; id?: string; icon?: ReactNode; bodyClassName?: string; delay?: number;
 }) {
@@ -126,7 +121,6 @@ export function Badge({ tone = "neutral", children, dot = false }: { tone?: Tone
   );
 }
 
-/** KPI tile: label, large number, optional visual (ring, spark bars) on the right and a quiet footnote. */
 export function Stat({ label, value, tone = "neutral", hint, icon, visual, delay = 0 }: {
   label: string; value: ReactNode; tone?: Tone; hint?: ReactNode; icon?: ReactNode; visual?: ReactNode; delay?: number;
 }) {
@@ -148,14 +142,13 @@ export function Stat({ label, value, tone = "neutral", hint, icon, visual, delay
   );
 }
 
-/** Radial progress (0..1). Gold by default; pass a status colour for semantic use. */
 export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)", gradient, children, label }: {
   value: number; size?: number; stroke?: number; color?: string; gradient?: [string, string]; children?: ReactNode; label: string;
 }) {
   const gid = useId().replace(/:/g, "");
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
-  const v = useMounted() ? Math.max(0, Math.min(1, value)) : 0; // fill in from zero on first paint
+  const v = useMounted() ? Math.max(0, Math.min(1, value)) : 0;
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }} role="img" aria-label={label}>
       <svg width={size} height={size} className="-rotate-90">
@@ -169,7 +162,6 @@ export function Ring({ value, size = 64, stroke = 5, color = "var(--color-gold)"
   );
 }
 
-/** Thin horizontal meter (0..1). */
 export function Meter({ value, color = "bg-gold", className = "", label }: { value: number; color?: string; className?: string; label?: string }) {
   const shown = useMounted() ? value : 0;
   return (
@@ -180,7 +172,6 @@ export function Meter({ value, color = "bg-gold", className = "", label }: { val
   );
 }
 
-/** Tiny bar sparkline for a short series of real values (e.g. per-batch counts). */
 export function SparkBars({ values, color = "var(--color-gold)", label }: { values: number[]; color?: string; label: string }) {
   if (values.length < 2) return null;
   const max = Math.max(...values, 1);
@@ -246,7 +237,6 @@ export function fmtTime(iso: string | null | undefined) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-/** Live polling indicator. Shows the time of the last successful refresh. */
 export function Updated({ at }: { at: Date | null }) {
   return (
     <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.07] bg-white/[0.03] px-3 py-1 text-[11px] text-mute backdrop-blur" aria-live="polite">
@@ -256,7 +246,6 @@ export function Updated({ at }: { at: Date | null }) {
   );
 }
 
-/** Req 9 report downloads. `institutions` (AICTE view) enables the per-institution accreditation pack picker. */
 export function ReportsCard({ institutions, id }: { institutions?: { id: string; name: string }[]; id?: string }) {
   const [inst, setInst] = useState(institutions?.[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -293,7 +282,6 @@ export function ReportsCard({ institutions, id }: { institutions?: { id: string;
   );
 }
 
-/** Data table: quiet uppercase header, hairline rows, horizontal scroll on narrow screens. */
 export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
   return (
     <div className="-mx-5 overflow-x-auto">

@@ -1,12 +1,3 @@
-"""Demo seed (T8.1): `python -m app.demo` rebuilds the demo database `apaar` and replays the labelled scenario
-through the real API (no shortcuts past validation, RLS, ledger or audit). Idempotent: every run starts from empty.
-
-Result: A clean, B messy (errors, excess, duplicates), C enrolment spike, D closed institution, a post-deadline
-backdated withdrawal (E501), open duplicate cases, one student with an Enrolment credential and a pending consent request.
-
-`--live`: leave Institution B out so the presenter uploads data/synthetic/B1.csv on stage (errors, excess, and the
-cross-institution duplicates with A open live). The E501 event is then recorded on an A student instead.
-"""
 import json
 import re
 import sys
@@ -18,10 +9,10 @@ from fastapi.testclient import TestClient
 
 from . import db, seed
 
-os.environ.setdefault("WEBHOOK_DISPATCH", "off")  # the seed registers no webhooks; no poller thread needed
+os.environ.setdefault("WEBHOOK_DISPATCH", "off")
 SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
-LIVE_E501 = "277145114059"  # A/CSE/2026/0013, withdrawn after the deadline in --live mode
-STUDENT = {"apaar": "328865551724", "dob": "2006-11-05", "name": "Asha Joshi"}  # A/ECE/2026/0081 in A1.csv
+LIVE_E501 = "277145114059"
+STUDENT = {"apaar": "328865551724", "dob": "2006-11-05", "name": "Asha Joshi"}
 
 
 def _ok(r, *codes):
@@ -31,8 +22,6 @@ def _ok(r, *codes):
 
 
 def demo_env() -> str:
-    """Live demo: let a freshly registered passkey approve at once (PASSKEY_FIRST_COOLDOWN_HOURS=0 in backend/.env,
-    which the API reads on every request). Reissued codes keep their 24 h cooldown regardless."""
     text = db.ENV_FILE.read_text(encoding="utf-8") if db.ENV_FILE.exists() else ""
     m = re.search(r"^PASSKEY_FIRST_COOLDOWN_HOURS=(.*)$", text, re.M)
     if m is None:
@@ -45,7 +34,7 @@ def demo_env() -> str:
 def run(live: bool = False) -> dict:
     sys.argv.append("--reset")
     seed.main()
-    from .main import app  # after the schema exists
+    from .main import app
     tokens = {}
 
     with TestClient(app) as c:
@@ -70,11 +59,10 @@ def run(live: bool = False) -> dict:
             elif step["op"] == "patch":
                 e = _ok(c.get("/v1/enrolments", params={"apaar": step["apaar"]}, headers=h(step["user"])), 200)[0]
                 _ok(c.patch(f"/v1/enrolments/{e['id']}", json=step["body"], headers=h(step["user"])), 200)
-        if live:  # deadline is now in the past: record one backdated withdrawal (E501) on an A student
+        if live:
             e = _ok(c.get("/v1/enrolments", params={"apaar": LIVE_E501}, headers=h("inst-a")), 200)[0]
             _ok(c.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "ended_on": "2026-09-01",
                                                            "reason": "Backdated withdrawal"}, headers=h("inst-a")), 200)
-        # scenario ends with the deadline in the past (to record E501); restore the real one so live edits behave normally
         real = next(y for y in json.loads(seed.SEED.read_text())["academic_years"] if y["code"] == "2026-27")
         set_deadline("2026-27", real["deadline"])
 

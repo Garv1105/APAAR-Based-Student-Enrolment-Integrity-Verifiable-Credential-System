@@ -1,28 +1,13 @@
-"""D3: explainable anomaly rules, Data Quality Score (DQS) and the risk-based inspection queue (PRD §9.4, §19 D3).
-
-Pure functions over aggregate features, so the platform and the offline evaluator (scored against the
-synthetic generator's ground_truth.json) run the SAME rules. Every flag carries the numbers that triggered it.
-Flags are risk indicators for review, never proof of misconduct. No AI is involved.
-
-Features per (institution, programme):
-  fill, history_fills[]            regular seats filled / approved intake, current vs prior years
-  foreign, history_foreign[]       FN/OCI/CIWG/NRI (supernumerary pool) admissions, current vs prior years
-  max_dob_cluster, rows            largest group of students sharing one date of birth (computed in memory at upload)
-  longest_apaar_run                longest run of consecutive APAAR numbers (computed in memory at upload)
-Features per institution:
-  minutes_before_deadline[]        for each upload batch
-"""
 import statistics
 from datetime import date
 
 from . import stats
 
-# Thresholds (documented so a reviewer can argue with them)
-SPIKE_Z, SPIKE_MIN_JUMP, MAD_FLOOR = 3.5, 0.20, 0.05   # robust z on fill ratio; MAD floored so 3 near-equal years don't hair-trigger
-MIX_MIN_NEW, MIX_MIN_SHARE_JUMP = 5, 0.08              # foreign-pool admissions vs the historical maximum
-DOB_CLUSTER_MIN = 10                                   # >=10 students with the same DOB in one programme
-APAAR_RUN_MIN = 10                                     # >=10 consecutive APAAR numbers
-DEADLINE_MINUTES = 180                                 # upload in the last 3 hours before the reporting deadline
+SPIKE_Z, SPIKE_MIN_JUMP, MAD_FLOOR = 3.5, 0.20, 0.05
+MIX_MIN_NEW, MIX_MIN_SHARE_JUMP = 5, 0.08
+DOB_CLUSTER_MIN = 10
+APAAR_RUN_MIN = 10
+DEADLINE_MINUTES = 180
 LABEL = "Risk indicator for review, not proof of misconduct"
 
 
@@ -31,7 +16,6 @@ def robust_z(value: float, history: list[float]) -> tuple[float, float, float]:
 
 
 def programme_flags(f: dict) -> list[dict]:
-    """f: {institution_id, programme, fill, history_fills, foreign, history_foreign, rows, max_dob_cluster, longest_apaar_run}"""
     out = []
 
     def flag(kind, score, evidence, why):
@@ -77,7 +61,6 @@ def institution_flags(institution_id: str, minutes_before_deadline: list[float])
              "explanation": f"batch uploaded {m:.0f} min before the reporting deadline", "label": LABEL}]
 
 
-# ---------- features computed in memory at upload (F1: plaintext never persisted) ----------
 def longest_consecutive_run(apaars: list[str]) -> int:
     nums = sorted({int(a) for a in apaars if a and a.isdigit()})
     best = run = 1 if nums else 0
@@ -95,20 +78,18 @@ def max_dob_cluster(dobs: list[date | str]) -> int:
     return max(counts.values(), default=0)
 
 
-# ---------- Data Quality Score ----------
-DQS_WEIGHTS = {  # sum = 1.0; shown in the UI next to each institution's score
-    "validation_pass_rate": 0.30,   # accepted rows / submitted rows
-    "seat_integrity": 0.15,         # 1 - excess seats / active enrolments
-    "timeliness": 0.15,             # share of submitted rows not uploaded in the last 24h before (or after) the deadline
-    "duplicate_exposure": 0.15,     # 1 - open duplicate cases per 100 enrolments / 5 (capped)
-    "anomaly_flags": 0.10,          # 1 - flags / 3 (capped)
-    "correction_churn": 0.10,       # 1 - enrolment updates / enrolments (capped)
-    "declarations": 0.05,           # 1 - (E303 declaration mismatches + E501 post-deadline changes) / 3 (capped)
+DQS_WEIGHTS = {
+    "validation_pass_rate": 0.30,
+    "seat_integrity": 0.15,
+    "timeliness": 0.15,
+    "duplicate_exposure": 0.15,
+    "anomaly_flags": 0.10,
+    "correction_churn": 0.10,
+    "declarations": 0.05,
 }
 
 
 def dqs(m: dict) -> dict:
-    """m: rows, accepted, active, excess, late_rows, open_cases, flags, updates, created, e303, e501. Returns score + components."""
     clamp = lambda x: max(0.0, min(1.0, x))  # noqa: E731
     comps = {
         "validation_pass_rate": m["accepted"] / m["rows"] if m["rows"] else 0.0,
@@ -125,10 +106,7 @@ def dqs(m: dict) -> dict:
 
 
 def inspection_queue(entries: list[dict], weights: dict[str, float] | None = None) -> list[dict]:
-    """entries: {institution_id, name, state, status, active, dqs|None, flags[] (visible flags only)}.
-    risk = active x ((100 - DQS) + sum of weight(rule) x severity x FLAG_DQS_POINTS)  (A4: flags in DQS units, so
-    inspector feedback visibly reorders the queue). Approved institutions that haven't submitted come first."""
-    from .feedback import flag_points  # local import: feedback imports this module's thresholds
+    from .feedback import flag_points
     out = []
     for e in entries:
         if e["dqs"] is None:

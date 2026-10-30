@@ -3,7 +3,6 @@ import type { S } from "../../api/client";
 import CountUp from "./CountUp";
 import { GOLD_TEXT, fmt, spotlight } from "./styles";
 
-/** Frosted glass dock of live national figures, floating over the bottom edge of the hero. */
 export default function MetricsDock({ stats }: { stats: S["PublicStats"] | null }) {
   const items = [
     { icon: Building2, value: stats && <CountUp value={stats.institutions_reporting} />, label: "Institutions", sub: `reporting of ${stats ? fmt(stats.institutions_approved) : "…"} approved` },

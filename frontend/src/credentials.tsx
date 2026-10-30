@@ -1,4 +1,3 @@
-// Shared UI for W3C Verifiable Credentials: verification result, credential card, verify tool.
 import { useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -92,7 +91,6 @@ export function VerifyResultView({ out }: { out: VerifyOut }) {
       role="status"
       aria-live="polite"
     >
-      {/* Header Banner */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/5 pb-3">
         <div className="flex items-center gap-2.5">
           {isOk ? (
@@ -118,7 +116,6 @@ export function VerifyResultView({ out }: { out: VerifyOut }) {
 
       <p className="mt-2.5 text-xs text-slate-700 font-medium">{r.help}</p>
 
-      {/* Cryptographic Checklist */}
       <div className="mt-4 rounded-xl border border-slate-200/80 bg-surface p-4 shadow-2xs">
         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
           Trust & Signature Verification Checklist
@@ -145,7 +142,6 @@ export function VerifyResultView({ out }: { out: VerifyOut }) {
         </ul>
       </div>
 
-      {/* Verified Claims Subject */}
       {out.subject && (
         <div className="mt-4">
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-2">
@@ -221,7 +217,6 @@ export function CertificateButton({ id }: { id: string }) {
   );
 }
 
-/** Paste a VC (JSON) or the certificate QR text (AV1:...), or load a file; verified online via POST /v1/verify. */
 export function VerifyTool({ allowForgedDemo = false }: { allowForgedDemo?: boolean }) {
   const [text, setText] = useState("");
   const [out, setOut] = useState<VerifyOut | null>(null);

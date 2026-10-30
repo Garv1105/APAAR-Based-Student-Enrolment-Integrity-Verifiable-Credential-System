@@ -1,5 +1,3 @@
-"""Software WebAuthn authenticator for tests: ES256 key, 'none' attestation, configurable UV flag and sign counter.
-step=0 behaves like a synced passkey (sign count stays 0)."""
 import base64
 import hashlib
 import json

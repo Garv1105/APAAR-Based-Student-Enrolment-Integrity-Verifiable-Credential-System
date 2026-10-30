@@ -1,4 +1,3 @@
-"""Vercel Python entry: the FastAPI app from backend/. vercel.json routes /v1, /status, /dids and /healthz here."""
 import sys
 from pathlib import Path
 

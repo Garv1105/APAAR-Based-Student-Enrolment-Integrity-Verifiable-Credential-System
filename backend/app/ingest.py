@@ -1,9 +1,3 @@
-"""Batch ingestion and enrolment updates: one transaction per batch (PRD §7, §9.2, §10).
-
-Concurrency (F11): counter rows for the institution's programmes are locked FOR UPDATE, and
-every APAAR blind index in the batch takes a transaction advisory lock, so two parallel batches
-can neither both slip under a cap nor both miss a cross-institution duplicate.
-"""
 import secrets
 from datetime import date, datetime, timezone
 
@@ -14,7 +8,7 @@ from .auth import audit
 from .mocks import apaar_registry
 from .validation import Ctx, counter_keys, student_id_key, validate_batch
 
-NOTICE = "A record in batch #{batch} needs AICTE review (case #{case})"  # F4: no other-institution data
+NOTICE = "A record in batch #{batch} needs AICTE review (case #{case})"
 
 
 def current_year(conn) -> dict:
@@ -32,14 +26,13 @@ def batch_out(b: dict, replayed=False) -> dict:
 
 def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: str | None, request_hash: str, request=None,
                   upload_time: datetime | None = None) -> dict:
-    """upload_time: DEMO_MODE clock override (the route only passes it then); None = now."""
     inst_id = user["institution_id"]
     with conn.transaction():
         b = conn.execute("INSERT INTO upload_batches (institution_id, channel, status, idempotency_key, request_hash, created_by, created_at) "
                          "VALUES (%s,%s,'processing',%s,%s,%s,coalesce(%s, now())) ON CONFLICT (institution_id, idempotency_key) "
                          "DO NOTHING RETURNING *",
                          (inst_id, channel, idem_key, request_hash, user["id"], upload_time)).fetchone()
-        if b is None:  # Idempotency-Key replay: return the original batch, insert nothing
+        if b is None:
             prev = conn.execute("SELECT * FROM upload_batches WHERE institution_id=%s AND idempotency_key=%s", (inst_id, idem_key)).fetchone()
             if prev["request_hash"] != request_hash:
                 raise ApiError(422, "Idempotency-Key was already used with a different request body")
@@ -60,11 +53,9 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
         for bi in bis:
             conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (bi,))
         own, other = set(), set()
-        # RLS hides other institutions' rows; this definer function answers only own / someone-else
         for r in conn.execute("SELECT * FROM active_enrolment_owners(%s, %s)", (bis, year["code"])):
             (own if r["own"] else other).add(r["apaar_bi"])
 
-        # own institution only (RLS); same-institution batches are already serialised by the counter locks above
         own_sids = {student_id_key(r["institution_student_id"]) for r in conn.execute(
             "SELECT e.institution_student_id FROM enrolments e JOIN programmes p ON p.id=e.programme_id "
             "WHERE p.institution_id=%s AND e.academic_year=%s AND e.status='active'", (inst_id, year["code"]))}
@@ -111,7 +102,7 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
         for i in issues:
             codes[i[2]] = codes.get(i[2], 0) + 1
         webhooks.emit(conn, "batch.validated", inst_id, batch_id=b["id"], counts=counts, codes=codes)
-        for cid in sorted(set(new_cases)):  # fires whenever a batch adds an enrolment to a case (new or existing)
+        for cid in sorted(set(new_cases)):
             webhooks.emit_case(conn, "case.opened", cid)
         audit(conn, user, "batch.upload", "upload_batch", b["id"], request=request,
               reason=f"DEMO_MODE upload time {upload_time.isoformat()}" if upload_time else None)
@@ -119,8 +110,6 @@ def process_batch(conn, user: dict, rows: list[dict], channel: str, idem_key: st
 
 
 def _store_batch_features(conn, batch_id: int, outcomes: list[dict], progs: dict, deadline, uploaded_at: datetime) -> None:
-    """F1 (PRD §9.1): anomaly features from the plaintext rows while they are still in memory. Every submitted,
-    parseable row counts (a ghost batch is suspicious even if its rows get rejected); only aggregates persist."""
     groups: dict[str, list[dict]] = {}
     for o in outcomes:
         if o["data"] and o["data"]["programme_code"] in progs:
@@ -134,11 +123,11 @@ def _store_batch_features(conn, batch_id: int, outcomes: list[dict], progs: dict
 
 
 def _student_id(conn, d: dict, o: dict) -> int:
-    if o["bi"]:  # the person row is shared across institutions; RLS hides it until we enrol them
+    if o["bi"]:
         s = conn.execute("SELECT student_id_by_bi(%s) id", (o["bi"],)).fetchone()
         if s["id"]:
             return s["id"]
-    sid = conn.execute("SELECT nextval('students_id_seq') id").fetchone()["id"]  # id first: it is part of the AAD
+    sid = conn.execute("SELECT nextval('students_id_seq') id").fetchone()["id"]
     enc = lambda col, v: crypto.encrypt("students", col, sid, v)  # noqa: E731
     conn.execute(
         "INSERT INTO students (id, apaar_enc, apaar_bi, apaar_masked, apaar_status, provisional_id, name_enc, dob_enc, "
@@ -166,7 +155,7 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
         e = conn.execute("SELECT e.* FROM enrolments e JOIN programmes p ON p.id=e.programme_id "
                          "WHERE e.id=%s AND p.institution_id=%s FOR UPDATE OF e", (enrolment_id, user["institution_id"])).fetchone()
         if e is None:
-            raise ApiError(404, "Enrolment not found")  # same answer for "not yours" (no oracle)
+            raise ApiError(404, "Enrolment not found")
         new_status = body.get("status") or e["status"]
         was_active = e["status"] == "active"
         if e["status"] != "active" and new_status == "active":
@@ -184,7 +173,7 @@ def patch_enrolment(conn, user: dict, enrolment_id: int, body: dict, request=Non
         e = conn.execute("UPDATE enrolments SET status=%s, ended_on=%s, year_of_study=%s WHERE id=%s RETURNING *",
                          (new_status, ended, body.get("year_of_study") or e["year_of_study"], enrolment_id)).fetchone()
         ledger.append(conn, user["institution_id"], "enrolment.updated", e)
-        if new_status in ("withdrawn", "migrated"):  # PRD §11.7: leaving the institution revokes its credentials
+        if new_status in ("withdrawn", "migrated"):
             conn.execute("SELECT revoke_enrolment_credentials(%s)", (e["id"],))
             if was_active:
                 for c in conn.execute("SELECT id FROM credentials WHERE enrolment_id=%s AND type <> 'VerificationCredential'",

@@ -4,7 +4,6 @@ import IndiaMapLive from "./IndiaMapLive";
 import TrustBar from "./TrustBar";
 import { BTN_PRIMARY, BTN_SECONDARY, fmt } from "./styles";
 
-// Optional background: drop the image at src/assets/hero-bg.webp. Without it the build still works (empty glob).
 const HERO_BG = Object.values(import.meta.glob("../../assets/hero-bg.webp", { eager: true, query: "?url", import: "default" }))[0] as
   | string | undefined;
 

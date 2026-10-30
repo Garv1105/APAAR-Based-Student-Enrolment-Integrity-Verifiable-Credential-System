@@ -1,4 +1,3 @@
-"""Vertical slice through the real API + Postgres (apaar_test database)."""
 import csv
 import io
 import json
@@ -28,7 +27,6 @@ def _csv(rows):
 
 
 def pending_rows(n, start=0, prog="CSE"):
-    """Rows without APAAR (reason PENDING): no registry needed, still counted (F10)."""
     base = date(2006, 1, 1)
     return [{"apaar_id": "", "apaar_reason": "PENDING", "institution_student_id": f"T/{start + i}", "student_name": "Test Student",
              "dob": (base + timedelta(days=start + i)).isoformat(), "guardian_name": "", "programme_code": prog,
@@ -46,7 +44,7 @@ def test_upload_clean_file_stores_encrypted(client, dbconn):
     raw = dbconn.execute("SELECT id, apaar_enc, name_enc, apaar_bi, apaar_masked FROM students").fetchall()
     from app import crypto
     s = raw[0]
-    assert len(crypto.decrypt("students", "name", s["id"], s["name_enc"])) > 0  # decrypts only with its own row id
+    assert len(crypto.decrypt("students", "name", s["id"], s["name_enc"])) > 0
     first = next(csv.DictReader(open(SYN / "A1.csv", encoding="utf-8")))
     blob = b"".join(bytes(x["apaar_enc"] or b"") + bytes(x["name_enc"]) for x in raw)
     assert first["apaar_id"].encode() not in blob and first["student_name"].encode() not in blob
@@ -59,9 +57,9 @@ def test_idempotency_key_replays_without_duplicating(client, dbconn):
     assert r1.status_code == 201 and r2.status_code == 200 and r2.json()["replayed"]
     assert r1.json()["batch_id"] == r2.json()["batch_id"]
     assert dbconn.execute("SELECT count(*) n FROM enrolments").fetchone()["n"] == r1.json()["counts"]["accepted"]
-    r3 = upload(client, "inst-a", "C1.csv", key="k1")  # same key, different content
+    r3 = upload(client, "inst-a", "C1.csv", key="k1")
     assert r3.status_code == 422 and r3.headers["content-type"] == "application/problem+json"
-    assert upload(client, "inst-b", "A1.csv", key="k1").status_code == 201  # keys are per institution
+    assert upload(client, "inst-b", "A1.csv", key="k1").status_code == 201
 
 
 def test_institution_isolation(client):
@@ -101,15 +99,12 @@ def test_error_report_and_dashboards(client):
     assert reg["cap"] == 120 and reg["excess"] == 5
     assert d["open_notices"] and all("1-0000000001" not in n and "Kalyani Devi Hegde" not in n for n in d["open_notices"])
     da = client.get("/v1/dashboard/institution", headers=login(client, "inst-a")).json()
-    assert da["open_notices"]  # the other side is notified too
+    assert da["open_notices"]
     agg = client.get("/v1/dashboard/aicte", headers=login(client, "aicte")).json()
-    # 3 injected duplicates + the 2 "legitimate move" students, who A has NOT withdrawn in this test
-    # excess seats = 5 regular (125/120) + 4 supernumerary (22/18); the CIWG sub-cap overflow (8/6) is inside those 4
     assert agg["open_cases"] == 5 and agg["totals"]["excess_seats"] == 9 and agg["ledger_ok"]
 
 
 def test_parallel_batches_cannot_both_slip_under_intake(client, dbconn):
-    """F11: B CSE intake 120; two concurrent 70-row batches -> exactly 20 E301 flags."""
     results = []
     files = [pending_rows(70, 0), pending_rows(70, 1000)]
     tokens = login(client, "inst-b")
@@ -144,7 +139,6 @@ def test_patch_withdraw_post_deadline_and_ledger_tamper(client, dbconn):
     after = dbconn.execute("SELECT filled FROM programme_category_counters WHERE programme_id=%s AND category_code='REGULAR'",
                            (e["programme_id"],)).fetchone()["filled"]
     assert after == before - 1
-    # other institution can't touch it, and can't tell it exists
     assert client.patch(f"/v1/enrolments/{e['id']}", json={"status": "completed", "reason": "x" * 3}, headers=login(client, "inst-b")).status_code == 404
 
     dbconn.execute("UPDATE academic_years SET deadline = now() - interval '1 day'")
@@ -157,12 +151,12 @@ def test_patch_withdraw_post_deadline_and_ledger_tamper(client, dbconn):
     ha = login(client, "aicte")
     assert client.post("/v1/ledger/checkpoints", headers=ha).status_code == 200
     assert client.get("/v1/ledger/verify", headers=ha).json()["ok"]
-    dbconn.execute("UPDATE enrolments SET status='active', ended_on=NULL WHERE id=%s", (e2["id"],))  # silent edit
+    dbconn.execute("UPDATE enrolments SET status='active', ended_on=NULL WHERE id=%s", (e2["id"],))
     dbconn.commit()
     v = client.get("/v1/ledger/verify", headers=ha).json()
     assert not v["ok"] and any(f"enrolment {e2['id']}" in p for p in v["problems"])
     dbconn.execute("UPDATE enrolments SET status='withdrawn', ended_on='2026-08-01' WHERE id=%s", (e2["id"],))
-    dbconn.execute("UPDATE ledger_entries SET payload_hash = repeat('0', 64) WHERE seq = 3")  # rewrite history
+    dbconn.execute("UPDATE ledger_entries SET payload_hash = repeat('0', 64) WHERE seq = 3")
     dbconn.commit()
     assert not client.get("/v1/ledger/verify", headers=ha).json()["ok"]
 
@@ -172,7 +166,6 @@ def test_csv_formula_injection_neutralised():
 
 
 def test_scenario_eval_through_api(client, dbconn, capsys):
-    """Full labelled scenario through API + DB, including E501 on patches. Do not loosen."""
     truth = {(t["file"], t["row_no"]): set(t["expected"]) for t in json.loads((SYN / "ground_truth.json").read_text())["rows"]}
     pred, patch_fail = {}, []
     for step in json.loads((SYN / "scenario.json").read_text())["steps"]:

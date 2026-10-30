@@ -1,5 +1,3 @@
-"""W3C vc-di-eddsa official eddsa-jcs-2022 test vectors (tests/vectors/eddsa-jcs-2022/, see SOURCE.txt).
-The implementation must reproduce every intermediate value byte for byte."""
 import hashlib
 import json
 from pathlib import Path
@@ -35,7 +33,7 @@ def test_canonical_forms_and_hashes_match():
 def test_signature_and_signed_document_match_byte_for_byte():
     kp, unsigned = j("keyPair.json"), j("unsigned.json")
     priv = crypto.private_from_multikey(kp["privateKeyMultibase"])
-    opts = {k: v for k, v in j("proofConfigJCS.json").items() if k != "@context"}  # @context comes from the document
+    opts = {k: v for k, v in j("proofConfigJCS.json").items() if k != "@context"}
     signed = crypto.eddsa_jcs_2022_sign(unsigned, opts, priv)
     assert crypto.from_multibase_b58(signed["proof"]["proofValue"]).hex() == t("sigHexJCS.txt")
     assert signed["proof"]["proofValue"] == t("sigBTC58JCS.txt")

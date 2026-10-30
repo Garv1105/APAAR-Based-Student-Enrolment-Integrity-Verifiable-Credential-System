@@ -1,5 +1,3 @@
-// AICTE / auditor workspace: one page per job instead of one long page. Routes: /aicte, /aicte/seats, /aicte/cases,
-// /aicte/inspection, /aicte/network, /aicte/institutions, /aicte/accounts, /aicte/reports.
 import { useMemo, useState, type ReactNode } from "react";
 import {
   AlertOctagon, ArrowRight, Building2, CalendarClock, CheckCircle2, ClipboardList, Fingerprint, Inbox, Info, Link2, PieChart, Search,
@@ -35,7 +33,6 @@ export default function AicteHome({ role, hash }: { role: Role; hash: string }) 
   }
 }
 
-/** "What this page is for" box at the top of every page. */
 function Intro({ children }: { children: ReactNode }) {
   return (
     <div className="flex gap-3 rounded-2xl border border-gold/20 bg-gold/[0.05] px-5 py-4">
@@ -55,7 +52,6 @@ function Page({ eyebrow = "AICTE", title, meta, intro, children }: { eyebrow?: s
   );
 }
 
-/* ---------------- Overview: what needs attention today ---------------- */
 
 function Overview({ role }: { role: Role }) {
   const d = useDashboard();
@@ -164,7 +160,6 @@ function StateFill({ rows, limit }: { rows: S["AicteDashboard"]["by_state"]; lim
   );
 }
 
-/* ---------------- Seats & intake ---------------- */
 
 function Seats() {
   const d = useDashboard();
@@ -239,7 +234,6 @@ function CategoryMix({ mix, total }: { mix: S["CategoryMix"]; total: number }) {
   );
 }
 
-/* ---------------- Duplicate cases ---------------- */
 
 function Cases({ officer }: { officer: boolean }) {
   return (
@@ -254,7 +248,6 @@ function Cases({ officer }: { officer: boolean }) {
   );
 }
 
-/* ---------------- Inspection priorities ---------------- */
 
 function Inspection({ officer }: { officer: boolean }) {
   const [tab, setTab] = useState<"colleges" | "signs" | "rules">("colleges");
@@ -279,7 +272,6 @@ function Inspection({ officer }: { officer: boolean }) {
   );
 }
 
-/* ---------------- Shared students (network) ---------------- */
 
 function Network() {
   return (
@@ -294,7 +286,6 @@ function Network() {
   );
 }
 
-/* ---------------- Institutions ---------------- */
 
 const SHOW = { all: "All colleges", missing: "Haven't uploaded", reporting: "Reporting", unapproved: "Not approved" } as const;
 
@@ -349,7 +340,6 @@ function Institutions({ initial }: { initial: string | null }) {
   );
 }
 
-/* ---------------- Accounts & access ---------------- */
 
 function Accounts({ officer }: { officer: boolean }) {
   return (
@@ -364,7 +354,6 @@ function Accounts({ officer }: { officer: boolean }) {
   );
 }
 
-/* ---------------- Reports & integrity ---------------- */
 
 function Reports({ officer }: { officer: boolean }) {
   const d = useDashboard();

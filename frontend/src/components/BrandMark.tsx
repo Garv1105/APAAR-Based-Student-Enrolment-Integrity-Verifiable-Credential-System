@@ -1,11 +1,9 @@
 import markUrl from "../assets/vidyapramaan-mark.png";
 
-/** VidyaPramaan mark: the team's logo artwork (docs/design/logo.png), resized for the UI. */
 export default function BrandMark({ className = "h-10" }: { className?: string }) {
   return <img src={markUrl} alt="" aria-hidden="true" draggable={false} className={`w-auto select-none ${className}`} />;
 }
 
-/** Full lockup: mark, "Vidya" + gold "Pramaan", optional tagline. `size` scales the whole lockup. */
 export function BrandLogo({ size = "md", tagline = true, className = "" }: { size?: "sm" | "md" | "lg"; tagline?: boolean; className?: string }) {
   const s = {
     sm: { mark: "h-9", word: "text-[18px]", tag: "text-[8px] tracking-[0.22em]" },

@@ -1,8 +1,3 @@
-"""Deterministic validation + intake engine (PRD §9). Pure functions: no DB, no AI.
-
-The DB layer supplies a Ctx (registry lookups, existing enrolment blind indexes and
-current counters read under row lock) and persists the outcomes.
-"""
 import math
 import re
 from dataclasses import dataclass, field
@@ -14,12 +9,11 @@ from . import crypto
 from .codes import severity
 from .contracts import APAAR_REASONS, REQUIRED_COLUMNS
 
-NAME_MATCH_THRESHOLD = 85  # rapidfuzz token_sort_ratio on normalised names
+NAME_MATCH_THRESHOLD = 85
 AGE_RANGE = (16, 35)
 
 
 def issue(row_no: int, code: str, field_: str | None = None, detail: str = "") -> dict:
-    """Issues carry code + params only; text is rendered from i18n templates on read."""
     return {"row_no": row_no, "code": code, "severity": severity(code), "field": field_,
             "params": {"field": field_ or "", "detail": detail}}
 
@@ -28,23 +22,21 @@ def issue(row_no: int, code: str, field_: str | None = None, detail: str = "") -
 class Ctx:
     institution_id: str
     institution_status: str
-    year: dict                      # {code, window_start: date, window_end: date}
-    programmes: dict                # code -> {id, approved_intake: int|None, duration_years}
-    seat_categories: dict           # code -> {scope, cap_rule_json}
-    registry_lookup: callable       # apaar -> {name, dob: 'YYYY-MM-DD'} | None   (MOCK APAAR registry)
+    year: dict
+    programmes: dict
+    seat_categories: dict
+    registry_lookup: callable
     own_active_bi: set = field(default_factory=set)
     other_active_bi: set = field(default_factory=set)
-    own_active_student_ids: set = field(default_factory=set)  # student_id_key() of own active enrolments
-    counters: dict = field(default_factory=dict)  # (programme_id, key) -> filled
+    own_active_student_ids: set = field(default_factory=set)
+    counters: dict = field(default_factory=dict)
 
 
 def student_id_key(sid: str) -> str:
-    """Comparison key for institution student IDs: case- and whitespace-insensitive."""
     return " ".join(sid.split()).casefold()
 
 
 def caps_for(intake: int, seat_categories: dict) -> dict:
-    """{key: cap} for one programme. Keys: category code, or 'CODE:SUB' for sub-caps."""
     caps = {}
     for code, cat in seat_categories.items():
         rule = cat["cap_rule_json"]
@@ -61,13 +53,11 @@ def caps_for(intake: int, seat_categories: dict) -> dict:
 
 
 def counter_keys(row: dict, seat_categories: dict) -> list[str]:
-    """Counters a row occupies: its category, plus any sub-cap whose flag it carries."""
     code = row["seat_category"]
     subs = seat_categories[code]["cap_rule_json"].get("sub_caps", {})
     return [code] + [f"{code}:{s}" for s, rule in subs.items() if row[rule["flag"]]]
 
 
-# ---------- parsing ----------
 _TRUE, _FALSE = {"y", "yes", "true", "1"}, {"n", "no", "false", "0", ""}
 
 
@@ -110,7 +100,7 @@ def missing_columns(header: list[str]) -> list[str]:
 def parse_row(row_no: int, raw: dict) -> tuple[dict | None, list[dict]]:
     out, issues = {}, []
     for col in REQUIRED_COLUMNS:
-        if col not in PARSERS and col != "institution_student_id" and not _str(raw.get(col)):  # blank ID → E105
+        if col not in PARSERS and col != "institution_student_id" and not _str(raw.get(col)):
             issues.append(issue(row_no, "E001", col, "required"))
     for col, fn in PARSERS.items():
         try:
@@ -129,15 +119,11 @@ def parse_row(row_no: int, raw: dict) -> tuple[dict | None, list[dict]]:
     return (None if issues else out), issues
 
 
-# ---------- validation ----------
 def _age(dob: date, on: date) -> int:
     return on.year - dob.year - ((on.month, on.day) < (dob.month, dob.day))
 
 
 def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
-    """rows: raw dicts (CSV strings or JSON values). Returns one outcome per row:
-    {row_no, data, issues, accepted, apaar_status, programme_id, counter_keys}.
-    Mutates ctx.counters for accepted rows (caller persists them in the same transaction)."""
     outcomes, seen, seen_sid, declared_flagged = [], {}, {}, set()
     for i, raw in enumerate(rows, start=1):
         data, issues = parse_row(i, raw)
@@ -147,7 +133,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         if data is None:
             continue
 
-        # Layer 2: format (student ID required, Req 10)
         sid = student_id_key(data["institution_student_id"])
         if not sid:
             issues.append(issue(i, "E105", "institution_student_id"))
@@ -163,7 +148,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         else:
             apaar_ok = True
 
-        # Layer 3: referential
         prog = ctx.programmes.get(data["programme_code"])
         if ctx.institution_status != "approved":
             issues.append(issue(i, "E304", "institution", f"Institution status is '{ctx.institution_status}', not approved"))
@@ -175,7 +159,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         if cat is None:
             issues.append(issue(i, "E001", "seat_category", f"unknown category '{data['seat_category']}'"))
 
-        # Layer 4: registry lookup (MOCK)
         if apaar_ok:
             reg = ctx.registry_lookup(apaar)
             if reg is None:
@@ -191,7 +174,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
                     issues.append(issue(i, "E104", "student_name" if mism[0] == "Name" else "dob", " and ".join(mism)))
                 o["apaar_status"] = "MISMATCH" if mism else "VERIFIED"
 
-        # Layer 5: business rules
         status_flags = [k for k in ("is_nri", "is_oci", "is_fn") if data[k]]
         if len(status_flags) > 1:
             issues.append(issue(i, "E401", "category", f"{' and '.join(status_flags)} cannot both be true"))
@@ -211,7 +193,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         if data["is_lateral_entry"] and data["year_of_study"] != 2:
             issues.append(issue(i, "E404", "year_of_study", str(data["year_of_study"])))
 
-        # Layer 7a: duplicates (before intake, so rejected duplicates never consume a seat)
         bi = crypto.apaar_bi(apaar) if apaar_ok else None
         key = ("a", bi) if bi else ("n", crypto.normalise_name(data["student_name"]), data["dob"].isoformat())
         if key in seen:
@@ -229,7 +210,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
         if any(x["severity"] == "error" for x in issues):
             continue
 
-        # Accepted. Layer 6: intake engine. Every accepted row counts, APAAR or not (F10).
         o["accepted"], o["programme_id"], o["bi"] = True, prog["id"], bi
         caps = caps_for(prog["approved_intake"], ctx.seat_categories)
         keys = o["counter_keys"] = counter_keys(data, ctx.seat_categories)
@@ -245,7 +225,6 @@ def validate_batch(rows: list[dict], ctx: Ctx) -> list[dict]:
             declared_flagged.add(prog["id"])
             issues.append(issue(i, "E303", "declared_intake", f"{data['declared_intake']} vs {prog['approved_intake']}"))
 
-        # Layer 7b: cross-institution (flag only; row accepted, case opened by DB layer)
         if bi and bi in ctx.other_active_bi:
             issues.append(issue(i, "E203", "apaar_id"))
     return outcomes

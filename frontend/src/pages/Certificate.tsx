@@ -3,8 +3,6 @@ import { ArrowLeft, Copy, Printer } from "lucide-react";
 import { ApiError, getJson, type S } from "../api/client";
 import { Button, ErrorNote, Loading } from "../ui";
 
-/** Printable certificate (Req 10): APAAR ID and student ID in full, plus the verification QR (checked online).
- *  Paper colours are explicit (not theme tokens) so it reads the same on screen and in print. */
 export default function Certificate({ id }: { id: string }) {
   const [cert, setCert] = useState<S["CertificateOut"] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -21,11 +19,10 @@ export default function Certificate({ id }: { id: string }) {
   const vc = cert.credential as { type: string[]; issuer: { name: string; id: string }; validFrom: string; credentialSubject: Record<string, string> };
   const s = vc.credentialSubject;
   const degree = vc.type.includes("DegreeCredential");
-  // the SVG comes from our backend's QR generator; rendered as an image, never injected as HTML
   const qrSrc = `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(cert.qr_svg)))}`;
 
   const copyPayload = async () => {
-    try { await navigator.clipboard.writeText(cert.qr_payload); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* clipboard blocked */ }
+    try { await navigator.clipboard.writeText(cert.qr_payload); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { }
   };
 
   const field = (label: string, value: React.ReactNode, mono = false) => (

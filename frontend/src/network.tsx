@@ -1,5 +1,3 @@
-// Shared-student network (AICTE only): colleges that list the same students. Counts only, never student data.
-// Each group of linked colleges gets its own tile (readable names), plus a table of the biggest overlaps.
 import { useMemo, useRef, useState } from "react";
 import { Share2 } from "lucide-react";
 import { getJson, type S } from "./api/client";
@@ -8,7 +6,6 @@ import { Badge, Button, Card, Empty, ErrorNote, go, Loading, Table, Td, usePoll 
 const TILE_W = 300, TILE_H = 210, COLS = 3;
 const short = (s: string, n = 26) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** Connected groups (union-find over kept edges), biggest first. */
 function groups(nodes: string[], edges: S["NetworkEdge"][]) {
   const parent = new Map(nodes.map((n) => [n, n]));
   const find = (x: string): string => (parent.get(x) === x ? x : (parent.set(x, find(parent.get(x)!)), parent.get(x)!));
@@ -30,7 +27,7 @@ export function NetworkCard() {
     const kept = data.edges.filter((e) => e.kept);
     const ids = data.nodes.filter((n) => n.connected).map((n) => n.id);
     const gs = groups(ids, kept);
-    const pos = new Map<string, { x: number; y: number; dx: number; dy: number }>();  // dx/dy: outward direction for the label
+    const pos = new Map<string, { x: number; y: number; dx: number; dy: number }>();
     gs.forEach((g, gi) => {
       const cx = (gi % COLS) * TILE_W + TILE_W / 2, cy = Math.floor(gi / COLS) * TILE_H + TILE_H / 2 - 12;
       const r = g.length === 2 ? 0 : 44;
@@ -90,7 +87,6 @@ export function NetworkCard() {
           })}
         </svg>
         {(() => {
-          // Floating cards, positioned in % of the SVG box so they track its responsive size.
           const W = COLS * TILE_W, H = view.height;
           const at = (x: number, y: number) => ({ left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%`,
             transform: `translate(${x > W * 0.66 ? "-100%" : x < W * 0.33 ? "0" : "-50%"}, ${y > H / 2 ? "calc(-100% - 14px)" : "14px"})` });

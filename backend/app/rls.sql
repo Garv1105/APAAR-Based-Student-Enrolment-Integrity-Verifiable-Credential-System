@@ -1,10 +1,3 @@
--- Row-level security (CLAUDE.md rule; PRD §6). Loaded after schema.sql by the admin role.
--- The app connects as app_user (NOSUPERUSER NOBYPASSRLS, not owner). db.app_connect() sets
--- app.role / app.institution_id / app.user_id per connection. Unset settings = no rows.
--- Cross-institution facts are reachable only through the SECURITY DEFINER functions below,
--- each of which checks the caller's role and institution and returns the minimum needed.
-
--- ---------- helpers ----------
 CREATE OR REPLACE FUNCTION app_role() RETURNS text LANGUAGE sql STABLE AS
 $$ SELECT coalesce(current_setting('app.role', true), '') $$;
 CREATE OR REPLACE FUNCTION app_inst() RETURNS text LANGUAGE sql STABLE AS
@@ -15,12 +8,10 @@ CREATE OR REPLACE FUNCTION app_owns_programme(pid text) RETURNS boolean LANGUAGE
 $$ SELECT app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM programmes p WHERE p.id = pid AND p.institution_id = app_inst()) $$;
 CREATE OR REPLACE FUNCTION app_student() RETURNS bigint LANGUAGE sql STABLE AS
 $$ SELECT CASE WHEN app_role() IN ('student', 'guardian') THEN nullif(current_setting('app.student_id', true), '')::bigint END $$;
--- a guardian (P1) acts for a minor and sees what the student sees
 CREATE OR REPLACE FUNCTION app_scope() RETURNS text LANGUAGE sql STABLE AS
 $$ SELECT coalesce(current_setting('app.scope', true), '') $$;
 CREATE OR REPLACE FUNCTION app_registrar_did() RETURNS text LANGUAGE sql STABLE AS
 $$ SELECT CASE WHEN app_role() = 'university_registrar' THEN nullif(current_setting('app.issuer_did', true), '') END $$;
--- issuer DIDs the caller may sign for: its own institution's DID, or the registrar's university DID
 CREATE OR REPLACE FUNCTION app_may_issue_for(p_did text) RETURNS boolean LANGUAGE sql STABLE AS
 $$ SELECT (app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM issuer_registry r WHERE r.did = p_did AND r.institution_id = app_inst()))
        OR (app_registrar_did() IS NOT NULL AND p_did = app_registrar_did()) $$;
@@ -28,27 +19,22 @@ CREATE OR REPLACE FUNCTION app_registrar_covers(pid text) RETURNS boolean LANGUA
 $$ SELECT app_registrar_did() IS NOT NULL AND EXISTS (SELECT 1 FROM programmes p JOIN affiliations a ON a.institution_id = p.institution_id
                                                       WHERE p.id = pid AND a.university_did = app_registrar_did()) $$;
 
--- ---------- privileges ----------
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM app_user;
 GRANT USAGE ON SCHEMA public TO app_user;
--- users is NOT granted: password hashes are reachable only through login_lookup()
 GRANT SELECT ON institutions, programmes, approved_intake, seat_categories, academic_years, intake_history,
-  issuer_registry, affiliations, status_lists TO app_user;   -- registry + status lists: public, written only by admin/definer fns
+  issuer_registry, affiliations, status_lists TO app_user;
 GRANT SELECT, INSERT, UPDATE ON upload_batches, validation_issues, enrolments, students, programme_category_counters,
   duplicate_cases, anomaly_flags, consents TO app_user;
 GRANT SELECT, INSERT, UPDATE ON webhook_endpoints TO app_user;
 GRANT SELECT ON passkeys TO app_user;
 GRANT SELECT, INSERT ON flag_reviews TO app_user;
-GRANT UPDATE (sign_count, last_used_at) ON passkeys TO app_user;  -- insert/revoke only via register_passkey / revoke_own_passkey
--- activation_codes and webauthn_challenges: no grants, functions only
-GRANT SELECT, UPDATE ON webhook_deliveries TO app_user;   -- inserts only via enqueue_event() / enqueue_case_event()
+GRANT UPDATE (sign_count, last_used_at) ON passkeys TO app_user;
+GRANT SELECT, UPDATE ON webhook_deliveries TO app_user;
 GRANT SELECT, INSERT ON audit_logs, ledger_checkpoints, credentials, batch_features TO app_user;
-GRANT SELECT ON ledger_entries TO app_user;            -- writes only via ledger_append()
+GRANT SELECT ON ledger_entries TO app_user;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_user;
 
--- ---------- policies ----------
--- upload_batches
 ALTER TABLE upload_batches ENABLE ROW LEVEL SECURITY; ALTER TABLE upload_batches FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON upload_batches; DROP POLICY IF EXISTS ins ON upload_batches; DROP POLICY IF EXISTS upd ON upload_batches;
 CREATE POLICY sel ON upload_batches FOR SELECT USING (app_is_regulator() OR (app_role() = 'institution_admin' AND institution_id = app_inst()));
@@ -56,49 +42,41 @@ CREATE POLICY ins ON upload_batches FOR INSERT WITH CHECK (app_role() = 'institu
 CREATE POLICY upd ON upload_batches FOR UPDATE USING (app_role() = 'institution_admin' AND institution_id = app_inst())
   WITH CHECK (institution_id = app_inst());
 
--- validation_issues (via batch)
 ALTER TABLE validation_issues ENABLE ROW LEVEL SECURITY; ALTER TABLE validation_issues FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON validation_issues; DROP POLICY IF EXISTS ins ON validation_issues;
 CREATE POLICY sel ON validation_issues FOR SELECT USING (app_is_regulator() OR EXISTS (SELECT 1 FROM upload_batches b WHERE b.id = batch_id));
 CREATE POLICY ins ON validation_issues FOR INSERT WITH CHECK (EXISTS (SELECT 1 FROM upload_batches b WHERE b.id = batch_id AND b.institution_id = app_inst()));
 
--- enrolments
 ALTER TABLE enrolments ENABLE ROW LEVEL SECURITY; ALTER TABLE enrolments FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON enrolments; DROP POLICY IF EXISTS ins ON enrolments; DROP POLICY IF EXISTS upd ON enrolments;
 CREATE POLICY sel ON enrolments FOR SELECT USING (app_is_regulator() OR app_owns_programme(programme_id)
-  OR student_id = app_student()                -- a student sees their own enrolments
-  OR app_registrar_covers(programme_id));      -- a university registrar sees its affiliated institutions' enrolments
+  OR student_id = app_student()
+  OR app_registrar_covers(programme_id));
 CREATE POLICY ins ON enrolments FOR INSERT WITH CHECK (app_owns_programme(programme_id));
 CREATE POLICY upd ON enrolments FOR UPDATE USING (app_owns_programme(programme_id)) WITH CHECK (app_owns_programme(programme_id));
 
--- batch_features (F1 aggregates): own institution and regulators
 ALTER TABLE batch_features ENABLE ROW LEVEL SECURITY; ALTER TABLE batch_features FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON batch_features; DROP POLICY IF EXISTS ins ON batch_features;
 CREATE POLICY sel ON batch_features FOR SELECT USING (app_is_regulator() OR app_owns_programme(programme_id));
 CREATE POLICY ins ON batch_features FOR INSERT WITH CHECK (app_owns_programme(programme_id)
   AND EXISTS (SELECT 1 FROM upload_batches b WHERE b.id = batch_id AND b.institution_id = app_inst()));
 
--- programme_category_counters
 ALTER TABLE programme_category_counters ENABLE ROW LEVEL SECURITY; ALTER TABLE programme_category_counters FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON programme_category_counters; DROP POLICY IF EXISTS upd ON programme_category_counters;
 CREATE POLICY sel ON programme_category_counters FOR SELECT USING (app_is_regulator() OR app_owns_programme(programme_id));
 CREATE POLICY upd ON programme_category_counters FOR UPDATE USING (app_owns_programme(programme_id)) WITH CHECK (app_owns_programme(programme_id));
 
--- students: shared person rows; an institution sees a student only through its own enrolment
 ALTER TABLE students ENABLE ROW LEVEL SECURITY; ALTER TABLE students FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON students; DROP POLICY IF EXISTS ins ON students;
 CREATE POLICY sel ON students FOR SELECT USING (app_is_regulator() OR id = app_student()
-  OR EXISTS (SELECT 1 FROM enrolments e WHERE e.student_id = students.id));  -- enrolments RLS decides (own / affiliated)
+  OR EXISTS (SELECT 1 FROM enrolments e WHERE e.student_id = students.id));
 CREATE POLICY ins ON students FOR INSERT WITH CHECK (app_role() = 'institution_admin');
 
--- duplicate_cases: visible to an institution only if one of its own enrolments is in the case
 ALTER TABLE duplicate_cases ENABLE ROW LEVEL SECURITY; ALTER TABLE duplicate_cases FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON duplicate_cases; DROP POLICY IF EXISTS upd ON duplicate_cases;
 CREATE POLICY sel ON duplicate_cases FOR SELECT USING (app_is_regulator() OR EXISTS (SELECT 1 FROM enrolments e WHERE e.id = ANY(enrolment_ids)));
 CREATE POLICY upd ON duplicate_cases FOR UPDATE USING (app_role() = 'aicte_officer') WITH CHECK (app_role() = 'aicte_officer');
 
--- webhooks (Req 7): an institution manages its own endpoints and sees its own deliveries; regulators read deliveries.
--- The in-process dispatcher connects with app.role='webhook_dispatcher' (no user row can hold that role: users.role CHECK).
 ALTER TABLE webhook_endpoints ENABLE ROW LEVEL SECURITY; ALTER TABLE webhook_endpoints FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON webhook_endpoints; DROP POLICY IF EXISTS ins ON webhook_endpoints; DROP POLICY IF EXISTS upd ON webhook_endpoints;
 CREATE POLICY sel ON webhook_endpoints FOR SELECT USING ((app_role() = 'institution_admin' AND institution_id = app_inst())
@@ -110,13 +88,10 @@ CREATE POLICY upd ON webhook_endpoints FOR UPDATE USING (app_role() = 'instituti
 ALTER TABLE webhook_deliveries ENABLE ROW LEVEL SECURITY; ALTER TABLE webhook_deliveries FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON webhook_deliveries; DROP POLICY IF EXISTS upd ON webhook_deliveries;
 CREATE POLICY sel ON webhook_deliveries FOR SELECT USING (app_is_regulator() OR app_role() = 'webhook_dispatcher'
-  OR EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id));   -- endpoints RLS decides (own institution)
+  OR EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id));
 CREATE POLICY upd ON webhook_deliveries FOR UPDATE USING (app_role() = 'webhook_dispatcher'
   OR (app_role() = 'institution_admin' AND EXISTS (SELECT 1 FROM webhook_endpoints w WHERE w.id = endpoint_id)));
 
-
--- passkeys (P1): the owner (student, or the guardian for guardian keys) sees its own keys and may update the sign
--- counter. New keys only via register_passkey() (one per redeemed code, cooldown set there); revocation via revoke_own_passkey().
 ALTER TABLE passkeys ENABLE ROW LEVEL SECURITY; ALTER TABLE passkeys FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON passkeys; DROP POLICY IF EXISTS ins ON passkeys; DROP POLICY IF EXISTS upd ON passkeys;
 CREATE POLICY sel ON passkeys FOR SELECT USING (student_id = app_student() AND kind = app_role());
@@ -125,36 +100,30 @@ CREATE POLICY upd ON passkeys FOR UPDATE USING (student_id = app_student() AND k
 ALTER TABLE activation_codes ENABLE ROW LEVEL SECURITY; ALTER TABLE activation_codes FORCE ROW LEVEL SECURITY;
 ALTER TABLE webauthn_challenges ENABLE ROW LEVEL SECURITY; ALTER TABLE webauthn_challenges FORCE ROW LEVEL SECURITY;
 
--- flag_reviews (A4): AICTE officers record reviews as themselves; regulators read; institutions see nothing.
 ALTER TABLE flag_reviews ENABLE ROW LEVEL SECURITY; ALTER TABLE flag_reviews FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON flag_reviews; DROP POLICY IF EXISTS ins ON flag_reviews;
 CREATE POLICY sel ON flag_reviews FOR SELECT USING (app_is_regulator());
 CREATE POLICY ins ON flag_reviews FOR INSERT WITH CHECK (app_role() = 'aicte_officer' AND reviewer = current_setting('app.user_id', true));
 
--- anomaly_flags (incl. E501)
 ALTER TABLE anomaly_flags ENABLE ROW LEVEL SECURITY; ALTER TABLE anomaly_flags FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON anomaly_flags; DROP POLICY IF EXISTS ins ON anomaly_flags;
 CREATE POLICY sel ON anomaly_flags FOR SELECT USING (app_is_regulator() OR (app_role() = 'institution_admin' AND institution_id = app_inst()));
 CREATE POLICY ins ON anomaly_flags FOR INSERT WITH CHECK (app_role() = 'institution_admin' AND institution_id = app_inst());
 
--- audit_logs: anyone authenticated may append as themselves; regulators read all; a student reads entries about them (D6)
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY; ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON audit_logs; DROP POLICY IF EXISTS ins ON audit_logs;
 CREATE POLICY sel ON audit_logs FOR SELECT USING (app_is_regulator() OR student_id = app_student());
 CREATE POLICY ins ON audit_logs FOR INSERT WITH CHECK (app_role() <> '' AND actor = current_setting('app.user_id', true));
 
--- ledger_entries: read by regulators only (payload hashes could otherwise be brute-forced into an oracle)
 ALTER TABLE ledger_entries ENABLE ROW LEVEL SECURITY; ALTER TABLE ledger_entries FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON ledger_entries;
 CREATE POLICY sel ON ledger_entries FOR SELECT USING (app_is_regulator());
 
--- ledger_checkpoints: public read (signed, no PII); only AICTE inserts; no UPDATE grant at all
 ALTER TABLE ledger_checkpoints ENABLE ROW LEVEL SECURITY; ALTER TABLE ledger_checkpoints FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON ledger_checkpoints; DROP POLICY IF EXISTS ins ON ledger_checkpoints;
 CREATE POLICY sel ON ledger_checkpoints FOR SELECT USING (true);
 CREATE POLICY ins ON ledger_checkpoints FOR INSERT WITH CHECK (app_role() = 'aicte_officer');
 
--- trust registry and status lists: public read (SELECT-only grant; writes by admin seed / definer fns)
 ALTER TABLE status_lists ENABLE ROW LEVEL SECURITY; ALTER TABLE status_lists FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON status_lists;
 CREATE POLICY sel ON status_lists FOR SELECT USING (true);
@@ -162,11 +131,6 @@ ALTER TABLE issuer_registry ENABLE ROW LEVEL SECURITY; ALTER TABLE issuer_regist
 DROP POLICY IF EXISTS sel ON issuer_registry;
 CREATE POLICY sel ON issuer_registry FOR SELECT USING (true);
 
--- credentials: the issuer (institution / registrar), the subject student and regulators can read.
--- VerificationCredentials are the student's (D5): the issuing institution can't see them (they reveal which
--- employer the student shares data with) — only the student, regulators and the consent requester (definer fn).
--- Insert: an issuer for its own DID; a student only for the single VerificationCredential of a consent they
--- granted, issued by an institution where they hold an active enrolment.
 ALTER TABLE credentials ENABLE ROW LEVEL SECURITY; ALTER TABLE credentials FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON credentials; DROP POLICY IF EXISTS ins ON credentials;
 CREATE POLICY sel ON credentials FOR SELECT USING (app_is_regulator() OR subject_student_id = app_student()
@@ -178,15 +142,11 @@ CREATE POLICY ins ON credentials FOR INSERT WITH CHECK (
       AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id JOIN issuer_registry r ON r.institution_id = p.institution_id
                   WHERE e.student_id = app_student() AND e.status = 'active' AND r.did = issuer_did)));
 
--- consents: the student sees and answers requests about them; regulators read. Verifiers have NO direct
--- access: they create and list requests only through request_consent() / my_consent_requests(), which never
--- return student_id — so a verifier can't tell whether an APAAR matched a registered student.
 ALTER TABLE consents ENABLE ROW LEVEL SECURITY; ALTER TABLE consents FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON consents; DROP POLICY IF EXISTS ins ON consents; DROP POLICY IF EXISTS upd ON consents;
 CREATE POLICY sel ON consents FOR SELECT USING (app_is_regulator() OR student_id = app_student());
 CREATE POLICY upd ON consents FOR UPDATE USING (student_id = app_student()) WITH CHECK (student_id = app_student());
 
--- ---------- SECURITY DEFINER functions (the only cross-institution paths) ----------
 DROP FUNCTION IF EXISTS login_lookup(text);
 CREATE FUNCTION login_lookup(p_id text)
 RETURNS TABLE (id text, role text, institution_id text, student_id bigint, issuer_did text, display_name text, password_hash text)
@@ -194,8 +154,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT id, role, institution_id, student_id, issuer_did, display_name, password_hash FROM users WHERE id = p_id
 $$;
 
--- MOCK student sign-in (APAAR + date of birth): returns the id and the encrypted DOB for the app to compare.
--- Anonymous (login) connections only; the app throttles failed attempts.
 DROP FUNCTION IF EXISTS student_id_for_login(text);
 CREATE OR REPLACE FUNCTION student_login_lookup(p_bi text) RETURNS TABLE (id bigint, dob_enc bytea)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -204,10 +162,6 @@ BEGIN
   RETURN QUERY SELECT s.id, s.dob_enc FROM students s WHERE s.apaar_bi = p_bi;
 END $$;
 
--- Verifier consent request. Always stores the request and returns the same shape, whether or not the APAAR
--- belongs to a registered student (unmatched requests simply stay pending until they expire, exactly like a
--- request the student never answers). Rate-limited per verifier; the audit row is written here, linked to
--- the student only when matched, so the application layer never learns the outcome either.
 CREATE OR REPLACE FUNCTION request_consent(p_bi text, p_purpose text, p_fields text[], p_days int, p_requester_name text,
                                            p_request_id text)
 RETURNS TABLE (id bigint, requester_name text, purpose text, scope_fields text[], status text, granted_by text,
@@ -235,8 +189,6 @@ BEGIN
                  FROM consents c WHERE c.id = v_id;
 END $$;
 
--- DQS correction churn for the caller's own institution: enrolment updates recorded in the ledger
--- (institutions can't read ledger_entries directly — payload hashes could be brute-forced into an oracle).
 CREATE OR REPLACE FUNCTION own_correction_count() RETURNS bigint
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
@@ -244,7 +196,6 @@ BEGIN
   RETURN (SELECT count(*) FROM ledger_entries WHERE institution_id = app_inst() AND event_type = 'enrolment.updated');
 END $$;
 
--- The verifier's own requests, without student_id.
 CREATE OR REPLACE FUNCTION my_consent_requests()
 RETURNS TABLE (id bigint, requester_name text, purpose text, scope_fields text[], status text, granted_by text,
                requested_at timestamptz, expires_at timestamptz)
@@ -255,7 +206,6 @@ BEGIN
                  FROM consents c WHERE c.requester_id = current_setting('app.user_id', true) ORDER BY c.requested_at DESC LIMIT 200;
 END $$;
 
--- Random unused index (herd privacy) on the issuer's revocation list. The same index is used on its suspension list.
 CREATE OR REPLACE FUNCTION allocate_status_index(p_issuer text) RETURNS TABLE (list_id text, idx int)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE v_list text; v_size int; v_idx int; tries int := 0; b bytea;
@@ -269,7 +219,6 @@ BEGIN
   IF v_list IS NULL THEN RAISE EXCEPTION 'allocate_status_index: issuer has no status list'; END IF;
   PERFORM pg_advisory_xact_lock(hashtextextended(v_list, 0));
   LOOP
-    -- CSPRNG: gen_random_uuid() uses the server's strong random source; 24 random bits mod a power-of-two size is unbiased
     b := uuid_send(gen_random_uuid());
     v_idx := ((get_byte(b, 0) << 16) | (get_byte(b, 1) << 8) | get_byte(b, 2)) % v_size;
     EXIT WHEN NOT EXISTS (SELECT 1 FROM credentials c WHERE c.status_list_id = v_list AND c.status_index = v_idx);
@@ -279,9 +228,6 @@ BEGIN
   RETURN QUERY SELECT v_list, v_idx;
 END $$;
 
--- Set or clear a credential's bit (W3C: index 0 = left-most bit; PG set_bit numbers bits from the right of each byte).
--- Issuers may suspend/unsuspend and revoke their own credentials; a student may only REVOKE a VerificationCredential
--- about themselves. Revocation is permanent for everyone (never cleared).
 CREATE OR REPLACE FUNCTION set_credential_status(p_cred text, p_purpose text, p_value boolean) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE c record; v_list text;
@@ -290,7 +236,7 @@ BEGIN
   IF p_purpose = 'revocation' AND NOT p_value THEN RAISE EXCEPTION 'set_credential_status: revocation is permanent'; END IF;
   SELECT * INTO c FROM credentials WHERE id = p_cred;
   IF c.id IS NULL THEN RAISE EXCEPTION 'set_credential_status: no such credential'; END IF;
-  IF NOT ((app_may_issue_for(c.issuer_did) AND c.type <> 'VerificationCredential')  -- consent-scoped VCs are the student's
+  IF NOT ((app_may_issue_for(c.issuer_did) AND c.type <> 'VerificationCredential')
           OR (c.type = 'VerificationCredential' AND c.subject_student_id = app_student() AND p_purpose = 'revocation' AND p_value)) THEN
     RAISE EXCEPTION 'set_credential_status: not allowed';
   END IF;
@@ -308,7 +254,6 @@ BEGIN
   IF app_role() <> 'institution_admin' THEN RAISE EXCEPTION 'active_enrolment_owners: not allowed'; END IF;
   IF coalesce(array_length(p_bis, 1), 0) > 50000 THEN RAISE EXCEPTION 'active_enrolment_owners: too many ids'; END IF;
   IF p_year <> (SELECT max(code) FROM academic_years) THEN RAISE EXCEPTION 'active_enrolment_owners: not the open year'; END IF;
-  -- returns only "own" vs "someone else": never which institution
   RETURN QUERY SELECT s.apaar_bi, bool_or(p.institution_id = app_inst())
     FROM enrolments e JOIN students s ON s.id = e.student_id JOIN programmes p ON p.id = e.programme_id
     WHERE s.apaar_bi = ANY(p_bis) AND e.academic_year = p_year AND e.status = 'active'
@@ -341,7 +286,6 @@ BEGIN
   RETURN cid;
 END $$;
 
--- entry_hash = sha256(prev|seq|institution|event|entity|payload_hash|ts) — ledger.verify() recomputes it in Python
 CREATE OR REPLACE FUNCTION ledger_append(p_inst text, p_event text, p_entity bigint, p_payload_hash text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE last record; v_seq bigint; v_prev text; v_ts text;
@@ -353,7 +297,7 @@ BEGIN
                  WHERE e.id = p_entity AND p.institution_id = app_inst()) THEN
     RAISE EXCEPTION 'ledger_append: enrolment is not the caller''s';
   END IF;
-  PERFORM pg_advisory_xact_lock(42);  -- ponytail: one global chain lock; shard per institution if throughput matters
+  PERFORM pg_advisory_xact_lock(42);
   SELECT seq, entry_hash INTO last FROM ledger_entries ORDER BY seq DESC LIMIT 1;
   v_seq := coalesce(last.seq, 0) + 1;
   v_prev := coalesce(last.entry_hash, repeat('0', 64));
@@ -364,8 +308,6 @@ BEGIN
           v_ts);
 END $$;
 
--- Withdrawal/migration revokes every credential of that enrolment, including the student's consent-scoped
--- VerificationCredentials (which the institution can't otherwise see or change). Caller must own the enrolment.
 CREATE OR REPLACE FUNCTION revoke_enrolment_credentials(p_enrolment bigint) RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE c record; n int := 0;
@@ -381,8 +323,6 @@ BEGIN
   RETURN n;
 END $$;
 
--- The verifier that requested a consent may fetch the VerificationCredential minted for it (D5).
--- Returns nothing unless the caller is that requester; the app checks status/expiry and audits the fetch.
 CREATE OR REPLACE FUNCTION consent_credential(p_consent bigint)
 RETURNS TABLE (credential_id text, vc_enc bytea, consent_status text, expires_at timestamptz)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -393,10 +333,6 @@ BEGIN
    WHERE k.id = p_consent AND k.requester_id = current_setting('app.user_id', true);
 END $$;
 
--- Records a verification in the audit log against the credential's subject (so the student sees it, D6)
--- without revealing anything to the verifier. The entry is linked to the student only when the presented
--- document is byte-for-byte the stored credential (same JCS hash), so nobody can plant fake entries by
--- quoting a credential id.
 DROP FUNCTION IF EXISTS log_verification(text, text, text);
 CREATE OR REPLACE FUNCTION log_verification(p_cred text, p_vc_hash text, p_result text, p_request_id text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -408,9 +344,6 @@ BEGIN
           left(p_result, 40), left(p_request_id, 64));
 END $$;
 
--- Case resolution side effects on credentials (AICTE officer only). confirmed_duplicate: revoke the credentials of
--- every enrolment in the case except the one the officer keeps. under_investigation: suspend all of them (reversible).
--- false_positive / confirmed: lift the suspension of the enrolments that stand.
 CREATE OR REPLACE FUNCTION apply_case_resolution(p_case bigint, p_keep bigint) RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE k record; c record; n int := 0; bitpos int;
@@ -434,9 +367,6 @@ BEGIN
   RETURN n;
 END $$;
 
--- Webhook events (Req 7). The app builds the payload from an allowlist (ids, counts, codes); these functions only
--- fan it out to the subscribed endpoints, so a caller never sees another institution's endpoints.
--- enqueue_event: an institution for itself, or an AICTE officer for an institution its action affected.
 CREATE OR REPLACE FUNCTION enqueue_event(p_type text, p_payload jsonb, p_inst text) RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE n int;
@@ -451,8 +381,6 @@ BEGIN
   RETURN n;
 END $$;
 
--- enqueue_case_event: notify every institution with an enrolment in the case (neutral payload built by the app).
--- Caller: an AICTE officer, or an institution that itself has an enrolment in the case.
 CREATE OR REPLACE FUNCTION enqueue_case_event(p_case bigint, p_type text, p_payload jsonb) RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE k record; insts text[]; n int;
@@ -471,11 +399,6 @@ BEGIN
   RETURN n;
 END $$;
 
--- ---------- passkeys (P1) ----------
--- Institution issues a one-time activation code for its own active student. Voids that student's unused codes of the
--- kind and revokes that kind's passkeys (lost-device recovery). Any code after the very first one is a REISSUE: a passkey
--- registered from it can't approve consent for 24 h (insider-impersonation cooldown). The plaintext code never reaches
--- the database; an Idempotency-Key replay returns replay=true and no code.
 CREATE OR REPLACE FUNCTION issue_activation_code(p_enrolment bigint, p_kind text, p_code_hash text, p_idem text, p_req_hash text)
 RETURNS TABLE (code_id bigint, student_id bigint, revoked int, reissue boolean, replay boolean, expires_at timestamptz)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -494,9 +417,6 @@ BEGIN
       RETURN;
     END IF;
   END IF;
-  -- H1: no codes for a person who is active at another institution or in an open duplicate case: an institution
-  -- uploading someone else's APAAR must not be able to take over that student's passkey identity.
-  -- A case AICTE resolved as a false positive lifts the "active elsewhere" block for that person.
   IF (EXISTS (SELECT 1 FROM enrolments o JOIN programmes op ON op.id = o.programme_id
                WHERE o.student_id = e.student_id AND o.status = 'active' AND op.institution_id <> app_inst())
       AND NOT EXISTS (SELECT 1 FROM duplicate_cases d WHERE d.student_id = e.student_id AND d.status = 'false_positive'))
@@ -504,7 +424,6 @@ BEGIN
     RAISE EXCEPTION 'issue_activation_code: record under review' USING ERRCODE = 'P0004';
   END IF;
   PERFORM pg_advisory_xact_lock(hashtextextended('activation:' || e.student_id || ':' || p_kind, 0));
-  -- M1: everything below looks only at THIS institution's codes and the passkeys they created
   rei := EXISTS (SELECT 1 FROM activation_codes a WHERE a.student_id = e.student_id AND a.kind = p_kind AND a.institution_id = app_inst());
   UPDATE activation_codes a SET voided_at = now()
    WHERE a.student_id = e.student_id AND a.kind = p_kind AND a.institution_id = app_inst() AND a.used_at IS NULL AND a.voided_at IS NULL;
@@ -519,7 +438,6 @@ BEGIN
   RETURN QUERY SELECT cid, e.student_id, n, rei, false, exp;
 END $$;
 
--- Anonymous: redeem (burn) a code for the student with this APAAR. Nothing comes back for any kind of mismatch.
 CREATE OR REPLACE FUNCTION redeem_activation_code(p_bi text, p_code_hash text)
 RETURNS TABLE (code_id bigint, student_id bigint, kind text, reissue boolean)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -529,13 +447,11 @@ BEGIN
     FROM students s
    WHERE s.id = a.student_id AND s.apaar_bi = p_bi AND a.code_hash = p_code_hash
      AND a.used_at IS NULL AND a.voided_at IS NULL AND a.expires_at > now()
-     AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id   -- L4: still enrolled there
+     AND EXISTS (SELECT 1 FROM enrolments e JOIN programmes p ON p.id = e.programme_id
                   WHERE e.student_id = a.student_id AND e.status = 'active' AND p.institution_id = a.institution_id)
   RETURNING a.id, a.student_id, a.kind, a.reissue;
 END $$;
 
--- Single-use WebAuthn challenges (5 min). Login: anonymous. Register: a passkey-setup session. Consent: the student or
--- guardian whose inbox holds the request; the challenge is stored with the request id and a hash of its terms.
 CREATE OR REPLACE FUNCTION store_challenge(p_challenge bytea, p_purpose text, p_consent bigint, p_terms_hash text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
@@ -561,8 +477,6 @@ BEGIN
   RETURNING w.consent_id, w.terms_hash;
 END $$;
 
--- Anonymous passkey sign-in: find an unrevoked key by credential id. The sign count is updated afterwards on a
--- connection opened as the signed-in student/guardian (RLS), so there is no anonymous write path.
 CREATE OR REPLACE FUNCTION passkey_for_login(p_credential bytea)
 RETURNS TABLE (id bigint, student_id bigint, kind text, public_key bytea, sign_count bigint)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -572,8 +486,6 @@ BEGIN
    WHERE k.credential_id = p_credential AND k.revoked_at IS NULL;
 END $$;
 
--- L1/L2: the only way to add a passkey. Bound to the setup session's own redeemed code (app.code_id comes from the
--- signed setup token); one passkey per code; the 24 h cooldown is set here from the code row, not by the caller.
 DROP FUNCTION IF EXISTS register_passkey(bytea, bytea, bigint, text[]);
 CREATE OR REPLACE FUNCTION register_passkey(p_credential bytea, p_public_key bytea, p_sign_count bigint, p_transports text[],
                                             p_first_cooldown_hours int)
@@ -589,12 +501,10 @@ BEGIN
   UPDATE activation_codes SET registered_at = now() WHERE id = c.id;
   RETURN QUERY INSERT INTO passkeys (student_id, kind, credential_id, public_key, sign_count, transports, approve_after, activation_code_id)
     VALUES (c.student_id, c.kind, p_credential, p_public_key, p_sign_count, p_transports,
-            -- reissued codes always wait 24 h; every new passkey waits PASSKEY_FIRST_COOLDOWN_HOURS (M2), whichever is longer
             now() + make_interval(hours => GREATEST(CASE WHEN c.reissue THEN 24 ELSE 0 END, GREATEST(p_first_cooldown_hours, 0))), c.id)
     RETURNING *;
 END $$;
 
--- L1: revocation is one-way (no UPDATE grant on revoked_at, so a key can't be un-revoked).
 CREATE OR REPLACE FUNCTION revoke_own_passkey(p_id bigint) RETURNS SETOF passkeys
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
@@ -603,7 +513,6 @@ BEGIN
    WHERE k.id = p_id AND k.student_id = app_student() AND k.kind = app_role() RETURNING *;
 END $$;
 
--- Regulators: activation-code reissues per institution (insider-impersonation signal on the AICTE dashboard).
 CREATE OR REPLACE FUNCTION activation_reissue_counts() RETURNS TABLE (institution_id text, reissues bigint)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
@@ -611,10 +520,6 @@ BEGIN
   RETURN QUERY SELECT a.institution_id, count(*) FROM activation_codes a WHERE a.reissue GROUP BY a.institution_id;
 END $$;
 
--- A3 shared-student network (regulators only). Joins enrolments on the person row, i.e. the APAAR blind index
--- (students without an APAAR are left out), over the 3 latest academic years <= p_year, and returns COUNTS only:
--- active_shared = active at both in p_year; historical_shared = enrolled at both in the window but not active at both;
--- carousel = students whose enrolments (by admission date) went A -> B -> A.
 CREATE OR REPLACE FUNCTION shared_student_edges(p_year text)
 RETURNS TABLE (inst_a text, inst_b text, active_shared bigint, historical_shared bigint, carousel bigint)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$
@@ -625,7 +530,7 @@ BEGIN
   RETURN QUERY
   WITH win AS (SELECT y.code FROM academic_years y WHERE y.code <= p_year ORDER BY y.code DESC LIMIT 3),
   multi AS (SELECT en.student_id FROM enrolments en WHERE en.academic_year IN (SELECT code FROM win)
-             GROUP BY en.student_id HAVING count(*) > 1),   -- only students seen more than once can link colleges
+             GROUP BY en.student_id HAVING count(*) > 1),
   e AS (SELECT en.id, en.student_id, p.institution_id AS inst, en.status, en.academic_year, en.admission_date
           FROM enrolments en JOIN multi m ON m.student_id = en.student_id JOIN programmes p ON p.id = en.programme_id
           JOIN students s ON s.id = en.student_id
@@ -664,19 +569,16 @@ GRANT EXECUTE ON FUNCTION login_lookup(text), active_enrolment_owners(text[], te
   activation_reissue_counts(), register_passkey(bytea, bytea, bigint, text[], int), revoke_own_passkey(bigint),
   shared_student_edges(text) TO app_user;
 
--- ---------- T-LANDING: public portal numbers, account search, account activation, verifier access requests ----------
--- account_codes: no grants, functions only. access_requests: regulators read (contact fields stay encrypted at rest).
 GRANT SELECT ON access_requests TO app_user;
 ALTER TABLE account_codes ENABLE ROW LEVEL SECURITY; ALTER TABLE account_codes FORCE ROW LEVEL SECURITY;
 ALTER TABLE access_requests ENABLE ROW LEVEL SECURITY; ALTER TABLE access_requests FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS sel ON access_requests;
 CREATE POLICY sel ON access_requests FOR SELECT USING (app_is_regulator());
 
--- Public landing numbers: aggregates only (no institution or student rows). The app suppresses small per-state counts.
 CREATE OR REPLACE FUNCTION public_stats(p_year text) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   WITH rep AS (SELECT DISTINCT b.institution_id FROM upload_batches b JOIN institutions i ON i.id = b.institution_id
-               WHERE b.status = 'completed' AND i.status = 'approved'),  -- "x of N approved" stays consistent
+               WHERE b.status = 'completed' AND i.status = 'approved'),
   stu AS (SELECT p.institution_id, count(*) n FROM enrolments e JOIN programmes p ON p.id = e.programme_id
            WHERE e.academic_year = p_year AND e.status = 'active' GROUP BY 1),
   st AS (SELECT i.state, count(*) FILTER (WHERE i.status = 'approved') institutions, count(rep.institution_id) reporting,
@@ -691,7 +593,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
     'states', coalesce((SELECT jsonb_agg(to_jsonb(st) ORDER BY st.state) FROM st), '[]'::jsonb))
 $$;
 
--- Public sign-in search: registry names + the account id to sign in with (no password data). p_q is LIKE-escaped by the app.
 CREATE OR REPLACE FUNCTION public_account_search(p_q text, p_state text, p_kind text, p_limit int)
 RETURNS TABLE (id text, name text, state text, kind text, login_id text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -708,8 +609,6 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   ORDER BY 2 LIMIT least(greatest(p_limit, 1), 20)
 $$;
 
--- AICTE officer: one-time code that sets the first password of an institution, registrar or verifier account.
--- A new code voids the account's earlier unused codes. Idempotency-Key is scoped to the issuing officer.
 CREATE OR REPLACE FUNCTION issue_account_code(p_user text, p_code_hash text, p_reason text, p_idem text, p_req_hash text)
 RETURNS TABLE (code_id bigint, user_id text, display_name text, replay boolean, expires_at timestamptz)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -735,8 +634,6 @@ BEGIN
   RETURN QUERY SELECT cid, u.id, u.display_name, false, exp;
 END $$;
 
--- Anonymous: burn a code and set the account's password (argon2 hash computed by the app). Nothing comes back on any
--- mismatch. Audited here because anonymous connections can't write audit_logs.
 CREATE OR REPLACE FUNCTION redeem_account_code(p_user text, p_code_hash text, p_password_hash text, p_request_id text)
 RETURNS TABLE (user_id text, role text)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -753,8 +650,6 @@ BEGIN
   RETURN QUERY SELECT p_user, r;
 END $$;
 
--- Anonymous: a verifier organisation asks for access. The app takes the id from the sequence first so the contact
--- ciphertexts can bind it (AAD); only that id (this session's currval) is accepted.
 CREATE OR REPLACE FUNCTION create_access_request(p_id bigint, p_org text, p_name_enc bytea, p_email_enc bytea, p_purpose text,
                                                  p_request_id text) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -766,8 +661,6 @@ BEGIN
   VALUES ('anonymous', 'public', 'access_request.create', 'access_request', p_id::text, p_request_id);
 END $$;
 
--- AICTE officer: approve (creates a verifier account with no password yet) or reject a pending request.
--- A request that is no longer pending comes back unchanged; the app compares the status.
 CREATE OR REPLACE FUNCTION decide_access_request(p_id bigint, p_decision text, p_reason text, p_new_user text)
 RETURNS SETOF access_requests
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$

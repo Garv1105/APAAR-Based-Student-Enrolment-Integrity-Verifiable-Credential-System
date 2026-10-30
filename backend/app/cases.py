@@ -1,5 +1,3 @@
-"""Duplicate-case workflow (PRD §10 step 4-5): list, resolve, unmask with reason.
-Institutions see neutral notices and only their own enrolment ids (F4). Only AICTE officers resolve or unmask."""
 from datetime import datetime, timezone
 
 from . import auth, crypto, webhooks
@@ -9,7 +7,6 @@ OPEN = ("flagged", "under_investigation")
 
 
 def _visible_ids(conn, case: dict) -> list[int]:
-    # enrolments RLS hides other institutions' rows, so this returns the caller's own ids only (all ids for regulators)
     return [r["id"] for r in conn.execute("SELECT id FROM enrolments WHERE id = ANY(%s) ORDER BY id", (case["enrolment_ids"],))]
 
 
@@ -25,7 +22,7 @@ def case_out(conn, case: dict, user: dict) -> dict:
 def _get(conn, case_id: int) -> dict:
     case = conn.execute("SELECT * FROM duplicate_cases WHERE id=%s", (case_id,)).fetchone()
     if not case:
-        raise ApiError(404, "Case not found")  # same answer for "not yours" (no oracle)
+        raise ApiError(404, "Case not found")
     return case
 
 

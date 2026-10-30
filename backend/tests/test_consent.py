@@ -1,4 +1,3 @@
-"""T5.5, T5.6, T5.9: consent requests, consent-scoped VerificationCredentials (D5), student access log (D6)."""
 import csv
 from datetime import date
 from pathlib import Path
@@ -42,12 +41,12 @@ def test_full_consent_flow_minimal_fields_and_transparency_log(client):
     hs = student(client, r["apaar_id"])
     inbox = client.get("/v1/consents", headers=hs).json()
     assert [c["id"] for c in inbox] == [cid] and inbox[0]["requester"].startswith("Kaveri Talent Solutions")
-    assert client.get(f"/v1/consents/{cid}/credential", headers=login(client, "employer")).status_code == 409  # not yet granted
+    assert client.get(f"/v1/consents/{cid}/credential", headers=login(client, "employer")).status_code == 409
 
     ok = client.post(f"/v1/consents/{cid}/approve", json={"otp": OTP}, headers=hs)
     assert ok.status_code == 200, ok.text
     subj = ok.json()["credential"]["credentialSubject"]
-    assert set(subj) == {"name", "programme", "institution", "consent"}   # D5: only the approved fields
+    assert set(subj) == {"name", "programme", "institution", "consent"}
     assert subj["name"] == r["student_name"] and subj["consent"]["purpose"].startswith("Pre-employment")
     assert ok.json()["consent"]["granted_by"] == "student"
 
@@ -59,7 +58,7 @@ def test_full_consent_flow_minimal_fields_and_transparency_log(client):
     assert {("consent.request", "employer"), ("credential.verify", "employer")} <= actions
     assert any(e["action"] == "consent.grant" for e in log)
     assert any(e["reason"] == "consent-credential-fetch" for e in log)
-    client.get("/v1/credentials", headers=hs)  # the student's own wallet views don't clutter their access log
+    client.get("/v1/credentials", headers=hs)
     assert not any(e["action"] == "credential.read" and e["role"] == "student"
                    for e in client.get("/v1/students/me/access-log", headers=hs).json())
     me = client.get("/v1/students/me", headers=hs).json()
@@ -70,20 +69,17 @@ def test_refusals_wrong_otp_denied_revoked_expired(client, dbconn):
     r = adult_a_student(client)
     hs = student(client, r["apaar_id"])
     he = login(client, "employer")
-    # wrong OTP, then deny
     c1 = request_consent(client, r["apaar_id"]).json()["id"]
     assert client.post(f"/v1/consents/{c1}/approve", json={"otp": "000000"}, headers=hs).status_code == 401
     assert client.post(f"/v1/consents/{c1}/deny", headers=hs).json()["status"] == "denied"
     assert client.get(f"/v1/consents/{c1}/credential", headers=he).status_code == 409
     assert client.post(f"/v1/consents/{c1}/approve", json={"otp": OTP}, headers=hs).status_code == 409
-    # granted, then revoked: fetch refused and the credential now verifies as REVOKED
     c2 = request_consent(client, r["apaar_id"], ("status", "apaar_id", "student_id")).json()["id"]
     vc = client.post(f"/v1/consents/{c2}/approve", json={"otp": OTP}, headers=hs).json()["credential"]
     assert set(vc["credentialSubject"]) == {"status", "apaarId", "studentId", "consent"}
     assert client.post(f"/v1/consents/{c2}/revoke", headers=hs).json()["status"] == "revoked"
     assert client.get(f"/v1/consents/{c2}/credential", headers=he).status_code == 403
     assert verify(client, vc) == "REVOKED"
-    # expired: pending can't be approved, granted can't be fetched
     c3 = request_consent(client, r["apaar_id"]).json()["id"]
     c4 = request_consent(client, r["apaar_id"]).json()["id"]
     client.post(f"/v1/consents/{c4}/approve", json={"otp": OTP}, headers=hs)
@@ -111,7 +107,7 @@ def test_isolation_between_verifiers_and_students(client, dbconn):
     assert request_consent(client, r["apaar_id"], user="aicte").status_code == 403
 
 
-VARYING = {"id", "requested_at", "expires_at"}  # per-request values; everything else must be identical
+VARYING = {"id", "requested_at", "expires_at"}
 
 
 def test_registered_and_unregistered_apaar_look_identical_to_the_verifier(client, dbconn):
@@ -128,7 +124,6 @@ def test_registered_and_unregistered_apaar_look_identical_to_the_verifier(client
     f1 = client.get(f"/v1/consents/{real.json()['id']}/credential", headers=he)
     f2 = client.get(f"/v1/consents/{fake.json()['id']}/credential", headers=he)
     assert f1.status_code == f2.status_code == 409 and f1.json() == f2.json()
-    # both are audit-logged; only the real one is linked to (and visible to) the student
     rows = dbconn.execute("SELECT entity_id, student_id FROM audit_logs WHERE action='consent.request' ORDER BY id").fetchall()
     assert [x["entity_id"] for x in rows] == [str(real.json()["id"]), str(fake.json()["id"])]
     assert rows[0]["student_id"] is not None and rows[1]["student_id"] is None
@@ -144,7 +139,7 @@ def test_consent_requests_are_rate_limited_per_verifier(client, dbconn):
         assert request_consent(client, f"9{i:011d}").status_code == 201
     limited = request_consent(client, "100000000001")
     assert limited.status_code == 429 and limited.headers["content-type"] == "application/problem+json"
-    assert request_consent(client, "100000000001", user="employer2").status_code == 201  # per verifier
+    assert request_consent(client, "100000000001", user="employer2").status_code == 201
 
 
 def test_verifier_has_no_direct_sql_access_to_consents(client, dbconn):
@@ -154,7 +149,7 @@ def test_verifier_has_no_direct_sql_access_to_consents(client, dbconn):
     r = adult_a_student(client)
     request_consent(client, r["apaar_id"])
     with db.app_connect({"role": "verifier", "id": "employer"}) as c:
-        assert c.execute("SELECT count(*) n FROM consents").fetchone()["n"] == 0   # RLS: nothing, not even its own rows
+        assert c.execute("SELECT count(*) n FROM consents").fetchone()["n"] == 0
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("INSERT INTO consents (student_id, requester_id, requester_name, purpose, scope_fields, status, expires_at) "
                       "VALUES (1, 'employer', 'x', 'probe', '{name}', 'pending', now() + interval '1 day')")
@@ -169,7 +164,6 @@ def test_verification_credentials_belong_to_the_student_not_the_institution(clie
     st = {"credential_id": vc["id"], "purpose": "suspension", "value": True, "reason": "test"}
     assert client.post("/v1/credentials/status", json=st, headers=ha).status_code == 404
     assert verify(client, vc) == "VALID"
-    # the verifier doesn't learn who approved (guardian would reveal the student is a minor)
     assert all(c["granted_by"] is None for c in client.get("/v1/consents", headers=login(client, "employer")).json())
 
 

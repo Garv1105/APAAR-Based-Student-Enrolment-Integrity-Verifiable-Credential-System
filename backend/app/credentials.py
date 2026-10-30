@@ -1,8 +1,3 @@
-"""W3C Verifiable Credentials 2.0 (PRD §11): trust registry (D4), Bitstring Status List, issuance, verification.
-
-Signing/verification primitives (eddsa-jcs-2022) live in crypto.py and match the official W3C test vectors.
-DIDs are did:web style identifiers on a MOCK demo host; keys are generated locally (prototype only).
-"""
 import base64
 import gzip
 import json
@@ -17,11 +12,11 @@ from . import crypto
 
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 VC_CONTEXT = ["https://www.w3.org/ns/credentials/v2"]
-STATUS_LIST_BITS = 131_072        # W3C Bitstring Status List minimum length (16KB uncompressed)
-AICTE_REGISTRY_DID = "did:web:registry.aicte-demo.in"   # signs registry snapshots (MOCK trust anchor)
+STATUS_LIST_BITS = 131_072
+AICTE_REGISTRY_DID = "did:web:registry.aicte-demo.in"
 AICTE_REGISTRY_KEY = "aicte-registry"
 STUDENT_CREDENTIAL_TYPES = {"EnrolmentCredential", "DegreeCredential", "VerificationCredential"}
-PUBLISHED_TTL = timedelta(hours=24)  # status lists / registry snapshots: offline verifiers must refresh after this
+PUBLISHED_TTL = timedelta(hours=24)
 
 
 class CredentialError(Exception):
@@ -46,11 +41,9 @@ def inst_did(host: str, institution_id: str) -> str:
 
 
 def did_path(did: str) -> str:
-    """did:web:host:inst:X -> inst/X (the path its did.json is served from)."""
     return "/".join(did.split(":")[3:])
 
 
-# ---------- trust registry (seeded by the admin role) ----------
 def seed_trust_registry(conn, cfg: dict) -> None:
     names = {r["id"]: r["name"] for r in conn.execute("SELECT id, name FROM institutions")}
     entries = [(inst_did(cfg["host"], i["institution_id"]), "institution", i["institution_id"], names[i["institution_id"]],
@@ -86,7 +79,6 @@ def registry_entry(r: dict) -> dict:
 
 
 def registry_snapshot(conn) -> dict:
-    """AICTE-signed snapshot of all issuers, for verifiers that cache the registry offline."""
     doc = {"@context": VC_CONTEXT, "type": ["VerifiableCredential", "TrustedIssuerRegistrySnapshot"],
            "issuer": AICTE_REGISTRY_DID, "validFrom": iso(now_utc()), "validUntil": iso(now_utc() + PUBLISHED_TTL),
            "credentialSubject": {"issuers": [registry_entry(r) for r in conn.execute("SELECT * FROM issuer_registry ORDER BY did")]}}
@@ -98,9 +90,7 @@ def registry_public_key() -> str:
     return crypto.public_multikey(crypto.signing_key(AICTE_REGISTRY_KEY))
 
 
-# ---------- Bitstring Status List ----------
 def encode_list(bits: bytes) -> str:
-    """Multibase base64url (no padding) of the GZIP-compressed bitstring (W3C Bitstring Status List §2.1)."""
     return "u" + base64.urlsafe_b64encode(gzip.compress(bytes(bits), mtime=0)).rstrip(b"=").decode()
 
 
@@ -112,7 +102,6 @@ def decode_list(encoded: str) -> bytes:
 
 
 def bit_is_set(bits: bytes, index: int) -> bool:
-    """Index 0 is the left-most bit of the first byte."""
     return bool(bits[index // 8] & (0x80 >> (index % 8)))
 
 
@@ -141,7 +130,6 @@ def _status_entries(revocation_list_id: str, index: int) -> list[dict]:
     return out
 
 
-# ---------- issuance ----------
 def _proof_options(vm: str) -> dict:
     return {"type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "created": iso(now_utc()),
             "verificationMethod": vm, "proofPurpose": "assertionMethod"}
@@ -156,7 +144,6 @@ def _issuer(conn, did: str) -> dict:
 
 
 def year_end(code: str) -> datetime:
-    """'2026-27' -> 2027-07-31T23:59:59Z (end of the academic year)."""
     return datetime(int(code[:4]) + 1, 7, 31, 23, 59, 59, tzinfo=timezone.utc)
 
 
@@ -197,15 +184,14 @@ def vc_hash(vc: dict) -> str:
 
 
 def issue(conn, user: dict, enrolment_id: int, vc_type: str, idempotency_key: str | None = None) -> tuple[dict, bool]:
-    """Returns (credential, replayed). A repeated Idempotency-Key for the same enrolment + type returns the original."""
     req_hash = crypto.sha256_hex(f"{enrolment_id}|{vc_type}".encode())
     if idempotency_key:
-        prev = conn.execute("SELECT * FROM credentials WHERE idempotency_key=%s", (idempotency_key,)).fetchone()  # RLS: own issuer
+        prev = conn.execute("SELECT * FROM credentials WHERE idempotency_key=%s", (idempotency_key,)).fetchone()
         if prev is not None:
             if prev["request_hash"] != req_hash:
                 raise CredentialError(422, "Idempotency-Key was already used for a different credential request")
             return stored_credential(conn, prev), True
-    e = conn.execute("SELECT * FROM enrolments WHERE id=%s", (enrolment_id,)).fetchone()  # RLS: own / affiliated only
+    e = conn.execute("SELECT * FROM enrolments WHERE id=%s", (enrolment_id,)).fetchone()
     if e is None:
         raise CredentialError(404, "Enrolment not found")
     if e["status"] not in ("active", "completed"):
@@ -227,10 +213,9 @@ def issue(conn, user: dict, enrolment_id: int, vc_type: str, idempotency_key: st
         if e["status"] != "completed":
             raise CredentialError(409, "A degree is awarded only for a completed enrolment (the institution marks it completed first)")
         issuer = _issuer(conn, user["issuer_did"])
-        # Req 10: APAAR ID and student ID are both carried (and printed on the certificate)
         subject = {k: v for k, v in d.items() if not k.startswith("_") and k not in ("status",)}
         subject |= {"degree": d["programme"], "awardedOn": date.today().isoformat()}
-        valid_until = None  # degrees don't expire; revocation is via the status list
+        valid_until = None
     else:
         raise CredentialError(422, "Unknown credential type")
     return sign_and_store(conn, issuer_did=issuer["did"], issuer_name=issuer["name"], vc_type=vc_type, subject=subject,
@@ -247,7 +232,6 @@ def credential_status(conn, row: dict) -> dict:
     return {p: bit_is_set(lists[p], row["status_index"]) for p in ("revocation", "suspension")}
 
 
-# ---------- verification (PRD §11.6) ----------
 def verify(conn, vc: dict, at: datetime | None = None) -> dict:
     at = at or now_utc()
     checks = {"well_formed": False, "issuer_trusted": False, "signature_valid": False,
@@ -263,15 +247,12 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
         refs = [(e["statusPurpose"], e["statusListCredential"], int(e["statusListIndex"])) for e in entries]
         if not all(url.startswith(f"{PUBLIC_BASE_URL}/status/") for _, url, _ in refs) or not isinstance(vc["credentialSubject"], dict):
             return out
-        # only student credentials, signed for assertion (not status lists, registry snapshots, ...)
         if not set(vc["type"]) & STUDENT_CREDENTIAL_TYPES or vc["proof"].get("proofPurpose") != "assertionMethod":
             return out
     except (KeyError, TypeError, ValueError, AttributeError):
         return out
     checks["well_formed"] = True
 
-    # 1-2. issuer must be in the AICTE registry, the key must be its active key, and it must have been
-    #      trusted when the credential was issued (closed institutions keep their earlier credentials valid)
     reg = conn.execute("SELECT * FROM issuer_registry WHERE did=%s", (issuer_did,)).fetchone()
     key = next((k for k in (reg["public_keys_json"] if reg else []) if k["id"] == vm_id and k["status"] == "active"), None)
     if reg is None or key is None or not vm_id.startswith(issuer_did + "#"):
@@ -279,11 +260,8 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
         return out
     checks["issuer_trusted"] = (reg["status"] == "active" and reg["valid_from"] <= valid_from
                                 and (reg["valid_until"] is None or valid_from <= reg["valid_until"]))
-    # 3. signature
     checks["signature_valid"] = crypto.eddsa_jcs_2022_verify(vc, crypto.public_from_multikey(key["publicKeyMultibase"]))
-    # 4. validity period
     checks["within_validity"] = valid_from <= at and (valid_until is None or at <= valid_until)
-    # 5. status lists (read live; the same lists are served signed at /status/{id} for offline caching)
     checks["not_revoked"] = checks["not_suspended"] = True
     for purpose, url, index in refs:
         sl = conn.execute("SELECT bits FROM status_lists WHERE id=%s AND issuer_did=%s AND purpose=%s",
@@ -307,13 +285,12 @@ def verify(conn, vc: dict, at: datetime | None = None) -> dict:
         out["result"] = "EXPIRED"
     else:
         out["result"] = "VALID"
-    if checks["signature_valid"]:  # never show unsigned data next to a registered issuer's name
+    if checks["signature_valid"]:
         out["subject"], out["issuer_name"] = vc["credentialSubject"], reg["name"]
     return out
 
 
-# ---------- printed-certificate QR (PRD §11.8): "AV1:" + Base45(zlib(VC JSON)) ----------
-B45 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"  # RFC 9285: the QR alphanumeric charset
+B45 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:"
 QR_PREFIX = "AV1:"
 
 
@@ -331,7 +308,7 @@ def b45encode(data: bytes) -> str:
 
 
 def b45decode(s: str) -> bytes:
-    vals = [B45.index(ch) for ch in s]  # ValueError on characters outside the alphabet
+    vals = [B45.index(ch) for ch in s]
     if len(vals) % 3 == 1:
         raise ValueError("invalid Base45 length")
     out = bytearray()
@@ -350,14 +327,13 @@ def b45decode(s: str) -> bytes:
 
 
 def qr_payload(vc: dict) -> str:
-    # separators without spaces keep the QR small; JCS canonicalisation makes the proof independent of formatting
     return QR_PREFIX + b45encode(zlib.compress(json.dumps(vc, separators=(",", ":"), ensure_ascii=False).encode(), 9))
 
 
 def from_qr_payload(payload: str) -> dict:
     if not payload.startswith(QR_PREFIX):
         raise ValueError("not an AV1 credential QR")
-    raw = zlib.decompressobj().decompress(b45decode(payload[len(QR_PREFIX):]), 64 * 1024)  # cap inflated size
+    raw = zlib.decompressobj().decompress(b45decode(payload[len(QR_PREFIX):]), 64 * 1024)
     return json.loads(raw)
 
 
@@ -370,7 +346,6 @@ def qr_svg(payload: str) -> str:
 
 
 def forged_credential() -> dict:
-    """DEMO: a well-formed credential signed by an issuer that is NOT in the AICTE registry (expected: UNTRUSTED_ISSUER)."""
     did = "did:web:fake-university.example"
     vc = {"@context": VC_CONTEXT, "id": f"urn:uuid:{uuid.uuid4()}", "type": ["VerifiableCredential", "DegreeCredential"],
           "issuer": {"id": did, "name": "Global Open University (unregistered)"}, "validFrom": iso(now_utc()),

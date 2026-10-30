@@ -1,12 +1,3 @@
-"""Public portal + account onboarding (T-LANDING).
-
-- Landing numbers and the sign-in search are public, aggregate / registry data only, throttled per client.
-- Institution, university and verifier accounts get their first password from a one-time code AICTE issues
-  (7 days, keyed hash only, reason required, audited). The plaintext is shown once to the officer, who sends it
-  out of band (MOCK: no email is sent).
-- Verifier organisations ask for access; an AICTE officer approves (creates the account + code) or rejects.
-  Contact name and email are encrypted at rest and only regulators can read them (each read audited).
-"""
 import re
 import secrets
 
@@ -17,7 +8,7 @@ from fastapi import HTTPException
 from . import auth, crypto
 from .ingest import current_year
 
-SUPPRESS_BELOW = 10  # per-state student counts below this are not published
+SUPPRESS_BELOW = 10
 ACTIVATE_FAILED = "Account ID and code don't match, or the code has expired or was already used"
 
 
@@ -29,7 +20,6 @@ def _rid(request):
     return request.state.request_id if request is not None else None
 
 
-# ---------- public ----------
 def public_stats(conn, request=None) -> dict:
     auth.throttle("pubstats:" + _ip(request), 120, 60)
     year = current_year(conn)["code"]
@@ -47,12 +37,11 @@ def search(conn, q: str | None, state: str | None, kind: str, limit: int, reques
     if q is not None and len(q) < 2:
         return []
     if q is None and not state and kind == "institution":
-        return []  # no full listing: type a name or pick a state
+        return []
     like = re.sub(r"([\\%_])", r"\\\1", q) if q else None
     return conn.execute("SELECT * FROM public_account_search(%s, %s, %s, %s)", (like, state or None, kind, limit)).fetchall()
 
 
-# ---------- account codes ----------
 def _code_error(conn, err: psycopg.Error):
     conn.rollback()
     if err.sqlstate == "P0002":
@@ -73,7 +62,7 @@ def issue_code(conn, user: dict, user_id: str, reason: str, idem_key: str | None
             raise e from None
         raise
     out = {"user_id": r["user_id"], "display_name": r["display_name"], "expires_at": r["expires_at"]}
-    if r["replay"]:  # the plaintext was never stored
+    if r["replay"]:
         return out | {"status": "already_issued", "code": None}
     auth.audit(conn, user, "account_code.issue", "account_code", r["code_id"], reason=f"{user_id}: {reason}", request=request)
     if commit:
@@ -82,11 +71,10 @@ def issue_code(conn, user: dict, user_id: str, reason: str, idem_key: str | None
 
 
 def activate(conn, user_id: str, code: str, password: str, request=None) -> dict:
-    """Anonymous. One 401 for every mismatch; 5 attempts per account and 20 per client per 15 minutes."""
     auth.throttle("acctip:" + _ip(request), 20, 15 * 60)
     key = "acct:" + user_id
     auth.throttle(key, 5, 15 * 60)
-    pw_hash = PasswordHasher().hash(password)  # always computed, so hits and misses cost the same
+    pw_hash = PasswordHasher().hash(password)
     r = conn.execute("SELECT * FROM redeem_account_code(%s, %s, %s, %s)",
                      (user_id, crypto.activation_code_hash(code), pw_hash, _rid(request))).fetchone()
     conn.commit()
@@ -96,7 +84,6 @@ def activate(conn, user_id: str, code: str, password: str, request=None) -> dict
     return {"user_id": r["user_id"], "role": r["role"]}
 
 
-# ---------- verifier access requests ----------
 def create_request(conn, body: dict, request=None) -> dict:
     auth.throttle("accreq:" + _ip(request), 5, 60 * 60)
     rid = conn.execute("SELECT nextval('access_requests_id_seq') id").fetchone()["id"]
@@ -115,7 +102,7 @@ def _out(r: dict) -> dict:
 
 
 def list_requests(conn, user: dict, request=None) -> list[dict]:
-    rows = conn.execute("SELECT * FROM access_requests ORDER BY (status = 'pending') DESC, id DESC LIMIT 200").fetchall()  # RLS
+    rows = conn.execute("SELECT * FROM access_requests ORDER BY (status = 'pending') DESC, id DESC LIMIT 200").fetchall()
     for r in rows:
         auth.audit(conn, user, "access_request.read", "access_request", r["id"], request=request)
     conn.commit()
@@ -128,9 +115,7 @@ def _verifier_id(org: str) -> str:
 
 
 def decide(conn, user: dict, req_id: int, decision: str, reason: str, request=None) -> dict:
-    """Idempotent by state: deciding the same way again returns the request (replayed, no new code);
-    the opposite decision on a decided request is a 409."""
-    cur = conn.execute("SELECT status FROM access_requests WHERE id=%s", (req_id,)).fetchone()  # RLS: regulators
+    cur = conn.execute("SELECT status FROM access_requests WHERE id=%s", (req_id,)).fetchone()
     if cur is None:
         raise HTTPException(404, "Access request not found")
     if cur["status"] != "pending":
@@ -140,7 +125,7 @@ def decide(conn, user: dict, req_id: int, decision: str, reason: str, request=No
         return {"request": _out(r), "account": None, "replayed": True}
     new_user = _verifier_id(conn.execute("SELECT organisation FROM access_requests WHERE id=%s", (req_id,)).fetchone()["organisation"])
     r = conn.execute("SELECT * FROM decide_access_request(%s, %s, %s, %s)", (req_id, decision, reason, new_user)).fetchone()
-    if r["status"] != decision:  # decided concurrently by someone else
+    if r["status"] != decision:
         conn.rollback()
         raise HTTPException(409, f"Request was already {r['status']}")
     auth.audit(conn, user, f"access_request.{decision}", "access_request", req_id, reason=reason, request=request)

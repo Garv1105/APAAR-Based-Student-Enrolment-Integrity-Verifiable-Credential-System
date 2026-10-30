@@ -1,9 +1,3 @@
-"""Req 9 reports for policy, accreditation, monitoring and regulation (PRD §14). Aggregates only: no names,
-APAARs or dates of birth. Every query runs on the caller's RLS connection, so an institution only ever
-sees its own programmes. Rendering to CSV (with formula-injection neutralisation) happens in main.py.
-
-Each builder returns (header, rows).
-"""
 from . import ledger
 from .ingest import current_year
 
@@ -50,7 +44,7 @@ def accreditation(conn, institution_id: str) -> tuple[list[str], list[dict]]:
         "SELECT coalesce(sum((b.row_counts_json->>'rows')::int), 0) AS rows_submitted, "
         "coalesce(sum((b.row_counts_json->>'rejected')::int), 0) AS rows_rejected "
         "FROM upload_batches b WHERE b.institution_id = %s", (institution_id,)).fetchone()
-    for r in rows:  # institution-level data quality, repeated on each programme row for a flat CSV
+    for r in rows:
         r["institution_rows_submitted"] = issues["rows_submitted"]
         r["institution_rows_rejected"] = issues["rows_rejected"]
     header = ["institution_id", "institution", "state", "approval_status", "programme_code", "programme", "academic_year",
@@ -107,8 +101,6 @@ def category_utilisation(conn) -> tuple[list[str], list[dict]]:
 
 
 def excess_case_file(conn) -> tuple[list[str], list[dict]]:
-    """One row per over-cap admission flagged at upload (E301/E302), with the programme's current position and
-    the seat ledger's integrity status, so an enforcement case can cite verifiable evidence."""
     year = current_year(conn)["code"]
     lv = ledger.verify(conn)
     cp = conn.execute("SELECT upto_seq, root_hash, published_at FROM ledger_checkpoints ORDER BY id DESC LIMIT 1").fetchone()

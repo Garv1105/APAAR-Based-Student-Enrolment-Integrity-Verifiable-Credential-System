@@ -1,28 +1,16 @@
-"""A1: peer-group baselines with national false-alarm control (docs/ANOMALY_V2_SPEC.md §A1). Pure functions.
-
-Each programme (and each institution, for institution-level metrics) is compared with SIMILAR units this year:
-peer robust z -> one-sided p-value -> Benjamini-Hochberg across every test in the country (FDR_Q) -> flag only if
-the test survives BH AND the gap to the peer median is practically large (MIN_GAP). Peers stay anonymous: the
-evidence holds only the peer median, MAD and count.
-
-Which metric is tested (so a programme that is simply full every year is never flagged):
-  fill:     no own history -> fill_ratio (the new-college case);  with history -> fill_growth (vs own median)
-  foreign:  no own history -> foreign_share;                      with history -> foreign_share_change
-  institution-level, once per institution: rejection_rate, late_share
-"""
 import statistics
 from collections import defaultdict
 
 from . import stats
 from .rules import LABEL
 
-MIN_PEERS = 8          # smallest peer group the comparison is allowed to use
-FDR_Q = 0.05           # Benjamini-Hochberg false discovery rate across all tests nationally
-SIZE_BANDS = ((60, "S"), (180, "M"))  # approved intake <= 60 -> S, <= 180 -> M, else L
+MIN_PEERS = 8
+FDR_Q = 0.05
+SIZE_BANDS = ((60, "S"), (180, "M"))
 FLOORS = {"fill_ratio": 0.03, "fill_growth": 0.03, "foreign_share": 0.02, "foreign_share_change": 0.02,
-          "rejection_rate": 0.02, "late_share": 0.05}       # MAD floor per metric (no hair-trigger on uniform peers)
+          "rejection_rate": 0.02, "late_share": 0.05}
 MIN_GAP = {"fill_ratio": 0.15, "fill_growth": 0.15, "foreign_share": 0.10, "foreign_share_change": 0.10,
-           "rejection_rate": 0.10, "late_share": 0.30}      # minimum practical gap above the peer median
+           "rejection_rate": 0.10, "late_share": 0.30}
 METRIC_LABEL = {"fill_ratio": "fill ratio", "fill_growth": "fill growth", "foreign_share": "foreign-pool share",
                 "foreign_share_change": "foreign-pool share change", "rejection_rate": "rejected-row rate",
                 "late_share": "share of rows uploaded in the last 24 h"}
@@ -38,7 +26,6 @@ def size_band(intake: float | None) -> str:
 
 
 def programme_metrics(r: dict) -> tuple[dict, list[str]]:
-    """(available metric values, metrics to TEST) for one programme row."""
     vals, tested = {}, []
     hist = r.get("history_fills") or []
     if r.get("fill") is not None:
@@ -56,7 +43,6 @@ def programme_metrics(r: dict) -> tuple[dict, list[str]]:
 
 
 def group_index(units: list[dict], levels) -> dict:
-    """(level, metric, key) -> [(unit index, value)], built once so each test is a lookup, not a scan of every unit."""
     idx = defaultdict(list)
     for j, u in enumerate(units):
         for name, key in levels:
@@ -67,7 +53,6 @@ def group_index(units: list[dict], levels) -> dict:
 
 
 def peer_group(i: int, units: list[dict], metric: str, levels, index: dict | None = None) -> tuple[str, list[float]] | None:
-    """Most specific level with >= MIN_PEERS peers that have this metric (the unit itself excluded)."""
     index = group_index(units, levels) if index is None else index
     for name, key in levels:
         peers = [v for j, v in index.get((name, metric, key(units[i])), ()) if j != i]
@@ -86,9 +71,6 @@ def _where(level: str, u: dict) -> str:
 
 
 def peer_flags(programmes: list[dict], institutions: list[dict]) -> dict:
-    """programmes: {institution_id, programme, state, approved_intake, fill, history_fills[], foreign_share,
-    history_foreign_shares[]}; institutions: {institution_id, state, total_intake, rejection_rate, late_share}.
-    Returns {"flags": [...], "tests": n, "insufficient": n} where insufficient counts tests skipped for lack of peers."""
     prog_units, inst_units = [], []
     for r in programmes:
         vals, tested = programme_metrics(r)

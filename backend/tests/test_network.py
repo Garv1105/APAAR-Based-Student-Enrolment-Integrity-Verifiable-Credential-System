@@ -1,4 +1,3 @@
-"""A3: shared-student network. Pure analysis on hand-made graphs, plus the regulator-only SQL function on the test DB."""
 import csv
 import json
 import re
@@ -44,11 +43,11 @@ def test_planted_ring_with_carousel_flags_all_four_colleges():
 
 
 def test_negative_controls_are_not_flagged():
-    assert network.analyse([edge("A", "B", hist=2)], {"A": 100, "B": 100})["flags"] == []      # 2 migrations: weight 1
+    assert network.analyse([edge("A", "B", hist=2)], {"A": 100, "B": 100})["flags"] == []
     out = network.analyse([edge("A", "B", hist=1), edge("B", "C", hist=1)], {"A": 100, "B": 100, "C": 100})
-    assert out["flags"] == [] and not any(e["kept"] for e in out["edges"])                      # thin chain
+    assert out["flags"] == [] and not any(e["kept"] for e in out["edges"])
     big = network.analyse(complete("XYZ", act=1, hist=4), {"X": 50_000, "Y": 50_000, "Z": 50_000})
-    assert big["flags"] == [] and big["components"][0]["shared_ratio"] < network.RING_SHARED_RATIO  # proportional sharing
+    assert big["flags"] == [] and big["components"][0]["shared_ratio"] < network.RING_SHARED_RATIO
 
 
 def test_seat_blocking_for_pairs_outside_rings():
@@ -59,17 +58,17 @@ def test_seat_blocking_for_pairs_outside_rings():
 def test_active_sharing_inside_a_ring_is_part_of_the_ring_flag():
     ring = list("ABCD")
     out = network.analyse(complete(ring, act=6), {n: 200 for n in ring})
-    assert kinds(out["flags"]) == [("SHARED_STUDENT_RING", n) for n in ring]       # no separate SEAT_BLOCKING
+    assert kinds(out["flags"]) == [("SHARED_STUDENT_RING", n) for n in ring]
     f = out["flags"][0]
     assert f["evidence"]["active_shared_inside"] == 36 and "36 of them are active at two of these colleges" in f["explanation"]
 
 
 def test_ring_detection_uses_the_2_core_so_attached_chains_are_not_flagged():
     ring = list("ABCD")
-    chain = [edge("D", "E", hist=6), edge("E", "F", hist=6), edge("F", "G", hist=6), edge("G", "H", hist=6)]  # kept, thin
+    chain = [edge("D", "E", hist=6), edge("E", "F", hist=6), edge("F", "G", hist=6), edge("G", "H", hist=6)]
     out = network.analyse(complete(ring, act=3) + chain, {n: 100 for n in "ABCDEFGH"})
     assert kinds(out["flags"]) == [("SHARED_STUDENT_RING", n) for n in ring]
-    assert all(e["kept"] for e in out["edges"][-4:])                                # the chain edges are kept, just not a ring
+    assert all(e["kept"] for e in out["edges"][-4:])
 
 
 def _conn(user):
@@ -81,7 +80,7 @@ def test_sql_edges_regulator_only_and_counts(client, dbconn):
     upload(client, "inst-b", "B1.csv")
     with _conn({"role": "aicte_officer", "id": "aicte"}) as c:
         rows = c.execute("SELECT * FROM shared_student_edges('2026-27')").fetchall()
-    assert [(r["inst_a"], r["inst_b"], r["active_shared"]) for r in rows] == [(A, B, 5)]   # 3 injected + 2 un-withdrawn moves
+    assert [(r["inst_a"], r["inst_b"], r["active_shared"]) for r in rows] == [(A, B, 5)]
     with _conn({"role": "institution_admin", "institution_id": A, "id": "inst-a"}) as c:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             c.execute("SELECT * FROM shared_student_edges('2026-27')")
@@ -112,7 +111,7 @@ def test_network_endpoint_is_regulator_only_and_has_no_student_data(client):
     assert r.status_code == 200, r.text
     out = r.json()
     assert [(e["inst_a"], e["inst_b"], e["active_shared"], e["kept"]) for e in out["edges"]] == [(A, B, 5, True)]
-    assert kinds(out["flags"]) == [("SEAT_BLOCKING", A), ("SEAT_BLOCKING", B)]               # a pair, not a ring
+    assert kinds(out["flags"]) == [("SEAT_BLOCKING", A), ("SEAT_BLOCKING", B)]
     assert {n["id"] for n in out["nodes"] if n["connected"]} == {A, B} and "multi-year" in out["note"]
     names = {row["student_name"] for f in ("A1.csv", "B1.csv") for row in csv.DictReader(open(SYN / f, encoding="utf-8"))}
     text = json.dumps(out)

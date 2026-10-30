@@ -2,7 +2,6 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
-// API calls go to /v1/* and are proxied to the FastAPI backend, so no CORS in dev.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {

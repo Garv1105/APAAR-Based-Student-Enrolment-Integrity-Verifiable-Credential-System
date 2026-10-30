@@ -6,7 +6,6 @@ import { Button, Card, ErrorNote, fmtTime, go, Loading, PageHeader, Stat } from 
 
 type Sev = "error" | "warning" | "flag";
 
-/** What each severity means for the row, in the institution's words. */
 const SEV: Record<Sev, { label: string; meaning: string; chip: string; icon: typeof XCircle; ring: string }> = {
   error: { label: "Rejected", meaning: "These rows were not saved. Fix them and upload those rows again.",
     chip: "bg-critical/15 text-critical-text ring-critical/40", icon: XCircle, ring: "border-critical/40" },
@@ -43,7 +42,6 @@ export default function BatchDetail({ id }: { id: number }) {
     })();
   }, [id, lang]);
 
-  // one group per problem type, worst first, then the most rows first
   const groups = useMemo(() => {
     const by = new Map<string, S["Issue"][]>();
     for (const i of issues) by.set(i.code, [...(by.get(i.code) ?? []), i]);
@@ -152,7 +150,6 @@ function Summary({ c }: { c: S["BatchOut"]["counts"] }) {
   );
 }
 
-/** One problem type: what it means, how to fix it, and the affected rows in a fixed-height, searchable box. */
 function Detail({ items }: { items: S["Issue"][] }) {
   const [find, setFind] = useState("");
   const first = items[0];

@@ -1,14 +1,3 @@
-"""Load a generated synthetic world (MOCK, apaar_world/) through the real API, in manifest order.
-
-  1. reseed with the world:   set WORLD_DIR=<world>  then  .venv\\Scripts\\python.exe -m app.seed --reset   (from backend/)
-  2. start the API with the same WORLD_DIR and DEMO_MODE=true (the APAAR mock and the upload clock need them)
-  3. .venv\\Scripts\\python.exe tools/load_world.py --dir <world>
-  4. .venv\\Scripts\\python.exe tools/eval_world.py --dir <world>
-
-Uploads go through POST /v1/batches as each college's own user, so validation, counters, ledger, features, duplicate
-cases and audit rows all come from the real code. Each upload sends X-Demo-Upload-Time = the step's planned_upload_at
-(honoured only with DEMO_MODE=true) so deadline features see the planned time. Data stays outside the repo.
-"""
 import argparse
 import hashlib
 import json
@@ -53,7 +42,6 @@ for step in m["steps"]:
         if a.limit and done >= a.limit:
             break
     elif step["op"] == "patch":
-        # the institution's own lookup: GET /v1/enrolments?apaar= (RLS limits it to the caller's enrolments)
         r = c.get("/v1/enrolments", headers=tok(step["user"]), params={"apaar": step["apaar"]})
         ids = [e["id"] for e in r.json() if e["status"] == "active"] if r.status_code == 200 else []
         if len(ids) != 1:

@@ -1,5 +1,3 @@
-// Passkeys with the browser's native WebAuthn API (no library). The server sends options as JSON (base64url);
-// newer browsers parse them natively, older ones use the small converters below.
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 const toBuf = (s: string) =>
@@ -33,7 +31,6 @@ export async function getPasskey(options: any) {
   return toJSON(await navigator.credentials.get({ publicKey }));
 }
 
-/** Readable message for the common browser errors (user cancelled, wrong origin, no authenticator). */
 export function passkeyError(e: unknown): string | null {
   if (e instanceof DOMException) {
     if (e.name === "NotAllowedError") return "Passkey prompt was cancelled or timed out.";

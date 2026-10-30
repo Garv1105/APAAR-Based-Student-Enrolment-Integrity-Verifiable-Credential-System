@@ -1,4 +1,3 @@
-// Data quality score (DQS), warning signs (anomaly flags) and the inspection priority list, in plain language.
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { ApiError, getJson, sendJson, type S } from "./api/client";
@@ -20,7 +19,6 @@ export const COMPONENT_HELP: Record<string, string> = {
   declarations: "Lower when declared intake differs from AICTE approval or records change after the deadline.",
 };
 
-/** Each warning sign: short name, what it means, why it matters. */
 export const FLAG_INFO: Record<string, { label: string; meaning: string; why: string }> = {
   ENROLMENT_SPIKE: { label: "Sudden jump in admissions", meaning: "This year's fill is far above the college's own last three years.",
     why: "Can mean seats were filled with students who aren't really there." },
@@ -115,7 +113,6 @@ export function FlagList({ flags, canReview = false, onChange, names }: {
   );
 }
 
-/** Inspector decision with a written reason (audited). */
 function ReviewBox({ flagKey, onDone }: { flagKey: string; onDone?: () => void }) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -143,7 +140,6 @@ function ReviewBox({ flagKey, onDone }: { flagKey: string; onDone?: () => void }
   );
 }
 
-/** How reliable each warning sign has proven in inspectors' reviews; reliable signs count more in the priority list. */
 export function RulePerformanceCard() {
   const p = usePoll(() => getJson<S["RulePerformance"]>("/v1/rules/performance"), 30000);
   return (
@@ -182,7 +178,6 @@ export function RulePerformanceCard() {
 type Bucket = "High" | "Medium" | "Low" | "No data";
 const BUCKET_TONE: Record<Bucket, Tone> = { High: "error", Medium: "warning", Low: "ok", "No data": "neutral" };
 
-/** Top 10% of ranked colleges = High, next 20% = Medium, rest = Low; colleges with nothing uploaded = No data. */
 export function withBuckets(q: S["InspectionEntry"][]) {
   const ranked = q.filter((e) => e.risk != null).sort((a, b) => (b.risk ?? 0) - (a.risk ?? 0));
   const pos = new Map(ranked.map((e, i) => [e.institution_id, i / Math.max(ranked.length, 1)]));
@@ -193,7 +188,6 @@ export function withBuckets(q: S["InspectionEntry"][]) {
   }).sort((a, b) => (a.risk == null ? 1 : 0) - (b.risk == null ? 1 : 0) || (b.risk ?? 0) - (a.risk ?? 0));
 }
 
-/** AICTE: which colleges to inspect first, and why. */
 export function InspectionList({ canReview = false }: { canReview?: boolean }) {
   const q = usePoll(() => getJson<S["InspectionEntry"][]>("/v1/inspection-queue"), 30000);
   const [open, setOpen] = useState<string | null>(null);
@@ -272,7 +266,6 @@ function reasons(e: S["InspectionEntry"] & { bucket: Bucket }): ReactNode {
   return parts.length ? parts.join(" · ") : "No problems found.";
 }
 
-/** All warning signs nationally, grouped by kind. */
 export function WarningSignsCard({ canReview = false, names }: { canReview?: boolean; names: Record<string, string> }) {
   const flags = usePoll(() => getJson<S["AnomalyFlag"][]>("/v1/anomalies"), 30000);
   const [kind, setKind] = useState<string | null>(null);

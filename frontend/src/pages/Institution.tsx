@@ -15,11 +15,6 @@ import { AnimatedCounter, Badge, Button, Empty, ErrorNote, go, Loading, Ring, Sp
 const pct = (n: number, d: number) => (d ? Math.round((100 * n) / d) : 0);
 const GOLD_TEXT = "bg-gradient-to-b from-[#FBE7A1] via-[#E2BC4A] to-[#C9982A] bg-clip-text text-transparent";
 
-/**
- * Institution dashboard, laid out as an editorial page rather than a grid of cards: an identity hero, one instrument
- * band of live figures, then numbered open sections. Only the upload console sits on a surface, because that is where
- * the user acts.
- */
 export default function InstitutionHome() {
   const { data, error, refresh } = usePoll(() => getJson<S["InstitutionDashboard"]>("/v1/dashboard/institution"));
   const risk = usePoll(() => getJson<S["InstitutionRisk"]>("/v1/dqs"), 10000);
@@ -31,7 +26,7 @@ export default function InstitutionHome() {
   const active = Object.values(cov).reduce((a, b) => a + b, 0);
   const verified = cov.VERIFIED ?? 0;
   const withoutApaar = (cov.REFUSED ?? 0) + (cov.NOT_GENERATED ?? 0) + (cov.PENDING ?? 0);
-  const chrono = [...data.batches].reverse(); // API returns newest first
+  const chrono = [...data.batches].reverse();
   const year = data.programmes[0]?.academic_year;
   const regFilled = data.programmes.reduce((a, p) => a + (p.lines.find((l) => l.category_code === "REGULAR")?.filled ?? 0), 0);
   const intake = data.programmes.reduce((a, p) => a + p.approved_intake, 0);
@@ -40,7 +35,6 @@ export default function InstitutionHome() {
 
   return (
     <div className="pb-6">
-      {/* ---------- hero ---------- */}
       <header className="relative grid gap-10 pt-2 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_250px_350px] xl:items-center">
         <div className="rise min-w-0">
           <p className="flex items-center gap-3 text-[12.5px] font-semibold uppercase tracking-[0.26em] text-slate-600">
@@ -64,7 +58,6 @@ export default function InstitutionHome() {
       </header>
       {error && <div className="mt-6"><ErrorNote>{error}</ErrorNote></div>}
 
-      {/* ---------- instrument band ---------- */}
       <section aria-label="Key figures" className="relative mt-12 border-y border-white/[0.07] bg-gradient-to-r from-gold/[0.05] via-transparent to-gold/[0.05]">
         <dl className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
           <Figure n={0} icon={Users} k="Enrolments" v={<AnimatedCounter value={active} />}
@@ -114,7 +107,6 @@ export default function InstitutionHome() {
   );
 }
 
-/* ---------- layout primitives ---------- */
 
 function Section({ id, title, lede, aside, children }: { id: string; title: string; lede?: string; aside?: ReactNode; children: ReactNode }) {
   return (
@@ -157,7 +149,6 @@ function Figure({ n, icon: Icon, k, v, note, visual, tone }: { n: number; icon: 
   );
 }
 
-/* ---------- AICTE bulletin ---------- */
 
 function Bulletin({ notices }: { notices: string[] }) {
   return (
@@ -192,7 +183,6 @@ function Bulletin({ notices }: { notices: string[] }) {
   );
 }
 
-/* ---------- 01 upload: drop zone + validation pipeline ---------- */
 
 const PIPELINE = [
   ["Format & columns", "18-column template, field types and required values."],
@@ -291,11 +281,7 @@ function Upload({ onDone }: { onDone: () => void }) {
   );
 }
 
-/* ---------- 02 seats ---------- */
 
-// Category colours. The base hues are validated with the dataviz palette checker (colour-blind safe on the dark
-// surface, all pairs); each is drawn as a two-tone gradient around its base. Shared by the seat bars and the donut,
-// so a colour means the same category everywhere on the page.
 const CAT = { regular: "#7c6cff", sn: "#ec4899", ciwg: "#cf7a00" } as const;
 const GRAD = {
   regular: ["#5b48ff", "#a99cff"],
@@ -344,9 +330,8 @@ function Seats({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   );
 }
 
-/** One category line: coloured fill within the cap, red for seats beyond it. */
 export function SeatBar({ line, color = "var(--color-gold)", thick = false }: { line: S["SeatLine"]; color?: string; thick?: boolean }) {
-  const on = useMounted(); // bars grow in from zero on first paint
+  const on = useMounted();
   const max = Math.max(line.cap, line.filled, 1);
   const within = on ? Math.min(line.filled, line.cap) : 0;
   return (
@@ -358,7 +343,6 @@ export function SeatBar({ line, color = "var(--color-gold)", thick = false }: { 
   );
 }
 
-/** Supernumerary quota: FN/OCI part in magenta, CIWG part in amber, over-quota in red. */
 function SnBar({ sn, ciwg }: { sn: S["SeatLine"]; ciwg?: S["SeatLine"] }) {
   const on = useMounted();
   const max = Math.max(sn.cap, sn.filled, 1);
@@ -399,7 +383,6 @@ function Categories({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
                 </linearGradient>
               ))}
             </defs>
-            {/* no animation: the dashboard polls every 3s and would replay it */}
             <Pie data={parts.filter((p) => p.value > 0)} dataKey="value" innerRadius="78%" outerRadius="100%" paddingAngle={3} cornerRadius={4}
               stroke="none" startAngle={90} endAngle={-270} isAnimationActive={false}>
               {parts.filter((p) => p.value > 0).map((p) => <Cell key={p.name} fill={`url(#cat-${p.key})`} />)}
@@ -428,7 +411,6 @@ function Categories({ programmes }: { programmes: S["ProgrammeSeats"][] }) {
   );
 }
 
-/* ---------- 03 data quality + anomalies ---------- */
 
 const EMERALD = "#1fe39a";
 const scoreTone = (s: number) => (s >= 85 ? { c: EMERALD, t: "text-success-text", w: "Good" } : s >= 65
@@ -452,7 +434,6 @@ function Quality({ risk, error }: { risk: S["InstitutionRisk"] | null; error: st
               <span className="pb-1 text-[20px] font-semibold text-slate-500">/ 100</span>
             </p>
             <p className={`mt-4 font-display text-[22px] font-bold ${tone.t}`}>{tone.w}</p>
-            {/* scale with the same thresholds as the tone: <65 needs attention, 65-84 fair, 85+ good */}
             <div className="relative mt-6" role="img" aria-label={`Score ${Math.round(d.score)} on a 0 to 100 scale; 85 and above is good, 65 to 84 fair`}>
               <div className="flex h-2 gap-[3px] overflow-hidden rounded-full">
                 <span className="h-full w-[65%] bg-critical/45" /><span className="h-full w-[20%] bg-warning/50" /><span className="h-full w-[15%] bg-success/60" />
@@ -512,7 +493,6 @@ function Quality({ risk, error }: { risk: S["InstitutionRisk"] | null; error: st
   );
 }
 
-/* ---------- 04 upload history: a timeline instead of a table ---------- */
 
 const STATUS_TONE = { completed: "ok", processing: "warning", failed: "error" } as const;
 
@@ -559,7 +539,6 @@ function History({ batches }: { batches: S["BatchOut"][] }) {
   );
 }
 
-/* ---------- 05 reports & tools ---------- */
 
 function Tools() {
   const [error, setError] = useState<string | null>(null);

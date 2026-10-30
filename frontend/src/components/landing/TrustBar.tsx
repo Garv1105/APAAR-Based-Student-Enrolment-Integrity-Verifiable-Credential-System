@@ -7,7 +7,6 @@ const ITEMS = [
   [FileCheck, "Better Access for Students"],
 ] as const;
 
-/** Micro-trust row under the hero buttons. */
 export default function TrustBar() {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-3">

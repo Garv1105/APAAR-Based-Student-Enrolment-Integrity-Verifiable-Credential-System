@@ -1,7 +1,3 @@
-"""Load the MOCK AICTE registry + demo users into a fresh database.
-`py -m app.seed --reset` drops all rows and reseeds (demo/test only).
-WORLD_DIR=<dir> (environment only, never .env) adds a generated world's <dir>/seed/registry.json on top of the repo registry.
-"""
 import json
 import os
 import sys
@@ -14,18 +10,15 @@ from . import credentials, db
 from .validation import caps_for
 
 SEED = Path(__file__).resolve().parent.parent / "data/seed/registry.json"
-DEMO_PASSWORD = "demo"  # seeded identity provider is MOCK
+DEMO_PASSWORD = "demo"
 
 
 def world_seed_dir() -> Path | None:
-    """Generated national world (MOCK, synthetic). Read from the process environment only, so tests never pick it up."""
     d = os.environ.get("WORLD_DIR")
     return Path(d) / "seed" if d else None
 
 
 def load_registry() -> dict:
-    """Repo registry + optional world overlay: lists are concatenated (exact duplicates dropped), so the world adds colleges
-    and users while seat categories, academic years and the demo users (aicte, auditor, ...) come from the repo."""
     s = json.loads(SEED.read_text())
     if (d := world_seed_dir()) is None:
         return s
@@ -71,7 +64,7 @@ def seed(conn, s: dict | None = None) -> None:
 
 def main(name: str = db.DB_NAME) -> None:
     db.create_database(name)
-    if "--reset" in sys.argv:  # demo DB only: rebuild schema so it tracks schema.sql
+    if "--reset" in sys.argv:
         with db.connect(name) as conn:
             conn.execute("DROP SCHEMA public CASCADE; CREATE SCHEMA public")
     db.load_schema(name)

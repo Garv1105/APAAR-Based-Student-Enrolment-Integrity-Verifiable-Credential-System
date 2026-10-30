@@ -1,4 +1,3 @@
-"""T-AI: Gemini explainer. Advisory, allow-listed aggregates only, rule-based fallback, cached, audited."""
 import csv
 import json
 import re
@@ -11,7 +10,7 @@ from conftest import login
 from test_api import upload
 
 SYN = Path(__file__).resolve().parent.parent / "data/synthetic"
-REAL_CALL = ai._call  # captured at import, before the conftest stub replaces it per test
+REAL_CALL = ai._call
 
 
 def _capture(monkeypatch, reply="AI SUMMARY"):
@@ -34,11 +33,11 @@ def test_upload_summary_sends_no_personal_data_and_is_cached(client, dbconn, mon
     h = login(client, "inst-b")
     r1, r2 = client.post(f"/v1/ai/upload-summary/{bid}", headers=h), client.post(f"/v1/ai/upload-summary/{bid}", headers=h)
     assert r1.json()["source"] == "gemini" and r1.json()["text"] == "AI SUMMARY" and not r1.json()["cached"]
-    assert r2.json()["cached"] and len(seen) == 1                                   # second answer from the cache
+    assert r2.json()["cached"] and len(seen) == 1
     sent = seen[0]
     rows = list(csv.DictReader(open(SYN / "B1.csv", encoding="utf-8")))
-    assert not re.search(r"\d{12}", sent)                                           # no APAAR IDs
-    for r in rows:                                                                  # no names, guardians, DOBs, student IDs
+    assert not re.search(r"\d{12}", sent)
+    for r in rows:
         for f in ("student_name", "guardian_name", "dob", "institution_student_id"):
             if r.get(f):
                 assert r[f] not in sent, f
@@ -71,7 +70,7 @@ def test_gemini_call_uses_header_key_and_survives_errors(monkeypatch):
     assert "test-key-123" not in sent["url"] and sent["headers"]["x-goog-api-key"] == "test-key-123"
     assert sent["body"]["generationConfig"]["temperature"] <= 0.3
     monkeypatch.setattr(httpx, "post", lambda *a, **k: httpx.Response(429, json={}))
-    assert REAL_CALL({"a": 1}, "task") is None                                       # free-tier limit -> fallback
+    assert REAL_CALL({"a": 1}, "task") is None
 
     def boom(*a, **k):
         raise httpx.ConnectTimeout("slow")
@@ -101,7 +100,6 @@ def test_map_columns_suggests_and_refuses_data(client, monkeypatch):
     for data_row in (["934098168005", "Pratik Jadhav"], ["Name", "2008-08-27"], ["x@college.example"]):
         bad = client.post("/v1/ai/map-columns", json={"headers": data_row}, headers=h)
         assert bad.status_code == 422 and bad.headers["content-type"].startswith("application/problem+json")
-    # the model's suggestions are checked: an unknown or repeated column falls back to the rule match
     monkeypatch.setattr(ai, "enabled", lambda: True)
     monkeypatch.setattr(ai, "_call", lambda facts, task, **k: json.dumps({"Name of Student": "student_name", "Branch": "not_a_column",
                                                                          "Year": "student_name"}))
@@ -115,7 +113,7 @@ def test_every_language_keeps_placeholders_and_codes():
     en = catalogue("en")
     keep = __import__("re").compile(r"\{[a-z]+\}|\b[a-z]+_[a-z_]+\b|\b[A-Z][A-Z_]{2,}\b|YYYY-MM-DD")
     locales = sorted(p.stem for p in DIR.glob("*.json") if p.stem != "en")
-    assert set(ai.LANGS) - {"en"} <= set(locales)                                   # a catalogue for every AI language
+    assert set(ai.LANGS) - {"en"} <= set(locales)
     for loc in locales:
         cat = catalogue(loc)
         for code, e in en.items():
@@ -143,7 +141,7 @@ def test_report_summaries_for_regulators(client, monkeypatch):
     r = client.post("/v1/ai/report-summary/excess-case-file?lang=ta", headers=h)
     facts, task = seen[0]
     assert r.json()["source"] == "gemini" and "Tamil" in task and "Latin" in task
-    assert not re.search(r"\d{12}", facts) and "row_no" not in facts                 # aggregates only
+    assert not re.search(r"\d{12}", facts) and "row_no" not in facts
 
 
 def test_unknown_language_is_rejected(client):

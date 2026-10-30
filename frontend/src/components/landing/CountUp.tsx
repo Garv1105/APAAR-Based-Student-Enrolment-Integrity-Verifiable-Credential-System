@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-/** Counts up from 0 once the value arrives (eased, ~1.2 s); shows the final value at once when motion is reduced. */
 export default function CountUp({ value }: { value: number }) {
   const [shown, setShown] = useState(0);
   useEffect(() => {

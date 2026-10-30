@@ -1,4 +1,3 @@
-"""P1: passkey consent. DEMO_MODE off; a software authenticator stands in for the browser + device."""
 from datetime import date, timedelta
 
 import pytest
@@ -8,9 +7,9 @@ from conftest import login
 from softauthn import ORIGIN, SoftAuthenticator
 from test_api import upload
 
-ADULT = "328865551724"      # Asha Joshi, DOB 2006-11-05 (19 in 2026)
-ADULT_2 = "277145114059"    # DOB 2007-09-16
-TEEN = "692210657021"       # DOB 2008-05-31: 17 on 2026-05-01, 18 on 2026-05-31
+ADULT = "328865551724"
+ADULT_2 = "277145114059"
+TEEN = "692210657021"
 REASON = "Student verified in person at the admissions office"
 
 
@@ -19,7 +18,7 @@ def pk(client, monkeypatch):
     monkeypatch.setenv("DEMO_MODE", "false")
     monkeypatch.setenv("WEBAUTHN_RP_ID", "localhost")
     monkeypatch.setenv("WEBAUTHN_ORIGINS", ORIGIN)
-    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "0")  # most tests approve right after activation; cooldown tests set it
+    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "0")
     upload(client, "inst-a", "A1.csv")
     return client
 
@@ -38,7 +37,6 @@ def activate(client, apaar, code):
 
 
 def setup(client, apaar, kind="student"):
-    """Institution issues a code; the student (or guardian) activates and registers a passkey. Returns the authenticator."""
     code = issue(client, apaar, kind).json()["code"]
     s = activate(client, apaar, code)
     assert s.status_code == 200, s.text
@@ -81,7 +79,7 @@ def test_knowing_the_dob_no_longer_gets_you_in(pk, dbconn):
     a = setup(pk, ADULT)
     h = session(pk, a)
     cid = request_consent(pk, ADULT)
-    r = pk.post(f"/v1/consents/{cid}/approve", json={"otp": "123456"}, headers=h)   # the old MOCK body
+    r = pk.post(f"/v1/consents/{cid}/approve", json={"otp": "123456"}, headers=h)
     assert r.status_code == 400 and "passkey" in r.json()["title"]
 
 
@@ -106,8 +104,7 @@ def test_replay_and_sign_counter(pk):
     cred = a.assertion(opts)
     assert pk.post(f"/v1/consents/{cid}/approve", json={"credential": cred}, headers=h).status_code == 200
     cid2 = request_consent(pk, ADULT)
-    assert pk.post(f"/v1/consents/{cid2}/approve", json={"credential": cred}, headers=h).status_code == 400  # replayed
-    # equal or lower non-zero sign count = cloned authenticator
+    assert pk.post(f"/v1/consents/{cid2}/approve", json={"credential": cred}, headers=h).status_code == 400
     assert approve(pk, h, cid2, a, count=a.count).status_code == 401
     assert approve(pk, h, cid2, a, count=1).status_code == 401
     assert approve(pk, h, cid2, a).status_code == 200
@@ -116,11 +113,11 @@ def test_replay_and_sign_counter(pk):
 def test_synced_passkey_with_zero_counter_is_accepted(pk):
     code = issue(pk, ADULT).json()["code"]
     h = {"Authorization": f"Bearer {activate(pk, ADULT, code).json()['setup_token']}"}
-    a = SoftAuthenticator(step=0)  # synced passkeys report 0 every time
+    a = SoftAuthenticator(step=0)
     opts = pk.post("/v1/passkeys/register/options", headers=h).json()
     assert pk.post("/v1/passkeys/register/verify", json={"credential": a.register(opts)}, headers=h).status_code == 201
     hs = session(pk, a)
-    assert sign_in(pk, a).status_code == 200      # 0 -> 0 again
+    assert sign_in(pk, a).status_code == 200
     assert approve(pk, hs, request_consent(pk, ADULT), a).status_code == 200
 
 
@@ -128,13 +125,13 @@ def test_assertion_is_bound_to_one_request_its_terms_and_its_owner(pk, dbconn):
     a = setup(pk, ADULT)
     h = session(pk, a)
     req_a, req_b = request_consent(pk, ADULT), request_consent(pk, ADULT, ("name",))
-    assert approve(pk, h, req_b, a, opts_for=req_a).status_code == 403            # options for A, approving B
+    assert approve(pk, h, req_b, a, opts_for=req_a).status_code == 403
     opts = pk.post(f"/v1/consents/{req_a}/approve/options", headers=h).json()
     dbconn.execute("UPDATE consents SET scope_fields = ARRAY['name','programme','apaar_id'] WHERE id=%s", (req_a,))
     dbconn.commit()
     r = pk.post(f"/v1/consents/{req_a}/approve", json={"credential": a.assertion(opts)}, headers=h)
-    assert r.status_code == 403                                                  # terms changed after the challenge
-    other = setup(pk, ADULT_2)                                                   # another student's passkey
+    assert r.status_code == 403
+    other = setup(pk, ADULT_2)
     opts = pk.post(f"/v1/consents/{req_b}/approve/options", headers=h).json()
     assert pk.post(f"/v1/consents/{req_b}/approve", json={"credential": other.assertion(opts)}, headers=h).status_code == 403
 
@@ -153,14 +150,14 @@ def test_user_verification_is_required(pk):
 
 def test_activation_codes_are_single_use_expire_and_are_throttled(pk, dbconn):
     code = issue(pk, ADULT).json()["code"]
-    assert activate(pk, ADULT, code.lower().replace("-", " ")).status_code == 200   # forgiving format
+    assert activate(pk, ADULT, code.lower().replace("-", " ")).status_code == 200
     burned = activate(pk, ADULT, code)
     unknown = activate(pk, "999999999999", code)
     assert burned.status_code == unknown.status_code == 401 and burned.json() == unknown.json()
     code2 = issue(pk, ADULT_2).json()["code"]
     dbconn.execute("UPDATE activation_codes SET expires_at = now() - interval '1 second' WHERE used_at IS NULL")
     dbconn.commit()
-    assert activate(pk, ADULT_2, code2).status_code == 401                          # expired
+    assert activate(pk, ADULT_2, code2).status_code == 401
     auth._failures.clear()
     for _ in range(5):
         assert activate(pk, ADULT_2, "AAAA-AAAA-AA").status_code == 401
@@ -177,21 +174,21 @@ def test_setup_session_can_only_register_and_explains_expiry(pk):
     r = pk.post("/v1/passkeys/register/options", headers={"Authorization": f"Bearer {expired['access_token']}"})
     assert r.status_code == 401 and "ask your institution for a new code" in r.json()["title"]
     normal = session(pk, setup(pk, ADULT_2))
-    assert pk.post("/v1/passkeys/register/options", headers=normal).status_code == 403  # full sessions can't add keys
+    assert pk.post("/v1/passkeys/register/options", headers=normal).status_code == 403
 
 
 def test_reissue_revokes_old_keys_and_new_key_waits_24h(pk, dbconn):
     old = setup(pk, ADULT)
     r = issue(pk, ADULT, reason="Student reported phone stolen, ID checked")
     assert r.json()["revoked_passkeys"] == 1 and r.json()["reissue"] and r.json()["cooldown_hours"] == 24
-    assert sign_in(pk, old).status_code == 401                                   # lost device is dead
+    assert sign_in(pk, old).status_code == 401
     s = activate(pk, ADULT, r.json()["code"]).json()
     assert s["reissue"] is True
     hs = {"Authorization": f"Bearer {s['setup_token']}"}
     new = SoftAuthenticator()
     opts = pk.post("/v1/passkeys/register/options", headers=hs).json()
     assert pk.post("/v1/passkeys/register/verify", json={"credential": new.register(opts)}, headers=hs).status_code == 201
-    h = session(pk, new)                                                         # sign-in works during the cooldown
+    h = session(pk, new)
     me = pk.get("/v1/students/me", headers=h).json()
     assert me["passkey_cooldown_until"] is not None
     cid = request_consent(pk, ADULT)
@@ -203,7 +200,6 @@ def test_reissue_revokes_old_keys_and_new_key_waits_24h(pk, dbconn):
     assert approve(pk, h, cid, new).status_code == 200
     log = pk.get("/v1/students/me/access-log", headers=h).json()
     assert any(e["action"] == "activation_code.issue" and "phone stolen" in e["reason"] and "revoked 1" in e["reason"] for e in log)
-    # two codes in a row can't dodge the cooldown: any code after the first is a reissue
     assert issue(pk, ADULT_2).json()["reissue"] is False
     assert issue(pk, ADULT_2).json()["reissue"] is True
     counts = {c["id"]: c["activation_reissues"] for c in pk.get("/v1/dashboard/aicte", headers=login(pk, "aicte")).json()["upload_compliance"]}
@@ -222,42 +218,39 @@ def test_code_is_shown_once_and_never_stored(pk, dbconn):
         for row in dbconn.execute(f"SELECT * FROM {table}"):
             text = str(row)
             assert first["code"] not in text and plain not in text, table
-    assert issue(pk, ADULT, reason="short").status_code == 422                     # reason required (min 10 chars)
-    assert issue(pk, ADULT, user="inst-b").status_code == 404                     # not B's student
+    assert issue(pk, ADULT, reason="short").status_code == 422
+    assert issue(pk, ADULT, user="inst-b").status_code == 404
 
 
 def test_minor_needs_the_guardian_until_18(pk, monkeypatch, dbconn):
-    monkeypatch.setattr(passkeys, "today", lambda: date(2026, 5, 1))             # TEEN is 17
-    assert issue(pk, ADULT, kind="guardian").status_code == 422                   # adults have no guardian code
+    monkeypatch.setattr(passkeys, "today", lambda: date(2026, 5, 1))
+    assert issue(pk, ADULT, kind="guardian").status_code == 422
     student = setup(pk, TEEN)
     guardian = setup(pk, TEEN, kind="guardian")
     hs, hg = session(pk, student), session(pk, guardian)
     assert pk.get("/v1/students/me", headers=hg).json()["viewer"] == "guardian"
     cid = request_consent(pk, TEEN)
-    assert pk.post(f"/v1/consents/{cid}/approve/options", headers=hs).status_code == 403   # minor's own key: no
+    assert pk.post(f"/v1/consents/{cid}/approve/options", headers=hs).status_code == 403
     assert approve(pk, hg, cid, guardian).status_code == 200
     assert dbconn.execute("SELECT granted_by FROM consents WHERE id=%s", (cid,)).fetchone()["granted_by"] == "guardian"
-    monkeypatch.setattr(passkeys, "today", lambda: date(2026, 5, 31))            # 18th birthday
+    monkeypatch.setattr(passkeys, "today", lambda: date(2026, 5, 31))
     cid2 = request_consent(pk, TEEN)
-    assert pk.post(f"/v1/consents/{cid2}/approve/options", headers=hg).status_code == 403  # guardian no longer
+    assert pk.post(f"/v1/consents/{cid2}/approve/options", headers=hg).status_code == 403
     assert approve(pk, hs, cid2, student).status_code == 200
 
 
-# ---------- security-review fixes ----------
 def test_another_institution_cannot_take_over_a_student(pk):
-    """H1: B uploads A's student (E203 doesn't block the row) but can't issue them an activation code."""
     a = setup(pk, ADULT)
-    upload(pk, "inst-b", "B1.csv")                          # contains APAAR 590573056992, also active at A
+    upload(pk, "inst-b", "B1.csv")
     hb = login(pk, "inst-b")
     eid = pk.get("/v1/enrolments", params={"apaar": "590573056992"}, headers=hb).json()[0]["id"]
     r = pk.post(f"/v1/enrolments/{eid}/activation-code", json={"kind": "student", "reason": REASON}, headers=hb)
     assert r.status_code == 409 and "under AICTE review" in r.json()["title"]
     assert "1-0000000001" not in r.text and "Kalyani Devi Hegde" not in r.text
-    assert sign_in(pk, a).status_code == 200                # A's student is untouched
+    assert sign_in(pk, a).status_code == 200
 
 
 def test_guardian_access_ends_at_18(pk, monkeypatch):
-    """M3: after the 18th birthday the guardian can't sign in, and an existing guardian session is refused."""
     monkeypatch.setattr(passkeys, "today", lambda: date(2026, 5, 1))
     guardian = setup(pk, TEEN, kind="guardian")
     hg = session(pk, guardian)
@@ -269,7 +262,6 @@ def test_guardian_access_ends_at_18(pk, monkeypatch):
 
 
 def test_one_passkey_per_code_and_no_direct_writes(pk):
-    """L1/L2: a setup session registers exactly one passkey; app_user can't insert keys or un-revoke them."""
     import psycopg
 
     from app import db
@@ -291,22 +283,19 @@ def test_one_passkey_per_code_and_no_direct_writes(pk):
 
 
 def test_code_dies_with_the_enrolment(pk):
-    """L4: a code can't be redeemed once the student has left the institution."""
     code = issue(pk, ADULT).json()["code"]
     eid = enrolment(pk, ADULT)
     assert pk.patch(f"/v1/enrolments/{eid}", json={"status": "withdrawn", "reason": "left"}, headers=login(pk, "inst-a")).status_code == 200
     assert activate(pk, ADULT, code).status_code == 401
 
 
-# ---------- P1.1 ----------
 def test_first_passkey_cooldown_default_24h_and_zero(pk, monkeypatch, tmp_path):
-    """M2: every new passkey waits PASSKEY_FIRST_COOLDOWN_HOURS (default 24) before its first consent approval."""
     from app import db
-    with monkeypatch.context() as m:                                             # nothing set anywhere -> 24
+    with monkeypatch.context() as m:
         m.delenv("PASSKEY_FIRST_COOLDOWN_HOURS")
         m.setattr(db, "ENV_FILE", tmp_path / "no.env")
         assert passkeys.first_cooldown_hours() == 24
-    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "24")                     # the default, explicitly
+    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "24")
     r = issue(pk, ADULT)
     assert r.json()["reissue"] is False and r.json()["cooldown_hours"] == 24
     s = activate(pk, ADULT, r.json()["code"]).json()
@@ -318,10 +307,10 @@ def test_first_passkey_cooldown_default_24h_and_zero(pk, monkeypatch, tmp_path):
     assert pk.get("/v1/students/me", headers=hs).json()["passkey_cooldown_until"] is not None
     r = approve(pk, hs, request_consent(pk, ADULT), a)
     assert r.status_code == 403 and "unlocks at" in r.json()["title"]
-    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "0")                      # demo setting
+    monkeypatch.setenv("PASSKEY_FIRST_COOLDOWN_HOURS", "0")
     b = setup(pk, ADULT_2)
     assert approve(pk, session(pk, b), request_consent(pk, ADULT_2), b).status_code == 200
-    rei = issue(pk, ADULT_2, reason="Lost phone, reissue for the demo test")     # reissue keeps 24 h even at 0
+    rei = issue(pk, ADULT_2, reason="Lost phone, reissue for the demo test")
     assert rei.json()["reissue"] is True and rei.json()["cooldown_hours"] == 24
 
 

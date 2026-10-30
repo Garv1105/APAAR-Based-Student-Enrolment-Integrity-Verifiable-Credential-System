@@ -6,7 +6,6 @@ import Landing from "./Landing";
 import SignIn from "./SignIn";
 import { Activate, RequestAccess } from "./Onboarding";
 
-/** Signed-out site: #/ landing, #/signin, #/activate, #/request-access (hash router, query after "?"). */
 export default function PublicSite({ hash, onLogin }: { hash: string; onLogin: (s: Session) => void }) {
   const [path, query] = hash.split("?");
   const params = new URLSearchParams(query ?? "");
@@ -28,7 +27,6 @@ export function useDemoMode() {
 function PublicShell({ demo, current, children }: { demo: boolean; current: string; children: ReactNode }) {
   return (
     <div className="relative min-h-screen w-full overflow-x-hidden bg-[#121316] font-inter text-white selection:bg-[#d4af37]/40 selection:text-white">
-      {/* quiet obsidian backdrop: one faint static warm light, vignette, grain, faint grid */}
       <Backdrop />
       <div aria-hidden className="ambient-grid pointer-events-none fixed inset-0 z-0 opacity-35" />
       <Navbar demo={demo} current={current} />

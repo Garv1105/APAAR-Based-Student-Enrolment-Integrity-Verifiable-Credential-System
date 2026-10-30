@@ -21,7 +21,6 @@ interface AppLayoutProps {
 type Item = { label: string; icon: React.ElementType; section?: string; route?: string };
 type Group = { title?: string; items: Item[] };
 
-/** Navigation per role. `section` scrolls to an element id on the role's home page; `route` changes page. */
 function navFor(role: Role, canVerify: boolean): Group[] {
   const verify: Group[] = canVerify ? [{ title: "Verification", items: [{ label: "Verify a credential", icon: BadgeCheck, route: "/verify" }] }] : [];
   switch (role) {
@@ -113,14 +112,12 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
   return (
     <MotionConfig reducedMotion="user">
       <div className="theme-gold min-h-screen antialiased lg:grid lg:grid-cols-[300px_minmax(0,1fr)]">
-        {/* ambient light behind the glass: a static base plus two slowly drifting lights */}
         <div aria-hidden className="ambient-gold no-print pointer-events-none fixed inset-0" />
         <div aria-hidden className="no-print pointer-events-none fixed inset-0 overflow-hidden">
           <div className="orb orb-a right-[-8%] top-[-10%] h-[55vh] w-[45vw] bg-[radial-gradient(closest-side,rgba(212,175,55,0.22),transparent)]" />
           <div className="orb orb-b bottom-[-15%] left-[10%] h-[60vh] w-[50vw] bg-[radial-gradient(closest-side,rgba(80,112,165,0.26),transparent)]" />
         </div>
         <div aria-hidden className="ambient-grid no-print pointer-events-none fixed inset-0 opacity-60" />
-        {/* Sidebar (desktop) */}
         <aside className="no-print sticky top-0 z-20 hidden h-screen flex-col border-r border-white/[0.06] bg-[#0b0f14]/55 backdrop-blur-xl lg:flex">
           <div className="px-6 pb-7 pt-6"><a href={`#${home}`} onClick={() => setActive("top")} aria-label="Dashboard home"><Brand /></a></div>
           <nav aria-label="Main" className="flex-1 space-y-7 overflow-y-auto px-4">
@@ -149,7 +146,6 @@ export default function AppLayout({ session, roleLabel, onLogout, canVerify = fa
         </aside>
 
         <div className="relative flex min-w-0 flex-col">
-          {/* Top bar: mobile shows brand + nav strip + MOCK note; desktop shows a thin context bar */}
           <header className="no-print sticky top-0 z-30 border-b border-white/[0.06] bg-[#0b0f14]/60 backdrop-blur-xl">
             <div className="flex items-center justify-between gap-3 px-4 py-3 lg:hidden">
               <a href={`#${home}`} aria-label="Dashboard home"><Brand /></a>

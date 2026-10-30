@@ -6,7 +6,6 @@ import { passkeyError, passkeysSupported } from "../webauthn";
 const field = "w-full rounded-xl border border-white/[0.09] bg-[#0b0f14]/70 px-3.5 py-2.5 text-sm text-white focus:border-[#d4af37]/60 focus:outline-none focus:ring-2 focus:ring-[#d4af37]/20";
 const label = "mb-1.5 block text-[10.5px] font-medium uppercase tracking-[0.18em] text-[#8a909a]";
 
-/** Students and guardians: passkey sign-in, first-time activation, and (DEMO_MODE only) the MOCK date-of-birth fallback. */
 export function StudentSignIn({ onLogin, demo }: { onLogin: (s: Session) => void; demo: boolean }) {
   const [apaar, setApaar] = useState("");
   const [code, setCode] = useState("");

@@ -1,16 +1,12 @@
-"""Validation issue codes (PRD §9.3). The only place codes are defined.
-Message text lives in backend/i18n/<locale>.json, keyed by code, with {placeholders}.
-Documented placeholders: {field} (column name), {detail} (non-PII detail: counts, row numbers, codes, dates).
-"""
-CODES = {  # code: (name, severity)
+CODES = {
     "E001": ("SCHEMA_INVALID", "error"),
     "E101": ("MISSING_APAAR_NO_REASON", "error"),
     "E101W": ("MISSING_APAAR_WITH_REASON", "warning"),
     "E102": ("INVALID_APAAR_FORMAT", "error"),
     "E103": ("APAAR_NOT_FOUND_IN_REGISTRY", "error"),
     "E104": ("APAAR_DETAILS_MISMATCH", "warning"),
-    "E105": ("MISSING_STUDENT_ID", "error"),        # extension: Req 10 prints the student ID on certificates
-    "E205": ("DUPLICATE_STUDENT_ID", "error"),      # extension: student ID unique per institution
+    "E105": ("MISSING_STUDENT_ID", "error"),
+    "E205": ("DUPLICATE_STUDENT_ID", "error"),
     "E201": ("DUPLICATE_IN_FILE", "error"),
     "E202": ("DUPLICATE_IN_INSTITUTION", "error"),
     "E203": ("CROSS_INSTITUTION_DUPLICATE", "flag"),

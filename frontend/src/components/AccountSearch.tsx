@@ -19,8 +19,6 @@ const STYLE = {
   },
 };
 
-/** Registry search (ARIA combobox): institutions by name, AICTE id or city (optionally within a state), or universities.
- *  Backed by the public, throttled GET /v1/public/institutions; at most 8 suggestions. */
 export default function AccountSearch({ kind, state, selected, onSelect, variant = "public", label, placeholder }: {
   kind: "institution" | "university"; state?: string; selected: Account | null; onSelect: (a: Account | null) => void;
   variant?: keyof typeof STYLE; label: string; placeholder?: string;

@@ -1,19 +1,16 @@
-// Advisory plain-language summaries (Gemini free tier via backend/app/ai.py; rule-based fallback). Never decides anything.
 import { useState } from "react";
 import { ClipboardCopy, Download, FileText, Sparkles, Wand2 } from "lucide-react";
 import { ApiError, sendJson, type S } from "./api/client";
 import { Button, ErrorNote } from "./ui";
 
-/** Languages the AI summaries and upload messages support, each named in its own script. */
 export const LANGUAGES: [string, string][] = [
   ["en", "English"], ["hi", "हिन्दी"], ["bn", "বাংলা"], ["mr", "मराठी"], ["te", "తెలుగు"], ["ta", "தமிழ்"], ["gu", "ગુજરાતી"],
   ["kn", "ಕನ್ನಡ"], ["ml", "മലയാളം"], ["or", "ଓଡ଼ିଆ"], ["pa", "ਪੰਜਾਬੀ"], ["as", "অসমীয়া"], ["ur", "اردو"],
 ];
 const LANG_KEY = "vp.lang";
-/** Language choice, remembered in this browser only (a convenience; works without storage). */
 export function useLang(): [string, (l: string) => void] {
   const [lang, setLang] = useState(() => { try { return localStorage.getItem(LANG_KEY) || "en"; } catch { return "en"; } });
-  return [lang, (l: string) => { setLang(l); try { localStorage.setItem(LANG_KEY, l); } catch { /* storage blocked */ } }];
+  return [lang, (l: string) => { setLang(l); try { localStorage.setItem(LANG_KEY, l); } catch { } }];
 }
 export function LangSelect({ value, onChange, label = "Language" }: { value: string; onChange: (l: string) => void; label?: string }) {
   return (
@@ -62,7 +59,6 @@ export function AiBox({ path, cta, title }: { path: string; cta: string; title: 
   );
 }
 
-/** AICTE officer: an editable DRAFT inspection note (copy or download; nothing is stored). */
 export function NoteDraft({ institutionId, name }: { institutionId: string; name: string }) {
   const [text, setText] = useState<string | null>(null);
   const [label, setLabel] = useState("");
@@ -111,7 +107,6 @@ export function NoteDraft({ institutionId, name }: { institutionId: string; name
   );
 }
 
-/** Quote-aware split of a CSV header line (header names only). */
 export function splitHeader(line: string): string[] {
   const out: string[] = [];
   let cur = "", q = false;
@@ -128,7 +123,6 @@ export function splitHeader(line: string): string[] {
 
 const quote = (h: string) => (/[",]/.test(h) ? `"${h.replace(/"/g, '""')}"` : h);
 
-/** Institution: match the file's own column names to the template, confirm, then re-upload with renamed headers. */
 export function ColumnMatcher({ file, onUpload, onCancel }: { file: File; onUpload: (f: File) => void; onCancel: () => void }) {
   const [data, setData] = useState<S["ColumnMapOut"] | null>(null);
   const [pick, setPick] = useState<Record<string, string>>({});

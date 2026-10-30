@@ -1,5 +1,3 @@
-// AICTE duplicate cases: the same student (same APAAR ID) holds a seat at more than one college.
-// Masked by default; seeing who is involved needs a recorded reason (PRD §10 steps 4-5).
 import { useState } from "react";
 import { ApiError, getJson, sendJson, type S } from "./api/client";
 import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Loading, usePoll, type Tone } from "./ui";

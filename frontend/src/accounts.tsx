@@ -7,7 +7,6 @@ import { Badge, Button, Card, Empty, ErrorNote, fmtTime, Table, Td, usePoll } fr
 const field = "mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-sm";
 const errText = (e: unknown) => (e instanceof ApiError ? e.text : "Request failed");
 
-/** The one-time code, shown once (it is never stored in plaintext). */
 function CodeBox({ out }: { out: S["AccountCodeOut"] }) {
   if (!out.code) return <p className="text-[13px] text-mute">A code was already issued with this request; issue a new one if it was lost.</p>;
   return (
@@ -133,7 +132,6 @@ function Requests({ canDecide }: { canDecide: boolean }) {
   );
 }
 
-/** AICTE onboarding: activation codes for accounts, and verifier access requests (regulators read, the officer decides). */
 export function AccountsCard({ canManage }: { canManage: boolean }) {
   return (
     <Card id="accounts" title="Accounts and access" icon={<UserPlus />} actions={<span>Codes are shown once · every action is audited</span>}>

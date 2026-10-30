@@ -1,5 +1,3 @@
-"""W1: outbound webhooks (Req 7) and the ERP connector. No network: DNS is faked, HTTP goes to a mock transport,
-except the end-to-end test, which uses a real receiver on 127.0.0.1."""
 import csv
 import json
 import re
@@ -26,7 +24,6 @@ ALL_EVENTS = sorted(webhooks.EVENTS)
 
 @pytest.fixture
 def dns(monkeypatch):
-    """hooks.example.test -> a public IP; private.example.test -> 10.1.2.3. Everything else: real resolver."""
     real = socket.getaddrinfo
 
     def fake(host, port, *a, **k):
@@ -39,7 +36,6 @@ def dns(monkeypatch):
 
 
 class Sink:
-    """Mock receiver: records requests, answers with `status`."""
     def __init__(self, status=204):
         self.status, self.reqs = status, []
 
@@ -72,14 +68,13 @@ def test_signature_roundtrip_matches_connector_and_rejects_tamper_stale_replay()
     assert connector.verify(secret, h, body, now=ts) == (True, "ok")
     assert connector.verify(secret, h, body + b" ", now=ts) == (False, "bad signature")
     assert not crypto.webhook_verify(secret, "msg_1", ts, body + b" ", sig, now=ts)
-    assert connector.verify(secret, h | {"webhook-id": "msg_2"}, body, now=ts) == (False, "bad signature")  # id is signed
+    assert connector.verify(secret, h | {"webhook-id": "msg_2"}, body, now=ts) == (False, "bad signature")
     assert connector.verify(secret, h, body, now=ts + 301) == (False, "stale timestamp")
     assert not crypto.webhook_verify(secret, "msg_1", ts, body, sig, now=ts + 301)
     assert connector.verify(crypto.webhook_secret(), h, body, now=ts)[0] is False
     seen = set()
     assert connector.verify(secret, h, body, now=ts, seen=seen)[0]
     assert connector.verify(secret, h, body, now=ts, seen=seen) == (False, "replayed event id")
-    # during a rotation both secrets sign; a receiver holding either one accepts
     old = crypto.webhook_secret()
     both = crypto.webhook_sign([secret, old], "msg_3", ts, body)
     for s in (secret, old):
@@ -95,7 +90,7 @@ def test_ssrf_guard(client, dns, monkeypatch):
             webhooks.resolve(url)
     assert register(client, "inst-a", "https://private.example.test/x").status_code == 422
     assert register(client, "inst-a", "https://hooks.example.test/in").status_code == 201
-    monkeypatch.setenv("WEBHOOK_ALLOW_LOCALHOST", "true")  # dev only: loopback, nothing else
+    monkeypatch.setenv("WEBHOOK_ALLOW_LOCALHOST", "true")
     assert webhooks.resolve("http://127.0.0.1:9/x")[1].is_loopback
     for url in ["http://hooks.example.test/in", "https://private.example.test/x", "https://10.0.0.1/x"]:
         with pytest.raises(webhooks.UrlRejected):
@@ -125,15 +120,14 @@ def test_retries_back_off_resign_each_attempt_then_fail_and_redeliver(client, dn
     expected_gaps = webhooks.BACKOFF
     for attempt in range(len(expected_gaps) + 1):
         assert webhooks.dispatch_due(t, sink.client()) == 1
-        assert webhooks.dispatch_due(t + timedelta(seconds=5), sink.client()) == 0  # not due yet
+        assert webhooks.dispatch_due(t + timedelta(seconds=5), sink.client()) == 0
         h = headers_of(sink.reqs[-1])
-        assert int(h["webhook-timestamp"]) == int(t.timestamp())  # fresh timestamp every attempt
-        assert connector.verify(secret, h, sink.reqs[-1].content, now=int(t.timestamp()))[0]  # incl. the one hours later
+        assert int(h["webhook-timestamp"]) == int(t.timestamp())
+        assert connector.verify(secret, h, sink.reqs[-1].content, now=int(t.timestamp()))[0]
         if attempt < len(expected_gaps):
             t += timedelta(seconds=expected_gaps[attempt])
-    assert len({headers_of(r)["webhook-id"] for r in sink.reqs}) == 1  # same event id throughout
-    assert (t - later(1)).total_seconds() > 3600  # the last attempts happened more than an hour after the first
-    # the first attempt's signature would be stale by now; the receiver accepts the re-signed one
+    assert len({headers_of(r)["webhook-id"] for r in sink.reqs}) == 1
+    assert (t - later(1)).total_seconds() > 3600
     first = headers_of(sink.reqs[0])
     assert connector.verify(secret, first, sink.reqs[0].content, now=int(t.timestamp()))[1] == "stale timestamp"
     h = login(client, "inst-a")
@@ -159,13 +153,12 @@ def test_events_are_emitted_neutral_and_pii_free(client, dbconn, dns):
         "WHERE w.institution_id=%s ORDER BY d.id", (inst,))]
     b = ev("1-0000000002")
     opened = [p for t, p in b if t == "case.opened"]
-    assert [t for t, _ in b].count("batch.validated") == 1 and len(opened) == 5  # 3 injected + 2 moves A has not withdrawn here
-    assert all(set(p) == {"case_id"} for p in opened)                               # F4: nothing about A
+    assert [t for t, _ in b].count("batch.validated") == 1 and len(opened) == 5
+    assert all(set(p) == {"case_id"} for p in opened)
     assert sorted(p["case_id"] for t, p in ev("1-0000000001") if t == "case.opened") == sorted(p["case_id"] for p in opened)
     batch = next(p for t, p in b if t == "batch.validated")
     assert batch["codes"]["E203"] >= 5 and batch["counts"]["rows"] == 208
 
-    # case resolution: B's credential on the rejected side is revoked, both sides hear case.resolved
     ha, hb, ho = login(client, "inst-a"), login(client, "inst-b"), login(client, "aicte")
     case = client.get("/v1/cases", headers=ho).json()[0]
     inst_of = {e: dbconn.execute("SELECT p.institution_id i FROM enrolments e JOIN programmes p ON p.id=e.programme_id WHERE e.id=%s",
@@ -181,12 +174,10 @@ def test_events_are_emitted_neutral_and_pii_free(client, dbconn, dns):
     assert ("case.resolved", {"case_id": case["id"], "status": "confirmed_duplicate"}) in b
     assert ("case.resolved", {"case_id": case["id"], "status": "confirmed_duplicate"}) in ev("1-0000000001")
 
-    # withdrawal revokes A's own credential
     a2 = client.post(f"/v1/credentials/{a_e}/issue", json={"type": "EnrolmentCredential"}, headers=ha).json()["id"]
     client.patch(f"/v1/enrolments/{a_e}", json={"status": "withdrawn", "reason": "left"}, headers=ha)
     assert ("credential.revoked", {"credential_id": a2, "enrolment_id": a_e, "reason": "withdrawn"}) in ev("1-0000000001")
 
-    # no PII in any payload: no 12-digit runs, no dates, no student names
     names = _names()
     for row in dbconn.execute("SELECT payload FROM webhook_deliveries"):
         text = json.dumps(row["payload"])
@@ -198,11 +189,11 @@ def test_endpoint_management_limits_rotation_and_isolation(client, dbconn, dns):
     h, hb = login(client, "inst-a"), login(client, "inst-b")
     first = register(client, "inst-a", key="k1").json()
     again = register(client, "inst-a", key="k1").json()
-    assert again["id"] == first["id"] and again["secret"] == first["secret"]  # idempotent replay
+    assert again["id"] == first["id"] and again["secret"] == first["secret"]
     assert register(client, "inst-a", url="https://hooks.example.test/other", key="k1").status_code == 422
     for i in range(4):
         assert register(client, "inst-a", url=f"https://hooks.example.test/{i}").status_code == 201
-    assert register(client, "inst-a", url="https://hooks.example.test/6").status_code == 409  # max 5 active
+    assert register(client, "inst-a", url="https://hooks.example.test/6").status_code == 409
     listed = client.get("/v1/webhooks", headers=h)
     assert len(listed.json()) == 5 and first["secret"] not in listed.text and "secret_enc" not in listed.text
     assert client.get("/v1/webhooks", headers=hb).json() == []
@@ -210,9 +201,8 @@ def test_endpoint_management_limits_rotation_and_isolation(client, dbconn, dns):
     wid = first["id"]
     for method, path in [("DELETE", f"/v1/webhooks/{wid}"), ("POST", f"/v1/webhooks/{wid}/rotate"),
                          ("GET", f"/v1/webhooks/{wid}/deliveries")]:
-        assert client.request(method, path, headers=hb).status_code == 404  # other institution: not found
+        assert client.request(method, path, headers=hb).status_code == 404
 
-    # rotation: both secrets sign for 24 h, then only the new one
     rot = client.post(f"/v1/webhooks/{wid}/rotate", headers=h).json()
     assert rot["secret"] != first["secret"] and rot["previous_secret_valid_until"]
     upload(client, "inst-a", "A1.csv")
@@ -230,14 +220,13 @@ def test_endpoint_management_limits_rotation_and_isolation(client, dbconn, dns):
     webhooks.dispatch_due(later(1), sink2.client())
     assert len(headers_of(sink2.reqs[0])["webhook-signature"].split()) == 1
 
-    # B can't redeliver A's deliveries; deleting cancels pending ones
     did = dbconn.execute("SELECT id FROM webhook_deliveries WHERE endpoint_id=%s LIMIT 1", (wid,)).fetchone()["id"]
     assert client.post(f"/v1/webhooks/deliveries/{did}/redeliver", headers=hb).status_code == 404
     assert client.post(f"/v1/webhooks/deliveries/{did}/redeliver", headers=h).status_code == 200
     assert client.delete(f"/v1/webhooks/{wid}", headers=h).json()["active"] is False
     assert {r["status"] for r in dbconn.execute("SELECT status FROM webhook_deliveries WHERE endpoint_id=%s", (wid,))} == {"cancelled"}
     assert client.post(f"/v1/webhooks/deliveries/{did}/redeliver", headers=h).status_code == 409
-    assert register(client, "inst-a", url="https://hooks.example.test/6").status_code == 201  # slot freed
+    assert register(client, "inst-a", url="https://hooks.example.test/6").status_code == 201
     actions = {r["action"] for r in dbconn.execute("SELECT action FROM audit_logs WHERE entity LIKE 'webhook%%'")}
     assert {"webhook.create", "webhook.rotate", "webhook.delete", "webhook.redeliver"} <= actions
 
@@ -256,7 +245,7 @@ def test_erp_connector_end_to_end(client, monkeypatch):
         out = connector.push(ex / "erp_export.csv", ex / "mapping.yaml", "", "inst-a", "demo", client=client)
         assert out["counts"]["rows"] == 25 and out["counts"]["accepted"] == 25 and not out["replayed"]
         assert connector.push(ex / "erp_export.csv", ex / "mapping.yaml", "", "inst-a", "demo", client=client)["replayed"]
-        assert webhooks.dispatch_due() == 1  # real HTTP to the local receiver
+        assert webhooks.dispatch_due() == 1
         assert got and got[0][0] is True and got[0][2]["type"] == "batch.validated"
         assert got[0][2]["data"]["batch_id"] == out["batch_id"]
     finally:

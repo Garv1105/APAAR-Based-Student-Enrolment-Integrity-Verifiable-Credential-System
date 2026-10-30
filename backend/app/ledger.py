@@ -1,12 +1,3 @@
-"""D1 Seat Ledger: hash-chained enrolment events + AICTE-signed head checkpoints (PRD §19 D1).
-Not a blockchain: append-only hashes, one signer.
-
-Appends go through the SECURITY DEFINER function ledger_append() in rls.sql, which computes
-entry_hash = SHA256(prev_hash | seq | institution_id | event_type | entity_id | payload_hash | ts).
-payload_hash = SHA256(JCS(enrolment state after the event)), computed here.
-verify() recomputes the chain, checks the latest checkpoint signature, and checks every
-enrolment row against the payload of its latest ledger event (catches silent edits, inserts, deletes).
-"""
 from . import crypto
 
 GENESIS = "0" * 64
@@ -37,7 +28,6 @@ def checkpoint(conn) -> dict | None:
 
 
 def verify(conn) -> dict:
-    """Needs a regulator (or admin) connection: it reads every ledger entry and enrolment."""
     problems, prev, latest = [], GENESIS, {}
     rows = conn.execute("SELECT * FROM ledger_entries ORDER BY seq").fetchall()
     for i, r in enumerate(rows, start=1):

@@ -1,14 +1,3 @@
-"""Passkeys (P1, Req 5/8): WebAuthn replaces the MOCK "APAAR + DOB + fixed OTP" for student sign-in and consent.
-
-- The institution issues a one-time activation code (7 days, keyed hash only, reason required, audited). Issuing a new
-  one revokes the earlier passkeys of that kind (lost device). Any code after the first is a REISSUE: a passkey made
-  from it can't approve consent for 24 h, and the student portal shows a notice (insider-impersonation cooldown).
-- The student (or, for a minor, the guardian) redeems the code once for a 15-minute setup session that can only
-  register a passkey (discoverable, user verification required).
-- Sign-in is discoverable (no APAAR typed, so no existence oracle). Consent approval needs an assertion whose challenge
-  commits to that request's terms (see consent.approve_options / verify_consent_assertion).
-- The old path survives only with DEMO_MODE=true (labelled MOCK).
-"""
 import json
 import os
 from datetime import date, datetime, timedelta, timezone
@@ -24,11 +13,11 @@ from webauthn.helpers.structs import (AuthenticatorSelectionCriteria, PublicKeyC
 from . import auth, crypto, db
 
 COOLDOWN = timedelta(hours=24)
-ADULT_AGE = 18  # DPDP treats under-18s as children: a guardian must consent
+ADULT_AGE = 18
 RP_NAME = "APAAR Student Data Platform (prototype)"
 REGISTER_FAILED = ("Passkey registration failed. Your activation code has already been used: try again within the setup "
                    "session, or ask your institution for a new code.")
-today = date.today  # tests inject the date (minor status is computed on the day of each request)
+today = date.today
 
 
 def demo_mode() -> bool:
@@ -36,8 +25,6 @@ def demo_mode() -> bool:
 
 
 def first_cooldown_hours() -> int:
-    """PASSKEY_FIRST_COOLDOWN_HOURS (default 24): hours before ANY new passkey can approve consent (M2: an intercepted
-    first code can't be used at once). Reissued codes always wait 24 h regardless. The demo sets it to 0."""
     raw = db._env("PASSKEY_FIRST_COOLDOWN_HOURS")
     try:
         return max(0, int(raw)) if raw not in (None, "") else 24
@@ -77,7 +64,7 @@ def age_on(dob: date, on: date) -> int:
 
 
 def is_minor(conn, student_id: int) -> bool:
-    s = conn.execute("SELECT id, dob_enc FROM students WHERE id=%s", (student_id,)).fetchone()  # RLS: own / own enrolment
+    s = conn.execute("SELECT id, dob_enc FROM students WHERE id=%s", (student_id,)).fetchone()
     if s is None:
         raise HTTPException(404, "Student not found")
     return age_on(date.fromisoformat(crypto.decrypt("students", "dob", s["id"], s["dob_enc"])), today()) < ADULT_AGE
@@ -89,9 +76,8 @@ def _label(conn, user: dict) -> str:
     return f"Guardian of {who}" if user["role"] == "guardian" else who.capitalize()
 
 
-# ---------- institution: activation codes ----------
 def issue_code(conn, user: dict, enrolment_id: int, kind: str, reason: str, idem_key: str | None, request_hash: str) -> dict:
-    e = conn.execute("SELECT student_id FROM enrolments WHERE id=%s", (enrolment_id,)).fetchone()  # RLS: own institution
+    e = conn.execute("SELECT student_id FROM enrolments WHERE id=%s", (enrolment_id,)).fetchone()
     if e is None:
         raise HTTPException(404, "Enrolment not found")
     if kind == "guardian" and not is_minor(conn, e["student_id"]):
@@ -104,12 +90,12 @@ def issue_code(conn, user: dict, enrolment_id: int, kind: str, reason: str, idem
         conn.rollback()
         if err.sqlstate == "P0002":
             raise HTTPException(404, "Enrolment not found (or not active)") from None
-        if err.sqlstate == "P0004":  # neutral: B already got the E203 notice; nothing new about the other side
+        if err.sqlstate == "P0004":
             raise HTTPException(409, "Activation codes can't be issued for this record while it is under AICTE review") from None
         if err.sqlstate == "P0003":
             raise HTTPException(422, "Idempotency-Key was already used with a different request body") from None
         raise
-    if r["replay"]:  # the plaintext was never stored, so it can't be shown again
+    if r["replay"]:
         return {"status": "already_issued", "code": None, "kind": kind, "expires_at": r["expires_at"], "revoked_passkeys": 0,
                 "reissue": r["reissue"], "cooldown_hours": max(24 if r["reissue"] else 0, first_cooldown_hours()),
                 "detail": "Code already issued; issue a new one if lost."}
@@ -121,10 +107,8 @@ def issue_code(conn, user: dict, enrolment_id: int, kind: str, reason: str, idem
             "reissue": r["reissue"], "cooldown_hours": max(24 if r["reissue"] else 0, first_cooldown_hours()), "detail": None}
 
 
-# ---------- student / guardian: activation + registration ----------
 def activate(conn, apaar_id: str, code: str, client_ip: str = "unknown") -> dict:
-    """Redeem (burn) the code for a 15-minute passkey-setup session. One 401 for every mismatch."""
-    auth.throttle("actip:" + client_ip, 20, 15 * 60)  # L3: per client as well as per APAAR
+    auth.throttle("actip:" + client_ip, 20, 15 * 60)
     apaar = apaar_id.replace(" ", "").replace("-", "")
     fail = HTTPException(401, "APAAR ID and activation code don't match, or the code has expired or was already used")
     if not (apaar.isdigit() and len(apaar) == 12):
@@ -144,7 +128,7 @@ def activate(conn, apaar_id: str, code: str, client_ip: str = "unknown") -> dict
 
 
 def register_options(conn, user: dict) -> dict:
-    existing = conn.execute("SELECT credential_id FROM passkeys WHERE revoked_at IS NULL").fetchall()  # RLS: own, same kind
+    existing = conn.execute("SELECT credential_id FROM passkeys WHERE revoked_at IS NULL").fetchall()
     ch = crypto.random_challenge()
     conn.execute("SELECT store_challenge(%s, 'register', NULL, NULL)", (ch,))
     conn.commit()
@@ -161,14 +145,14 @@ def register_verify(conn, user: dict, credential: dict) -> dict:
     if conn.execute("SELECT * FROM take_challenge(%s, 'register')", (ch,)).fetchone() is None:
         conn.commit()
         raise HTTPException(400, REGISTER_FAILED)
-    conn.commit()  # the challenge is burned whatever happens next
+    conn.commit()
     try:
         v = verify_registration_response(credential=credential, expected_challenge=ch, expected_rp_id=rp_id(),
                                          expected_origin=origins(), require_user_verification=True)
     except Exception:
         raise HTTPException(400, REGISTER_FAILED) from None
     transports = credential.get("response", {}).get("transports")
-    try:  # the definer binds it to this session's code, allows one passkey per code and sets the cooldown itself
+    try:
         k = conn.execute("SELECT * FROM register_passkey(%s, %s, %s, %s, %s)",
                          (v.credential_id, v.credential_public_key, v.sign_count,
                           [str(t) for t in transports] if isinstance(transports, list) else None, first_cooldown_hours())).fetchone()
@@ -193,7 +177,6 @@ def passkey_out(k: dict) -> dict:
             "approve_after": k["approve_after"], "revoked": k["revoked_at"] is not None}
 
 
-# ---------- sign-in ----------
 def login_options(conn, client_ip: str) -> dict:
     auth.throttle("ip:" + client_ip, 30, 60)
     ch = crypto.random_challenge()
@@ -219,8 +202,8 @@ def login_verify(conn, credential: dict) -> dict:
     except Exception:
         raise fail from None
     user = {"id": f"{k['kind']}:{k['student_id']}", "role": k["kind"], "student_id": k["student_id"]}
-    with db.app_connect(user) as c2:  # sign-count update as the owner (RLS), never anonymously
-        if k["kind"] == "guardian" and not is_minor(c2, k["student_id"]):  # M3: guardian access ends at 18
+    with db.app_connect(user) as c2:
+        if k["kind"] == "guardian" and not is_minor(c2, k["student_id"]):
             raise HTTPException(401, "Guardian access ended: the student is 18 or over and signs in with their own passkey")
         c2.execute("UPDATE passkeys SET sign_count=%s, last_used_at=now() WHERE id=%s", (v.new_sign_count, k["id"]))
         auth.audit(c2, user, "passkey.sign_in", "passkey", k["id"], student_id=k["student_id"])
@@ -229,14 +212,13 @@ def login_verify(conn, credential: dict) -> dict:
     return auth.issue_token(user["id"], k["kind"], label, student_id=k["student_id"])
 
 
-# ---------- consent assertions ----------
 def consent_terms(k: dict) -> dict:
     return {"consentId": k["id"], "requester": k["requester_id"], "purpose": k["purpose"], "fields": list(k["scope_fields"]),
             "expiresAt": k["expires_at"].astimezone(timezone.utc).isoformat()}
 
 
 def consent_options(conn, k: dict) -> dict:
-    keys = conn.execute("SELECT credential_id FROM passkeys WHERE revoked_at IS NULL").fetchall()  # own, caller's kind
+    keys = conn.execute("SELECT credential_id FROM passkeys WHERE revoked_at IS NULL").fetchall()
     if not keys:
         raise HTTPException(409, "No passkey registered. Ask your institution for an activation code.")
     th = crypto.consent_terms_hash(consent_terms(k))
@@ -249,12 +231,10 @@ def consent_options(conn, k: dict) -> dict:
 
 
 def verify_consent_assertion(conn, user: dict, k: dict, credential: dict) -> dict:
-    """The assertion must answer a challenge issued for THIS request with its current terms, come from one of the
-    caller's own unrevoked passkeys past any reissue cooldown, carry user verification and a valid sign count."""
     auth.throttle(f"apr:{user['student_id']}", 10, 15 * 60)
     ch = _client_challenge(credential)
     t = conn.execute("SELECT * FROM take_challenge(%s, 'consent')", (ch,)).fetchone()
-    conn.commit()  # burned whatever happens next
+    conn.commit()
     if t is None:
         raise HTTPException(400, "Passkey challenge is invalid, expired or already used; start the approval again")
     if t["consent_id"] != k["id"] or t["terms_hash"] != crypto.consent_terms_hash(consent_terms(k)):

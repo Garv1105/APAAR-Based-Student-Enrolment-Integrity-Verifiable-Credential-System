@@ -39,9 +39,7 @@ export default function StudentHome() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      {/* Student Profile & Digital APAAR ID Card */}
       <div className="grid gap-6 md:grid-cols-3">
-        {/* APAAR identity summary */}
         <div className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-[#1a1710] via-raised to-surface p-6 text-white ring-1 ring-gold/25 shadow-premium-lg md:col-span-1 flex flex-col justify-between">
           <div className="absolute right-0 top-0 -mr-8 -mt-8 h-32 w-32 rounded-full bg-accent-600/20 blur-2xl" />
 
@@ -74,7 +72,6 @@ export default function StudentHome() {
           </div>
         </div>
 
-        {/* Overview Header */}
         <div className="flex flex-col justify-between rounded-3xl border border-slate-200/90 bg-surface p-6 shadow-premium md:col-span-2">
           <div>
             <h1 className="mt-1 font-display text-[36px] font-normal leading-tight text-ink sm:text-[42px]">
@@ -101,7 +98,6 @@ export default function StudentHome() {
         </div>
       )}
 
-      {/* Enrolment Registry Record */}
       <Card
         title={
           <div className="flex items-center gap-2">
@@ -131,7 +127,6 @@ export default function StudentHome() {
         )}
       </Card>
 
-      {/* Consent Requests Inbox */}
       <Card id="consents"
         title={
           <div className="flex items-center gap-2.5">
@@ -189,7 +184,6 @@ export default function StudentHome() {
         )}
       </Card>
 
-      {/* Credential Wallet */}
       <Card id="wallet"
         title={
           <div className="flex items-center gap-2">
@@ -223,7 +217,6 @@ export default function StudentHome() {
         )}
       </Card>
 
-      {/* Access Audit Log */}
       <Card id="access-log"
         title={
           <div className="flex items-center gap-2">

@@ -5,7 +5,7 @@ interface PasswordFieldProps {
   value: string;
   onChange: (val: string) => void;
   disabled?: boolean;
-  demo?: boolean;  // DEMO_MODE: offer to fill the seeded MOCK password
+  demo?: boolean;
   id?: string;
   label?: string;
   autoComplete?: string;

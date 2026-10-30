@@ -1,4 +1,3 @@
-"""T5.7: printed-certificate QR (Req 10) — Base45 per RFC 9285, AV1 payload, certificate endpoint."""
 import pytest
 
 from app import credentials
@@ -7,12 +6,11 @@ from test_credentials import a_enrolment, issue, verify
 
 
 def test_base45_rfc9285_examples():
-    # RFC 9285 §4.3 / §4.4 examples
     assert credentials.b45encode(b"AB") == "BB8"
     assert credentials.b45encode(b"Hello!!") == "%69 VD92EX0"
     assert credentials.b45encode(b"base-45") == "UJCLQE7W581"
     assert credentials.b45decode("QED8WEX0") == b"ietf!"
-    for bad in ("GGW", "A", "a1"):  # out-of-range triplet, bad length, lowercase not in the alphabet
+    for bad in ("GGW", "A", "a1"):
         with pytest.raises(ValueError):
             credentials.b45decode(bad)
 
@@ -25,12 +23,12 @@ def test_certificate_qr_round_trip_and_verification(client, dbconn, capsys):
     assert cert.status_code == 200, cert.text
     body = cert.json()
     s = body["credential"]["credentialSubject"]
-    assert s["apaarId"] == row["apaar_id"] and s["studentId"] == row["institution_student_id"]  # both IDs printed (Req 10)
+    assert s["apaarId"] == row["apaar_id"] and s["studentId"] == row["institution_student_id"]
     assert body["qr_svg"].startswith("<?xml") or body["qr_svg"].startswith("<svg")
     assert credentials.from_qr_payload(body["qr_payload"]) == vc
-    with capsys.disabled():  # PRD §11.8: measure the real payload size
+    with capsys.disabled():
         print(f"\nDegreeCredential QR payload: {body['qr_payload_chars']} Base45 chars (QR alphanumeric, EC level M)")
-    assert body["qr_payload_chars"] < 3391  # QR version 40-M alphanumeric capacity
+    assert body["qr_payload_chars"] < 3391
 
     r = client.post("/v1/verify", json={"qr": body["qr_payload"]}, headers=login(client, "employer")).json()
     assert r["result"] == "VALID"

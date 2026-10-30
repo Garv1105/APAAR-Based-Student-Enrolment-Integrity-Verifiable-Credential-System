@@ -1,12 +1,3 @@
-"""Gemini explainer: the ONLY module that talks to an LLM (CLAUDE.md rule).
-
-- Advisory only: it puts numbers the deterministic code already produced into plain words. It never decides validity,
-  seat limits, duplicates or rankings.
-- Free tier (owner's decision): Google may use free-tier prompts, so inputs are built here from an allow-list of
-  aggregates (codes, counts, percentages, labels). Never names, DOB, APAAR IDs, guardian names or row contents.
-- No key, a timeout, an error or the free-tier rate limit -> the rule-based summary below, so every page still works.
-- Answers are cached per input for CACHE_TTL to save the free quota; callers audit every request.
-"""
 import json
 import re
 import threading
@@ -26,7 +17,6 @@ SYSTEM = ("You explain data-quality findings on India's AICTE student-enrolment 
           "headings or tables, no greeting.")
 LABEL_AI = "AI-generated summary (Gemini). Advisory only: check the numbers above before acting."
 LABEL_RULES = "Automatic summary from the platform's own rules."
-# Languages Gemini may answer in (major scheduled Indian languages + English). Codes match backend/i18n/<code>.json.
 LANGS = {"en": "English", "hi": "Hindi", "bn": "Bengali", "mr": "Marathi", "te": "Telugu", "ta": "Tamil", "gu": "Gujarati",
          "kn": "Kannada", "ml": "Malayalam", "or": "Odia", "pa": "Punjabi", "as": "Assamese", "ur": "Urdu"}
 SCRIPTS = {"hi": "Devanagari", "bn": "Bengali", "mr": "Devanagari", "te": "Telugu", "ta": "Tamil", "gu": "Gujarati", "kn": "Kannada",
@@ -45,14 +35,13 @@ def enabled() -> bool:
 
 
 def _call(facts: dict, task: str, json_out: bool = False, max_tokens: int = 400) -> str | None:
-    """One generateContent call; None on any failure (the caller falls back to rules)."""
     config = {"temperature": 0.2, "maxOutputTokens": max_tokens} | ({"responseMimeType": "application/json"} if json_out else {})
     body = {"systemInstruction": {"parts": [{"text": SYSTEM}]},
             "contents": [{"role": "user", "parts": [{"text": f"{task}\n\nFacts (JSON):\n{json.dumps(facts, ensure_ascii=False)}"}]}],
             "generationConfig": config}
     try:
         r = httpx.post(URL.format(model=model()), json=body, timeout=TIMEOUT,
-                       headers={"x-goog-api-key": db._env("GEMINI_API_KEY") or ""})  # header, so the key never sits in a URL
+                       headers={"x-goog-api-key": db._env("GEMINI_API_KEY") or ""})
         if r.status_code != 200:
             return None
         parts = r.json()["candidates"][0]["content"]["parts"]
@@ -63,11 +52,10 @@ def _call(facts: dict, task: str, json_out: bool = False, max_tokens: int = 400)
 
 
 def generate(purpose: str, facts: dict, task: str, fallback: str, max_tokens: int = 400, lang: str = "en") -> dict:
-    """{text, source: gemini|rules, model, cached, label}. `facts` must come from the allow-listed builders below."""
     if lang != "en":
         task += (f" Write the whole answer in {LANGS[lang]} using its native {SCRIPTS[lang]} script, never in Latin letters; keep "
                  "numbers, codes and the words APAAR and AICTE as they are.")
-        max_tokens = int(max_tokens * 1.8)  # Indic scripts take more tokens
+        max_tokens = int(max_tokens * 1.8)
     key = crypto.sha256_hex(json.dumps([purpose, model(), lang, facts], sort_keys=True).encode())
     with _lock:
         hit = _cache.get(key)
@@ -77,19 +65,17 @@ def generate(purpose: str, facts: dict, task: str, fallback: str, max_tokens: in
     if text is None:
         return {"text": fallback, "source": "rules", "model": None, "cached": False, "label": LABEL_RULES}
     with _lock:
-        if len(_cache) > 2000:  # ponytail: simple bound; per instance, so serverless copies each keep their own
+        if len(_cache) > 2000:
             _cache.clear()
         _cache[key] = (time.time(), text)
     return {"text": text, "source": "gemini", "model": model(), "cached": False, "label": LABEL_AI}
 
 
-# ---------- allow-listed fact builders (the only inputs that may reach the model) ----------
 def _pct(v: float) -> int:
     return round(v * 100)
 
 
 def institution_facts(entry: dict, priority: str) -> dict:
-    """From an inspection-queue entry: score parts, warning-sign kinds and the rules' own explanation lines."""
     d = entry.get("dqs") or {}
     return {
         "priority": priority,
@@ -116,7 +102,6 @@ def institution_fallback(facts: dict) -> str:
 
 
 def upload_facts(counts: dict, issues: list[dict]) -> dict:
-    """From a batch: counts plus one line per problem type (code, title, fix hint, rows, columns). No row contents."""
     groups: dict[str, dict] = {}
     for i in issues:
         g = groups.setdefault(i["code"], {"code": i["code"], "problem": i["title"], "severity": i["severity"],
@@ -141,9 +126,7 @@ def upload_fallback(facts: dict) -> str:
     return "\n".join(lines)
 
 
-# ---------- inspection note draft (the AICTE officer edits it before use) ----------
 def note_facts(entry: dict, priority: str) -> dict:
-    """institution_facts plus officers' decisions on its warning signs (the decision only, never the written reason)."""
     facts = institution_facts(entry, priority)
     facts["officer_decisions"] = [{"kind": f["type"].replace("_", " ").lower(), "decision": str((f.get("review") or {}).get("decision"))}
                                   for f in entry.get("flags", []) if f.get("review")][:12]
@@ -165,7 +148,6 @@ def note_fallback(facts: dict) -> str:
     ])
 
 
-# ---------- CSV header matching (header NAMES only, never values) ----------
 ALIASES = {
     "apaar_id": ["apaar", "apaar no", "apaar number", "apaar id no", "abc id"],
     "apaar_reason": ["reason", "apaar status", "no apaar reason"],
@@ -186,7 +168,6 @@ DATA_LIKE = re.compile(r"\d{5,}|\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}|@")
 
 
 def looks_like_data(header: str) -> bool:
-    """A header row should hold names, not values: a long number, a date or an email may be a student's data."""
     return len(header) > 60 or bool(DATA_LIKE.search(header))
 
 
@@ -195,7 +176,6 @@ def _norm(h: str) -> str:
 
 
 def rule_mapping(headers: list[str], columns: list[str]) -> dict[str, str | None]:
-    """Exact name or known alias first, then a fuzzy match (rapidfuzz, already a dependency); each column used once."""
     from rapidfuzz import fuzz, process
     choices = {c: [c.replace("_", " ")] + ALIASES.get(c, []) for c in columns}
     out: dict[str, str | None] = {}
@@ -214,7 +194,6 @@ def rule_mapping(headers: list[str], columns: list[str]) -> dict[str, str | None
 
 
 def map_columns(headers: list[str], columns: list[str]) -> dict:
-    """{mapping, source, label}. The model only suggests; unknown or repeated columns fall back to the rule match."""
     rules = rule_mapping(headers, columns)
     raw = _call({"their_headers": headers, "template_columns": columns},
                 "Match each of their_headers to at most one of template_columns, or null if none fits. "
@@ -237,9 +216,7 @@ def map_columns(headers: list[str], columns: list[str]) -> dict:
     return {"mapping": out, "source": "gemini", "label": "Suggested by Gemini (AI). Check each match before uploading."}
 
 
-# ---------- one-time message translation (offline tool; a person reviews the result) ----------
 def translate_catalogue(entries: dict, language: str) -> dict | None:
-    """{code: {title, template, fix_hint}} -> the same shape in `language`, or None. Message templates only, no data."""
     raw = _call({"messages": entries},
                 f"Translate every title, template and fix_hint into {language}, written in its native script (never Latin letters), "
                 "for college data officers. Keep exactly unchanged: "
@@ -250,15 +227,12 @@ def translate_catalogue(entries: dict, language: str) -> dict | None:
         out = json.loads(raw) if raw else None
     except ValueError:
         return None
-    if isinstance(out, dict) and set(out) == {"messages"}:  # the model may echo the wrapper it was given
+    if isinstance(out, dict) and set(out) == {"messages"}:
         out = out["messages"]
     return out if isinstance(out, dict) else None
 
 
-# ---------- AICTE reports & integrity (aggregates only) ----------
 def report_facts(kind: str, header: list[str], rows: list[dict], ledger_status: dict) -> dict:
-    """Compact, allow-listed aggregates of a national report: totals and the top rows by the report's key measure.
-    Institution names and counts only; no student rows (the reports themselves carry none)."""
     if kind == "state-summary":
         keep = ("state", "institutions", "approved_intake", "active_enrolments", "fill_pct", "excess_seats", "open_duplicate_cases",
                 "apaar_coverage_pct")
@@ -286,7 +260,6 @@ def report_facts(kind: str, header: list[str], rows: list[dict], ledger_status: 
         return {"report": "excess-admission case file", "over_cap_rows": len(rows), "institutions": len(per),
                 "still_over_cap": sum(t["still_over_cap"] for t in per.values()), "worst_institutions": worst[:12],
                 "ledger_consistent": ledger_status.get("ok")}
-    # ledger
     return {"report": "seat ledger integrity", "consistent": ledger_status.get("ok"), "entries": ledger_status.get("entries"),
             "checkpoint_ok": ledger_status.get("checkpoint_ok"), "problems": len(ledger_status.get("problems") or [])}
 

@@ -1,24 +1,11 @@
-"""A3: shared-student network (docs/ANOMALY_V2_SPEC.md §A3). Pure functions over edge COUNTS only.
-
-Colleges are nodes; an edge counts students shared between two colleges (from the regulator-only SQL function
-shared_student_edges, which joins on the APAAR blind index). Normal migration makes thin, scattered edges. A ring
-(several colleges densely sharing the same students) points to ghost students or seat blocking.
-
-  weight = active_shared + 0.5 * historical_shared + 2 * carousel; edges with weight >= EDGE_MIN are kept
-  rings: 2-core of the kept graph (iteratively drop colleges with < 2 kept edges), then connected components (union-find);
-         SHARED_STUDENT_RING if size >= 3 and (density >= 0.5 or carousel >= 5) and shared_ratio >= 0.02
-  SEAT_BLOCKING: a pair with >= 5 students active at both, unless both colleges are in the same flagged ring
-                 (then those students are part of the ring flag: active_shared_inside)
-historical_shared and carousel need multi-year migration data; on single-year data they are ~0.
-"""
 from .rules import LABEL
 
-EDGE_MIN = 3.0            # minimum edge weight kept in the graph
-RING_MIN_SIZE = 3         # colleges
-RING_DENSITY = 0.5        # kept edges / possible edges
-RING_CAROUSEL = 5         # students who moved A -> B -> A inside the component
-RING_SHARED_RATIO = 0.02  # shared students / active enrolments of the component's colleges
-SEAT_BLOCKING_MIN = 5     # students active at both colleges of a pair
+EDGE_MIN = 3.0
+RING_MIN_SIZE = 3
+RING_DENSITY = 0.5
+RING_CAROUSEL = 5
+RING_SHARED_RATIO = 0.02
+SEAT_BLOCKING_MIN = 5
 
 
 def weight(e: dict) -> float:
@@ -26,7 +13,6 @@ def weight(e: dict) -> float:
 
 
 def components(nodes, edges) -> list[list[str]]:
-    """Connected components by union-find; deterministic order (each sorted, then by first member)."""
     parent = {n: n for n in nodes}
 
     def find(x):
@@ -46,7 +32,6 @@ def components(nodes, edges) -> list[list[str]]:
 
 
 def two_core(nodes, edges) -> set[str]:
-    """Colleges left after repeatedly removing those with fewer than 2 edges (strips chains and pendant pairs)."""
     alive = set(nodes)
     while True:
         deg = {n: 0 for n in alive}
@@ -61,7 +46,6 @@ def two_core(nodes, edges) -> set[str]:
 
 
 def analyse(edges: list[dict], enrolments: dict[str, int]) -> dict:
-    """edges: {inst_a, inst_b, active_shared, historical_shared, carousel}; enrolments: active enrolments per college."""
     es = [{**e, "weight": weight(e), "kept": weight(e) >= EDGE_MIN} for e in edges]
     kept = [e for e in es if e["kept"]]
     kept_pairs = [(e["inst_a"], e["inst_b"]) for e in kept]

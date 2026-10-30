@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""
-Independent check of a generated dataset: re-reads every upload file from disk, recomputes the
-expected codes from the raw cells + registries, and compares them with ground_truth.json.
-
-  python -m synthetic.selfcheck data/
-
-Exit code 0 = ground truth is consistent with the files. This is also a reference implementation
-of the parsing rules a validator must handle (header variants, date/bool/seat/reason dialects).
-"""
 from __future__ import annotations
 
 import csv
@@ -124,7 +115,6 @@ def main(root: Path) -> int:
 
     tmap = {(t["file"], t["row"]): set(t["codes"]) for t in truth["rows"]}
 
-    # 1) row-local codes recomputed from raw cells
     for key, r in rows.items():
         exp: set[str] = set()
         if aicte[r["inst"]]["status_by_year"][year] != "approved":
@@ -152,7 +142,6 @@ def main(root: Path) -> int:
         if exp != got:
             errors.append(f"{key}: recomputed {sorted(exp)} vs truth {sorted(got)}")
 
-    # 2) duplicate groups are real, and no APAAR is reused outside a group/negative
     explained: set[tuple] = set()
     for g in truth["duplicate_groups"]:
         m = [rows[(x["file"], x["row"])] for x in g["members"]]
@@ -180,7 +169,6 @@ def main(root: Path) -> int:
         if len(rs) > 1 and not all((r["file"], r["row"]) in explained for r in rs):
             errors.append(f"APAAR {a} reused outside any group/negative: {[(r['file'], r['row']) for r in rs]}")
 
-    # 3) programme-level codes recomputed from counted rows
     cats, pools = caps_cfg["seat_categories"], caps_cfg["pools"]
     counts: dict[tuple[str, str], Counter] = defaultdict(Counter)
     for key, r in rows.items():
@@ -214,7 +202,6 @@ def main(root: Path) -> int:
         errors.append(f"programme faults differ: only-recomputed={sorted(derived - truth_p)} "
                       f"only-truth={sorted(truth_p - derived)}")
 
-    # 4) mutations: E501 exactly for post-deadline ones
     dl = datetime.fromisoformat(man["reporting_deadline"])
     for m in json.loads((root / "mutations.json").read_text()):
         if (datetime.fromisoformat(m["at"]) > dl) != bool(m["expected_codes"]):

@@ -1,4 +1,3 @@
-"""Dashboard aggregates (PRD §14). Plain SQL over live tables; counters are the intake source."""
 import time
 
 from . import ledger
@@ -7,8 +6,6 @@ _LEDGER_OK: tuple[float, bool] | None = None
 
 
 def _ledger_ok(conn) -> bool:
-    """Dashboard badge only. ponytail: 60 s per-process cache, because a full verify reads every ledger entry and enrolment
-    (about 3 s at 58k rows) and the dashboard polls every 30 s. GET /v1/ledger/verify always re-checks."""
     global _LEDGER_OK
     if _LEDGER_OK is None or time.monotonic() - _LEDGER_OK[0] > 60:
         _LEDGER_OK = (time.monotonic(), ledger.verify(conn)["ok"])
@@ -77,7 +74,6 @@ def aicte(conn) -> dict:
         "totals": {"institutions": one("SELECT count(*) n FROM institutions"),
                    "active_enrolments": one("SELECT count(*) n FROM enrolments WHERE academic_year=%s AND status='active'", year),
                    "approved_intake": one("SELECT coalesce(sum(approved_intake),0)::int n FROM approved_intake WHERE academic_year=%s", year),
-                   # sub-cap rows (e.g. SN_FN_OCI_CIWG:CIWG) overflow inside their parent pool: don't count them twice
                    "excess_seats": sum(r["excess"] for r in excess if ":" not in r["category_code"]),
                    "batches": one("SELECT count(*) n FROM upload_batches"),
                    "post_deadline_mutations": one("SELECT count(*) n FROM anomaly_flags WHERE type='E501'")},

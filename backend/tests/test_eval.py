@@ -1,9 +1,3 @@
-"""Detection quality on labelled synthetic data (PRD §2.4). Run with -s to print the table.
-
-Replays data/synthetic/scenario.json through the pure engine with an in-memory store of
-active enrolments. E501 needs the DB layer and is evaluated in the API eval instead.
-Regenerate data with `py data/gen.py --seed 42`. Do not loosen the thresholds to pass.
-"""
 import csv
 import json
 from datetime import date
@@ -23,7 +17,7 @@ def run_scenario():
     cats = {c["code"]: c for c in SEED["seat_categories"]}
     y = SEED["academic_years"][0]
     year = {"code": y["code"], "window_start": date.fromisoformat(y["window_start"]), "window_end": date.fromisoformat(y["window_end"])}
-    active, counters, predicted = {}, {}, {}   # bi -> (institution, programme_id, counter_keys, student_id_key)
+    active, counters, predicted = {}, {}, {}
     by_apaar = {}
     for step in json.loads((DATA / "synthetic/scenario.json").read_text())["steps"]:
         if step["op"] == "upload":
@@ -42,7 +36,6 @@ def run_scenario():
             for o in validate_batch(rows, ctx):
                 predicted[(step["file"], o["row_no"])] = {i["code"] for i in o["issues"]}
                 if o["accepted"]:
-                    # no-APAAR rows still hold a student ID (and seats); key them by row
                     k = o["bi"] or ("row", step["file"], o["row_no"])
                     active[k] = (inst, o["programme_id"], o["counter_keys"], student_id_key(o["data"]["institution_student_id"]))
                     if o["bi"]:

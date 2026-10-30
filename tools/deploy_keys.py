@@ -1,12 +1,3 @@
-"""Complete a key file for a serverless deployment, then print it as one line for the APAAR_KEYS_JSON variable.
-
-    set APAAR_KEY_FILE=<keys file kept OUTSIDE git>   (the same file used to seed the production database)
-    set APAAR_DB=<database>  DATABASE_URL=<admin URL>
-    .venv\\Scripts\\python.exe tools/deploy_keys.py --out <file for the env value>
-
-Serverless instances can't write keys, so every key the API may ask for must exist up front: the symmetric keys, the
-AICTE signers, the demo forged issuer and every issuer DID in the trust registry. Never commit either file.
-"""
 import argparse
 import json
 import os
@@ -14,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
-os.environ.pop("APAAR_KEYS_JSON", None)  # this tool writes the key file
+os.environ.pop("APAAR_KEYS_JSON", None)
 from app import consent, credentials, crypto, db, ledger  # noqa: E402
 
 SYMMETRIC = ("k_enc", "k_apaar_bi", "k_dob_bi", "k_name_bi", "k_jwt", "k_activation")

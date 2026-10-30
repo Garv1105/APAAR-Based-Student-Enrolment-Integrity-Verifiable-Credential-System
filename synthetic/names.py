@@ -1,5 +1,3 @@
-"""Name and place vocabularies for synthetic data. All combinations are invented."""
-
 FIRST_MALE = [
     "Aarav", "Aditya", "Akash", "Amit", "Anil", "Arjun", "Ashok", "Bharath", "Chetan", "Deepak",
     "Dinesh", "Ganesh", "Gaurav", "Harish", "Imran", "Jagdish", "Karthik", "Kiran", "Lokesh", "Mahesh",
@@ -24,8 +22,6 @@ SURNAMES = [
     "Thakur", "Rathore", "Mehta", "Kapoor", "Malhotra", "Sinha", "Jha", "Mohanty", "Sahu", "Borah",
 ]
 
-# Spelling variants of the same name. A validator should treat these as the same person
-# (used for transliteration negatives and for fuzzy-duplicate positives).
 VARIANT_GROUPS = [
     ["Mohammed", "Mohd", "Muhammad", "Mohammad"],
     ["Lakshmi", "Laxmi", "Lakshmy"],

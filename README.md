@@ -66,8 +66,6 @@ How far each PS requirement has got, with the evidence in the test suite:
 | Innovation: Indian languages | ✅ | Upload messages and AI answers in English + 12 Indian languages (machine-translated; tests check every placeholder and code survives) |
 | 10. APAAR ID + student ID on certificates | ✅ | Printable certificate showing both IDs in full, with a QR holding the signed credential (`AV1:` + Base45(zlib), RFC 9285). Measured at 1,012 chars, which fits one QR at error-correction level M |
 
-Day-to-day progress, blockers and limitations are tracked in [`TASKS.md`](docs/TASKS.md). What is in or out of scope is in [`MVP_SCOPE.md`](docs/MVP_SCOPE.md).
-
 ## Architecture
 
 ```
@@ -89,7 +87,7 @@ PostgreSQL 18: schema.sql + rls.sql (FORCE row-level security, SECURITY DEFINER 
 
 **Stack:** React 19 + TypeScript + Vite + Tailwind CSS 4 + Recharts (frontend); Python 3.14, FastAPI, psycopg 3 (raw SQL), PostgreSQL 18, `cryptography`, `rfc8785`, `rapidfuzz`, `jellyfish`, `argon2-cffi`, PyJWT; optional Google Gemini over plain REST (no SDK). Hosted on Vercel (static frontend + one Python function) with Neon Postgres. Exact versions are pinned in `requirements.txt`.
 
-**Design rules** (full list in [`CLAUDE.md`](CLAUDE.md)):
+**Design rules:**
 - Validity, seat limits and duplicate detection are decided by deterministic code. No LLM decides anything; AI only explains.
 - Approved intake comes **only** from the AICTE registry, never from the upload. A mismatched declaration raises `E303`.
 - Every accepted row counts toward intake, with or without an APAAR ID. Leaving out an APAAR never hides a student.
@@ -279,7 +277,7 @@ What is implemented and tested:
   - **No APAAR existence oracle.** A verifier's consent request gets the same response whether or not the APAAR is registered. Unmatched requests simply stay pending, exactly like unanswered ones. Requests are rate-limited (20/hour per verifier) and audit-logged. Verifiers never see `student_id`, even at the SQL level.
 - **Crypto against standard vectors.** The primitives are checked against RFC 8032 (Ed25519), RFC 4231 (HMAC), the McGrew–Viega GCM vectors and the RFC 8785 (JCS) example.
 
-Security reviews of the RLS, credential and consent changes found no high-severity issues. All medium findings are fixed. The open low findings are listed in [`TASKS.md`](docs/TASKS.md).
+Security reviews of the RLS, credential and consent changes found no high-severity issues. All medium findings are fixed.
 
 ## Tests and evaluation
 
@@ -323,15 +321,13 @@ Every "false positive" sits on a programme the generator deliberately over-fille
 ├── api/index.py            Vercel entry point for the FastAPI app
 ├── synthetic/              independent synthetic-data generator used to score the anomaly rules
 ├── tools/                  translation, deploy keys, world loading, ERP connector
-├── docs/                   PRD, scope, plan, task log, demo runbook, design references
+├── docs/                   PRD, demo runbook
 ├── vercel.json             deployment config
-├── requirements.txt        pinned Python dependencies
-└── CLAUDE.md               engineering rules
+└── requirements.txt        pinned Python dependencies
 ```
 
 ## Known limitations
 
-These are the main ones; the full list is in [`TASKS.md`](docs/TASKS.md).
 - **Mock APAAR format rule.** APAAR is checked only as exactly 12 digits, because the real checksum isn't public.
 - **Only one seat scheme modelled.** FN/OCI/CIWG is the only supernumerary scheme, and its rounding still needs checking against the AICTE Approval Process Handbook. Other schemes (TFW, PMSSS, J&K, PwD) aren't guessed.
 - **Validation is synchronous.** It runs inside the upload request, which is fine for demo-sized batches. There's no background processing or push updates yet.
@@ -354,9 +350,4 @@ These are the main ones; the full list is in [`TASKS.md`](docs/TASKS.md).
 
 ## Documents
 - [`APAAR_SIH_PRD.md`](docs/APAAR_SIH_PRD.md): problem statement, design, sources
-- [`MVP_SCOPE.md`](docs/MVP_SCOPE.md): included and deferred features
-- [`TASKS.md`](docs/TASKS.md): progress, risks, limitations
-- [`IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md): reference phased plan
 - [`demo-runbook.md`](docs/demo-runbook.md): step-by-step demo script
-- [`ANOMALY_V2_SPEC.md`](docs/ANOMALY_V2_SPEC.md): anomaly rules specification
-- [`design/`](docs/design/): logo and UI reference images

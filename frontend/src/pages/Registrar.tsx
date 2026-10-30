@@ -11,7 +11,6 @@ import { ApiError, getJson, sendJson, type S } from "../api/client";
 import { CertificateButton, CredentialCard } from "../credentials";
 import { Badge, Button, Card, Empty, ErrorNote, PageHeader } from "../ui";
 
-/** University registrar: find a student at an affiliated institution and award the degree credential (Req 10). */
 export default function RegistrarHome() {
   return (
     <div className="space-y-6">
@@ -23,8 +22,6 @@ export default function RegistrarHome() {
   );
 }
 
-/** Shared by the registrar (degrees) and the institution (enrolment credentials, completion/withdrawal). */
-/** `bare` drops the card frame and adds a short guide before the first search (used on the institution dashboard). */
 export function EnrolmentLookup({ mode, bare = false }: { mode: "registrar" | "institution"; bare?: boolean }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<S["EnrolmentOut"][] | null>(null);
@@ -193,7 +190,6 @@ function EnrolmentPanel({
         </Badge>
       </div>
 
-      {/* Action Buttons */}
       <div className="mt-4 flex flex-wrap gap-2">
         {mode === "registrar" ? (
           <Button disabled={busy} onClick={() => issue("DegreeCredential")}>
@@ -240,7 +236,6 @@ function EnrolmentPanel({
 
       {mode === "institution" && e.status === "active" && <ActivationCodeBox enrolmentId={e.id} />}
 
-      {/* Credentials Sub-list */}
       {creds && (
         <div className="mt-4 border-t border-slate-100 pt-4">
           {creds.length === 0 ? (
@@ -277,7 +272,6 @@ function EnrolmentPanel({
 }
 
 
-/** P1: one-time passkey activation code for the student (or a minor's guardian). Shown once, never stored. */
 function ActivationCodeBox({ enrolmentId }: { enrolmentId: number }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<"student" | "guardian">("student");

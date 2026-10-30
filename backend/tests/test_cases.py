@@ -1,4 +1,3 @@
-"""T3.3: duplicate-case workflow. Neutral notices (F4), resolve, unmask with reason (D6), credential side effects."""
 import json
 
 from conftest import login, student_headers
@@ -44,7 +43,7 @@ def test_only_officer_resolves_and_unmask_needs_reason(client):
     assert client.post("/v1/cases/999999/unmask", json={"reason": "checking the case"}, headers=h).status_code == 404
     assert client.post(f"/v1/cases/{cid}/resolve", json={"status": "confirmed_duplicate", "note": "dup"}, headers=h).status_code == 422
     assert client.post(f"/v1/cases/{cid}/resolve", json=body, headers=h).status_code == 200
-    assert client.post(f"/v1/cases/{cid}/resolve", json=body, headers=h).status_code == 409  # final
+    assert client.post(f"/v1/cases/{cid}/resolve", json=body, headers=h).status_code == 409
 
 
 def test_unmask_is_audited_and_visible_to_student(client, dbconn):

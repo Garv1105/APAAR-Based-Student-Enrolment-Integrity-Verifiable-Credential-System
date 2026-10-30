@@ -10,10 +10,6 @@ const LINKS = [
   ["#/activate", "Activate account", "/activate"],
 ] as const;
 
-/**
- * Public header (sticky, glass): VidyaPramaan lockup, section links and a gold Sign in button. No government or AICTE
- * emblem: this is a prototype, not an official site (said in the footer).
- */
 export default function Navbar({ current = "/" }: { demo?: boolean; current?: string }) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-white/[0.06] bg-[#131417]/75 backdrop-blur-xl">

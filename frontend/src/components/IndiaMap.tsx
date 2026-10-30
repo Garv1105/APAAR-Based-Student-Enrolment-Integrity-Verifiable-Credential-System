@@ -2,14 +2,7 @@ import { useEffect, useId, useRef } from "react";
 import { INDIA_PATH, INDIA_VIEWBOX, STATE_PATHS, project } from "./indiaGeo";
 import { useReducedMotion } from "./motion";
 
-/**
- * Landing illustration of India (DataMeet boundaries, CC BY 4.0): lit land with state borders, city lights,
- * routes to New Delhi with travelling signals, a scanning light and a slight 3D tilt that follows the mouse.
- * With `values` (state -> count; null = withheld small count) states are shaded by count and name their number on
- * hover; without it the map is purely illustrative. Every animation stops when the user prefers reduced motion.
- */
 
-// [lon, lat, tier]  tier 1 = metro, 2 = large city, 3 = city
 const CITIES: [number, number, 1 | 2 | 3][] = [
   [72.88, 19.08, 1], [77.59, 12.97, 1], [80.27, 13.08, 1], [88.36, 22.57, 1], [78.49, 17.39, 1], [72.57, 23.02, 1], [73.86, 18.52, 1],
   [75.79, 26.91, 2], [80.95, 26.85, 2], [77.41, 23.26, 2], [85.14, 25.59, 2], [85.82, 20.3, 2], [91.75, 26.14, 2], [76.78, 30.73, 2],
@@ -19,7 +12,7 @@ const CITIES: [number, number, 1 | 2 | 3][] = [
   [76.96, 11.0, 3], [78.12, 9.93, 3], [79.83, 11.93, 3], [80.65, 16.51, 3], [79.58, 17.97, 3], [86.98, 23.68, 3], [93.94, 24.81, 3],
   [94.1, 25.67, 3], [91.28, 23.83, 3], [92.72, 23.73, 3], [88.6, 27.33, 3], [77.58, 34.16, 3], [92.73, 11.62, 3],
 ];
-const ROUTES = [0, 1, 2, 3, 4, 5, 12, 14, 20, 11]; // indices of cities with a visible route to New Delhi
+const ROUTES = [0, 1, 2, 3, 4, 5, 12, 14, 20, 11];
 const HUB = project(77.21, 28.61);
 
 const arc = ([x, y]: [number, number]) => {
@@ -30,7 +23,6 @@ const arc = ([x, y]: [number, number]) => {
   return `M${x.toFixed(1)} ${y.toFixed(1)} Q${cx.toFixed(1)} ${cy.toFixed(1)} ${hx.toFixed(1)} ${hy.toFixed(1)}`;
 };
 
-/** Tilts its child a few degrees toward the mouse (eased with rAF). */
 function useTilt(disabled: boolean) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -114,12 +106,10 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
           <filter id={`soft-${u}`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2.2" /></filter>
         </defs>
 
-        {/* halo + lit land */}
         <path d={INDIA_PATH} fill={p.halo} opacity="0.26" filter={`url(#halo-${u})`} />
         <path d={INDIA_PATH} fill={`url(#land-${u})`} />
         <path d={INDIA_PATH} fill={`url(#dots-${u})`} />
 
-        {/* state borders, then a scanning light, clipped to the land */}
         <g clipPath={`url(#clip-${u})`}>
           {STATE_PATHS.map((s) => {
             const v = values?.[s.name];
@@ -134,7 +124,6 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
         <path d={INDIA_PATH} fill="none" stroke={`url(#edge-${u})`} strokeWidth="1.1" strokeLinejoin="round" />
         <path d={INDIA_PATH} fill="none" stroke={p.label} strokeOpacity="0.35" strokeWidth="3" strokeLinejoin="round" filter={`url(#soft-${u})`} />
 
-        {/* routes to New Delhi: one smooth solid line each, with travelling signals */}
         {ROUTES.map((ci, i) => (
           <path key={ci} id={`r-${u}-${i}`} d={arc(pts[ci])} fill="none" stroke={`url(#route-${u})`} strokeWidth="1.1" strokeLinecap="round" />
         ))}
@@ -146,7 +135,6 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
           </circle>
         ))}
 
-        {/* city lights */}
         {pts.map(([x, y], i) => {
           const tier = CITIES[i][2];
           const r = tier === 1 ? 2.4 : tier === 2 ? 1.7 : 1.2;
@@ -158,7 +146,6 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
           );
         })}
 
-        {/* hub: New Delhi */}
         <circle cx={HUB[0]} cy={HUB[1]} r="34" fill={`url(#glow-${u})`} opacity="0.7" />
         {!reduce && <>
           <circle cx={HUB[0]} cy={HUB[1]} r="7" fill="none" stroke={p.dot} strokeWidth="1" className="hub-pulse" />
@@ -169,7 +156,6 @@ export default function IndiaMap({ className = "", tone = "blue", values, unit =
         <circle cx={HUB[0]} cy={HUB[1]} r="1.8" fill="#ffffff" />
         {hubLabel && <text x={HUB[0] + 20} y={HUB[1] - 14} fill={p.label} className="font-inter text-[11px] font-medium tracking-[0.12em]">NEW DELHI</text>}
 
-        {/* hover layer on top of the decoration: each state names its number */}
         {values && STATE_PATHS.map((s) => (
           <path key={s.name} d={s.d} fill="#ffffff" fillOpacity={0} className="cursor-default transition-[fill-opacity] duration-150 hover:[fill-opacity:0.14]">
             <title>{label(s.name)}</title>

@@ -1,4 +1,3 @@
-"""T-LANDING: AICTE-issued account codes, account activation, verifier access requests."""
 from conftest import login
 
 PW = "correct horse battery"
@@ -21,27 +20,27 @@ def test_account_code_sets_password_once(client, dbconn):
     code = r.json()["code"]
     assert r.json()["display_name"] and len(code) == 12
     assert activate(client, "inst-a", "AAAA-AAAA-AA").status_code == 401
-    assert activate(client, "inst-b", code).status_code == 401                   # code is bound to its account
-    ok = activate(client, "inst-a", code.lower())                                 # case and dashes tolerated
+    assert activate(client, "inst-b", code).status_code == 401
+    ok = activate(client, "inst-a", code.lower())
     assert ok.status_code == 200 and ok.json() == {"user_id": "inst-a", "role": "institution_admin"}
-    assert activate(client, "inst-a", code).status_code == 401                    # single use
+    assert activate(client, "inst-a", code).status_code == 401
     assert client.post("/v1/auth/login", json={"user_id": "inst-a", "password": PW}).status_code == 200
     assert client.post("/v1/auth/login", json={"user_id": "inst-a", "password": "demo"}).status_code == 401
     acts = {r["action"] for r in dbconn.execute("SELECT action FROM audit_logs WHERE entity='account_code'")}
     assert acts == {"account_code.issue", "account.activate"}
-    assert code not in str(dbconn.execute("SELECT * FROM account_codes").fetchall())  # keyed hash only
+    assert code not in str(dbconn.execute("SELECT * FROM account_codes").fetchall())
 
 
 def test_account_code_reissue_idempotency_and_unknown(client):
     first = issue(client, "inst-b").json()["code"]
     second = issue(client, "inst-b").json()["code"]
-    assert activate(client, "inst-b", first).status_code == 401                   # voided by the new code
+    assert activate(client, "inst-b", first).status_code == 401
     assert activate(client, "inst-b", second).status_code == 200
     r1, r2 = issue(client, "inst-c", key="k1"), issue(client, "inst-c", key="k1")
     assert r1.status_code == 201 and r2.status_code == 200 and r2.json()["code"] is None
     assert issue(client, "inst-c", key="k1", reason="a different reason here").status_code == 422
     assert issue(client, "nobody").status_code == 404
-    assert issue(client, "aicte").status_code == 404                              # regulator accounts aren't onboarded this way
+    assert issue(client, "aicte").status_code == 404
 
 
 def test_access_request_approve_activate_and_reject(client, dbconn):
@@ -62,7 +61,7 @@ def test_access_request_approve_activate_and_reject(client, dbconn):
     acct = d.json()["account"]
     uid = d.json()["request"]["user_id"]
     assert uid == acct["user_id"] and uid.startswith("prism-hr-verification-se-") and acct["code"]
-    assert client.post("/v1/auth/login", json={"user_id": uid, "password": "demo"}).status_code == 401  # no password yet
+    assert client.post("/v1/auth/login", json={"user_id": uid, "password": "demo"}).status_code == 401
     assert activate(client, uid, acct["code"]).json()["role"] == "verifier"
     v = client.post("/v1/auth/login", json={"user_id": uid, "password": PW})
     assert v.status_code == 200 and v.json()["role"] == "verifier" and v.json()["display_name"] == REQ["organisation"]

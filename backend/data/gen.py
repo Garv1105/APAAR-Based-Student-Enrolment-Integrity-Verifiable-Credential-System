@@ -1,16 +1,3 @@
-"""Synthetic dataset with labelled ground truth (PRD §15). Deterministic: `py data/gen.py --seed 42`.
-
-Writes:
-  data/seed/apaar_registry.json   MOCK APAAR registry
-  data/synthetic/*.csv            upload files
-  data/synthetic/scenario.json    ordered steps (uploads + patches) with expected patch codes
-  data/synthetic/ground_truth.json  {file, row_no, expected[]} for every row
-
-Static faults are injected per row. Order-dependent codes (E201 second occurrence, E301/E302
-rows beyond a cap, E303 first accepted row per programme) are derived after shuffling, using the
-counting rule documented in PRD §9.2: accepted rows count in file order; a row whose count exceeds
-the cap is flagged.
-"""
 import argparse
 import csv
 import json
@@ -97,7 +84,6 @@ class Gen:
 
 
 def derive_positional(rows, own_prior=()):
-    """Assign E201 / E301 / E302 / E303 by file order. Mirrors PRD §9.2 counting rule."""
     seen, counters, e303 = set(), {}, set()
     for r in rows:
         exp, raw = r["static"], r["raw"]
@@ -133,7 +119,6 @@ def build(seed):
     g = Gen(seed)
     files = {}
 
-    # ---- A1: clean institution (warnings only) ----
     a = []
     dup_ab = [g.next_person() for _ in range(3)]
     withdrawn, migrated = g.next_person(), g.next_person()
@@ -151,7 +136,6 @@ def build(seed):
     g.r.shuffle(a)
     files["A1.csv"] = a
 
-    # ---- B1: messy institution ----
     b, clean_b = [], []
     for _ in range(110):
         p = g.next_person()
@@ -159,7 +143,7 @@ def build(seed):
         b.append(g.row("B", "CSE", p))
     for p in dup_ab:
         b.append(g.row("B", "CSE", p, expected={"E203"}))
-    for p in (withdrawn, migrated):  # legitimate moves: must NOT flag
+    for p in (withdrawn, migrated):
         b.append(g.row("B", "CSE", p))
     for p in [g.next_person() for _ in range(2)]:
         b.append(g.row("B", "CSE", p, expected={"E104"}, student_name=g.wrong_name(p)))
@@ -171,14 +155,13 @@ def build(seed):
         b.append(g.row("B", "CSE", g.next_person(), expected={"E403"}, admission_date="2026-12-15"))
     for reason in ("REFUSED", "NOT_GENERATED", "PENDING"):
         b.append(g.row("B", "CSE", g.next_person(), expected={"E101W"}, apaar_id="", apaar_reason=reason))
-    # rejected rows
     for _ in range(3):
         b.append(g.row("B", "CSE", g.next_person(), expected={"E101"}, apaar_id=""))
     for bad in ("12345", "1234567890123", "12345678901X"):
         b.append(g.row("B", "CSE", g.next_person(), expected={"E102"}, apaar_id=bad))
     for _ in range(3):
         p = dict(g.next_person())
-        p["apaar"] = g._apaar()  # fresh id never added to the registry
+        p["apaar"] = g._apaar()
         b.append(g.row("B", "CSE", p, expected={"E103"}))
     for fl in ({"is_fn": "Y", "is_oci": "Y"}, {"is_nri": "Y", "is_fn": "Y"}, {"is_nri": "Y", "is_oci": "Y"}):
         b.append(g.row("B", "CSE", g.next_person(), expected={"E401"}, **fl))
@@ -190,9 +173,8 @@ def build(seed):
         p = g.next_person()
         d = date.fromisoformat(p["dob"])
         b.append(g.row("B", "CSE", p, expected={"E001"}, dob=d.strftime("%d/%m/%Y")))
-    for p in g.r.sample(clean_b[:60], 3):  # exact in-file duplicates; E201 assigned by order
+    for p in g.r.sample(clean_b[:60], 3):
         b.append(g.row("B", "CSE", p))
-    # supernumerary pool: cap 18, CIWG sub-cap 6
     for i in range(14):
         b.append(g.row("B", "CSE", g.next_person(), **g.sn(**[{"is_fn": 1}, {"is_oci": 1}, {"is_nri": 1}][i % 3])))
     for _ in range(8):
@@ -202,36 +184,30 @@ def build(seed):
     g.r.shuffle(b)
     files["B1.csv"] = b
 
-    # ---- C1: enrolment spike vs history (anomaly), within intake ----
     c = [g.row("C", "MBA", g.next_person()) for _ in range(116)]
     c += [g.row("C", "MBA", g.next_person(), expected={"E403"}, admission_date="2026-06-20") for _ in range(2)]
     g.r.shuffle(c)
-    # student-ID faults appended after the shuffle so "first occurrence" is unambiguous
     c += [g.row("C", "MBA", g.next_person(), expected={"E105"}, institution_student_id="") for _ in range(2)]
     c += [g.row("C", "MBA", g.next_person(), expected={"E205"}, institution_student_id=c[k]["raw"]["institution_student_id"])
           for k in (0, 1)]
     files["C1.csv"] = c
 
-    # ---- D1: closed institution ----
     files["D1.csv"] = [g.row("D", "CE", g.next_person(), expected={"E304"}) for _ in range(10)]
 
     for name in ("A1.csv", "B1.csv", "C1.csv", "D1.csv"):
         derive_positional(files[name])
 
-    # ---- B2: second batch: repeats (E202) + new ME rows ----
     accepted_b = [r for r in files["B1.csv"] if r["prog"] == "CSE" and not r["static"] and r["raw"]["seat_category"] == "REGULAR"]
     b2 = [g.row("B", "CSE", {"apaar": r["raw"]["apaar_id"], "name": r["raw"]["student_name"], "dob": r["raw"]["dob"],
                              "guardian": r["raw"]["guardian_name"]}, expected={"E202"}) for r in accepted_b[:5]]
     b2 += [g.row("B", "ME", g.next_person()) for _ in range(3)]
-    # new student reusing an active B1 student's ID -> E205 against the institution's existing enrolments
     b2.append(g.row("B", "ME", g.next_person(), expected={"E205"},
                     institution_student_id=accepted_b[20]["raw"]["institution_student_id"]))
-    files["B2.csv"] = b2  # ME count 40 + 3 <= 60, so no positional codes
+    files["B2.csv"] = b2
 
     post = accepted_b[10]["raw"]["apaar_id"]
     pre = accepted_b[11]["raw"]["apaar_id"]
     scenario = {"steps": [
-        # deadline pinned in the future so the run doesn't depend on today's date
         {"op": "set_deadline", "academic_year": "2026-27", "deadline": "2030-01-01T00:00:00+05:30"},
         {"op": "upload", "user": "inst-a", "file": "A1.csv"},
         {"op": "patch", "user": "inst-a", "apaar": withdrawn["apaar"],

@@ -1,11 +1,3 @@
-"""One-time translation of backend/i18n/en.json into another language with Gemini (through backend/app/ai.py).
-
-    .venv\\Scripts\\python.exe tools/translate_i18n.py --locale hi --language Hindi
-
-Only the message templates are sent (no data). Every field is checked: the {field}/{detail} placeholders, column names,
-codes and fixed words (APAAR, YYYY-MM-DD, ...) must survive unchanged, otherwise that field stays in English. The output
-is marked machine-translated: have a native speaker review it before relying on it.
-"""
 import argparse
 import json
 import re

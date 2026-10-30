@@ -1,7 +1,3 @@
-"""API contract: the single source of truth for request/response shapes.
-`py -m app.export_openapi` writes openapi.json; the frontend codes against it.
-Change this file first, then backend and frontend.
-"""
 import re
 from datetime import date, datetime
 from typing import Literal
@@ -9,23 +5,22 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-# ---------- upload row (data dictionary, PRD Req 2) ----------
 CSV_COLUMNS = [
-    "apaar_id",               # 12 digits, or blank with apaar_reason
-    "apaar_reason",           # REFUSED | NOT_GENERATED | PENDING (only when apaar_id blank)
-    "institution_student_id", # institution roll number, printed on certificates (Req 10)
+    "apaar_id",
+    "apaar_reason",
+    "institution_student_id",
     "student_name",
-    "dob",                    # YYYY-MM-DD
+    "dob",
     "guardian_name",
-    "programme_code",         # programme code within the uploading institution
-    "academic_year",          # e.g. 2026-27
-    "year_of_study",          # 1..duration
-    "seat_category",          # REGULAR | SN_FN_OCI_CIWG
-    "is_supernumerary",       # Y/N, must agree with seat_category scope
-    "is_lateral_entry",       # Y/N, only valid with year_of_study = 2
-    "is_nri", "is_oci", "is_fn", "is_ciwg",  # Y/N
-    "admission_date",         # YYYY-MM-DD
-    "declared_intake",        # optional; compared with AICTE registry (E303), never used as the limit
+    "programme_code",
+    "academic_year",
+    "year_of_study",
+    "seat_category",
+    "is_supernumerary",
+    "is_lateral_entry",
+    "is_nri", "is_oci", "is_fn", "is_ciwg",
+    "admission_date",
+    "declared_intake",
 ]
 REQUIRED_COLUMNS = [c for c in CSV_COLUMNS if c not in ("apaar_id", "apaar_reason", "guardian_name", "declared_intake")]
 APAAR_REASONS = ("REFUSED", "NOT_GENERATED", "PENDING")
@@ -261,7 +256,6 @@ class FlagReviewIn(BaseModel):
     @field_validator("reason")
     @classmethod
     def no_pii(cls, v: str) -> str:
-        # digit runs of 6+ (APAAR, phone, Aadhaar) or dates (DOB): reasons are shown to every regulator
         if re.search(r"\d[\d\s-]{4,}\d|\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}", v):
             raise ValueError("reason must not contain ID numbers, phone numbers or dates")
         return v
@@ -532,7 +526,6 @@ class Problem(BaseModel):
     detail: str | None = None
 
 
-# ---------- webhooks (Req 7) ----------
 WebhookEvent = Literal["batch.validated", "case.opened", "case.resolved", "credential.issued", "credential.revoked"]
 
 
@@ -575,7 +568,6 @@ class WebhookDeliveriesPage(BaseModel):
     next_cursor: int | None
 
 
-# ---------- passkeys (P1) ----------
 class AuthConfig(BaseModel):
     demo_mode: bool = Field(description="true: the MOCK APAAR + DOB sign-in and OTP consent approval are enabled")
     rp_id: str
@@ -622,7 +614,6 @@ class ActivationCodeOut(BaseModel):
     detail: str | None = None
 
 
-# ---------- T-LANDING: public portal, account activation, verifier access requests ----------
 class PublicStateStat(BaseModel):
     state: str
     institutions: int = Field(description="approved institutions in the registry")
@@ -719,7 +710,6 @@ class AccessRequestDecided(BaseModel):
     replayed: bool = False
 
 
-# ---------- T-AI: Gemini explainer (advisory) ----------
 class AiSummary(BaseModel):
     text: str
     source: Literal["gemini", "rules"] = Field(description="gemini = AI-generated; rules = the platform's own fallback summary")

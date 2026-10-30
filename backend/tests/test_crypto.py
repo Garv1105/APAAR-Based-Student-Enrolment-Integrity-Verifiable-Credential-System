@@ -1,4 +1,3 @@
-"""Standards test vectors for the primitives we rely on, plus our own wrappers."""
 import hashlib
 import hmac
 
@@ -12,7 +11,7 @@ H = bytes.fromhex
 
 
 def test_ed25519_rfc8032_test1_and_test2():
-    vectors = [  # RFC 8032 §7.1 TEST 1, TEST 2
+    vectors = [
         ("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
          "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a", "",
          "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"),
@@ -56,7 +55,7 @@ def test_field_encryption_roundtrip_and_row_column_binding():
     blob = crypto.encrypt("students", "name", 7, "Asha R")
     assert crypto.decrypt("students", "name", 7, blob) == "Asha R"
     assert b"Asha" not in blob
-    assert crypto.encrypt("students", "name", 7, "Asha R") != blob  # fresh nonce each time
+    assert crypto.encrypt("students", "name", 7, "Asha R") != blob
     for moved in (("students", "dob", 7), ("students", "name", 8), ("enrolments", "name", 7)):
         try:
             crypto.decrypt(*moved, blob)
@@ -84,7 +83,6 @@ def test_multikey_roundtrip():
 
 
 def test_keys_from_environment_are_read_only(monkeypatch):
-    """Serverless: keys come from APAAR_KEYS_JSON; a missing key fails instead of being invented per instance."""
     import json
     from app import crypto
     keys = {"k_enc": "11" * 32, "signing": {"aicte-ledger": "22" * 32}}
@@ -100,7 +98,7 @@ def test_keys_from_environment_are_read_only(monkeypatch):
             except RuntimeError as e:
                 assert crypto.KEYS_ENV in str(e)
     finally:
-        monkeypatch.setattr(crypto, "_keys", None)  # later tests reload the test key file
+        monkeypatch.setattr(crypto, "_keys", None)
 
 
 def test_jcs_fast_path_matches_rfc8785():

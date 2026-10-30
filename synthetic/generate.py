@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""
-Synthetic dataset generator for the APAAR Student Data Platform (SIH26263).
-
-Produces, under --out:
-  uploads/<institution_id>/batch_NN.(csv|xlsx)   messy institution uploads (what the platform ingests)
-  registry/apaar_registry.json                   mock APAAR registry (persons with APAAR IDs)
-  registry/aicte_institutions.json               mock AICTE approval registry (status, programmes, intake by year)
-  registry/approved_intake.csv                   same intake data, flat (seed approved_intake table)
-  registry/seat_categories_used.yaml             caps used for this run
-  history/enrolment_history.csv                  3 prior years of programme-level counts (anomaly baselines)
-  manifest.json                                  one entry per batch: file, institution, upload time, dialect
-  mutations.json                                 later edits/withdrawals (post-deadline ones must raise E501)
-  ground_truth.json                              answer key: row, duplicate-group, programme, batch, anomaly faults
-  summary.txt                                    human-readable counts
-
-Every value is synthetic. APAAR IDs are random 12-digit strings with a configurable prefix;
-use this data only in development/test environments.
-
-Usage:
-  python -m synthetic.generate --institutions 30 --students 50000 --faults synthetic/faults.yaml --out data/ --seed 42
-  python -m synthetic.generate --preset demo --out data_demo/ --seed 7
-"""
 from __future__ import annotations
 
 import argparse
@@ -37,7 +15,7 @@ from typing import Any
 import yaml
 from openpyxl import Workbook
 
-try:  # run as module (python -m synthetic.generate) or as a script
+try:
     from . import names as N
 except ImportError:  # pragma: no cover
     import names as N  # type: ignore
@@ -53,7 +31,6 @@ SEVERITY = {
 }
 BLOCKING = {c for c, s in SEVERITY.items() if s == "error"}
 
-# code -> (name, kind, short alias)
 PROGRAMMES = {
     "BE-CSE": ("B.E. Computer Science and Engineering", "BE", "CSE"),
     "BE-ISE": ("B.E. Information Science and Engineering", "BE", "ISE"),
@@ -76,7 +53,6 @@ INST_TYPES = {
 }
 AGE_RANGE = {"BE": (17.0, 20.5), "DIP": (15.2, 18.0), "PG": (21.0, 29.0), "LATERAL": (19.0, 23.0)}
 
-# Messy-format vocabularies
 HEADER_VARIANTS = {
     "apaar_id": ["APAAR ID", "Stud APAAR No", "APAAR_No", "Apaar Id.", "APAAR Number"],
     "apaar_reason": ["APAAR Status", "Reason if no APAAR", "APAAR Remarks"],
@@ -146,7 +122,6 @@ class Generator:
         self.up_start = date.fromisoformat(cal["uploads_between"][0])
         self.up_end = date.fromisoformat(cal["uploads_between"][1])
 
-    # ------------------------------------------------------------------ helpers
     def _apaar(self) -> str:
         pref = str(self.cfg["apaar_prefix"])
         while True:
@@ -222,7 +197,6 @@ class Generator:
         return {"FN": "FOREIGN", "OCI": "FOREIGN", "CIWG": "FOREIGN", "NRI": "FOREIGN"}.get(seat, seat)
 
     def _counted(self, r: dict) -> bool:
-        """Would this row be accepted and count toward intake? (blocked rows and withdrawn rows don't)."""
         return (r["enrolment_status"] == "active" and not r.get("_will_block")
                 and not (set(r["_codes"]) & BLOCKING))
 
@@ -256,7 +230,6 @@ class Generator:
         return next(p for p in inst["programmes"] if p["code"] == code)
 
     def _role_insts(self, role: str) -> list[dict]:
-        """Institutions eligible for a kind of injection. In the demo preset roles are fixed."""
         ok = [i for i in self.institutions if i["status"] == "approved"]
         if self.preset != "demo":
             return ok
@@ -264,7 +237,6 @@ class Generator:
                  "anomaly": ["C"], "declared": ["B"], "negative": ["A", "B"], "mutation": ["B"]}[role]
         return [i for i in ok if i["demo_role"] in roles]
 
-    # ------------------------------------------------------------------ build
     def build_institutions(self) -> None:
         rng, cfg = self.rng, self.cfg
         mess = cfg["messiness"]
@@ -285,21 +257,18 @@ class Generator:
                 "batches": [], "demo_role": None,
             }
             self.institutions.append(inst)
-        # closed institutions (E304): the last n_closed
         for inst in self.institutions[-n_closed:] if n_closed else []:
             inst["status"] = "closed"
             self.intended.append({"code": "E304", "institution_id": inst["id"]})
         if self.preset == "demo":
             for inst, role in zip(self.institutions, ["A", "B", "C", "D"]):
                 inst["demo_role"] = role
-        # scale intakes (multiples of 30) to approximate the requested student count
         total_w = sum(p["weight"] for i in self.institutions for p in i["programmes"])
         per_w = self.n_students / 0.92 / max(total_w, 1)
         for inst in self.institutions:
             for p in inst["programmes"]:
                 p["intake"] = max(30, int(round(p["weight"] * per_w / 30.0)) * 30)
                 p["name"], p["kind"], _ = PROGRAMMES[p["code"]]
-        # dialects
         n_decl = max(1, round(len(self.institutions) * mess["declared_intake_share"]))
         decl = set(rng.sample(range(len(self.institutions)), min(n_decl, len(self.institutions))))
         n_inj = mess.get("prompt_injection_header", 0)
@@ -349,7 +318,6 @@ class Generator:
         }
 
     def plan_special_programmes(self) -> None:
-        """Pick programmes for programme-level faults and anomalies (each gets one role)."""
         rng, cfg = self.rng, self.cfg
         pool = [(i, p) for i in self._role_insts("programme") for p in i["programmes"] if p["intake"] >= 60]
         an_pool = [(i, p) for i in self._role_insts("anomaly") for p in i["programmes"] if p["intake"] >= 60]
@@ -389,7 +357,6 @@ class Generator:
             pass
         for inst, p in take(an_pool, an["sequential_apaar"]["count"], "sequential_apaar"):
             pass
-        # declared-intake mismatches (E303): institutions with the declared column
         decl = [(i, p) for i in self._role_insts("declared") if i["dialect"]["declared_intake_column"]
                 for p in i["programmes"] if not p.get("role")]
         rng.shuffle(decl)
@@ -468,7 +435,6 @@ class Generator:
                     else:
                         person = self._person(kind)
                     self._row(inst, p, person)
-                # supernumerary seats
                 if kind in ("BE", "DIP") and caps["TFW"]:
                     for _ in range(rng.randint(0, caps["TFW"])):
                         self._row(inst, p, self._person(kind), "TFW")
@@ -494,7 +460,6 @@ class Generator:
                 if kind == "BE" and caps["LATERAL"]:
                     for _ in range(rng.randint(0, caps["LATERAL"])):
                         self._row(inst, p, self._person("LATERAL"), "LATERAL")
-        # closed institution: every row gets E304
         for r in self.rows:
             if self._inst_by_id(r["_inst"])["status"] == "closed":
                 r["_codes"].append("E304")
@@ -511,7 +476,6 @@ class Generator:
                 if r["_inst"] == inst["id"]:
                     r["_batch"] = 2 if two and rng.random() < 0.15 else 1
 
-    # ------------------------------------------------------------------ faults
     def _rate_count(self, rate: float, eligible: int) -> int:
         n = round(rate * eligible / 1000)
         minimum = 2 if self.preset == "demo" else 1
@@ -547,10 +511,10 @@ class Generator:
         else:
             i = self.rng.randint(1, 11)
             r["apaar_id"] = a[:i] + self.rng.choice("OIlSB") + a[i + 1:]
-        r["_raw_apaar"] = True  # keep exact string when writing
+        r["_raw_apaar"] = True
 
     def _f_E103(self, r: dict) -> None:
-        r["apaar_id"] = self._apaar()  # valid format, never added to the registry
+        r["apaar_id"] = self._apaar()
 
     def _f_E104(self, r: dict) -> None:
         if self.rng.random() < 0.5:
@@ -583,7 +547,7 @@ class Generator:
         age = self.rng.choice([self.rng.uniform(11.0, 13.5), self.rng.uniform(40.0, 52.0)])
         new = self.win_start - timedelta(days=int(age * 365.25))
         r["dob"] = new
-        r["_person"]["dob"] = new  # registry agrees, so only the age rule fires
+        r["_person"]["dob"] = new
 
     def _f_E403(self, r: dict) -> None:
         if self.rng.random() < 0.5:
@@ -607,7 +571,6 @@ class Generator:
 
     def inject_cross_faults(self) -> None:
         rng, cf = self.rng, self.cfg["cross_faults"]
-        # E202: same student again in the institution's second batch
         two = [i for i in self._role_insts("row") if i["n_batches"] == 2]
         cands = [r for r in self.rows if r["_inst"] in {i["id"] for i in two} and r["_batch"] == 1 and self._clean(r)]
         rng.shuffle(cands)
@@ -621,7 +584,6 @@ class Generator:
             d["_faults"].append("E202_duplicate_in_institution")
             r["_neg"] = True
             self.groups.append({"kind": "in_institution", "code": "E202", "members": [r["_uid"], d["_uid"]]})
-        # E203 exact and E204 fuzzy across institutions
         src = iter(self._source_rows())
         for code, n in (("E203", cf["E203_cross_institution_exact"]), ("E204", cf["E204_cross_institution_fuzzy"])):
             done = 0
@@ -670,7 +632,6 @@ class Generator:
     def inject_negatives(self) -> None:
         rng, neg = self.rng, self.cfg["negatives"]
         src = iter(self._source_rows("negative"))
-        # withdrawn at A, active at B: must not raise E203
         done = 0
         while done < neg["withdrawn_then_reenrolled"]:
             r = next(src, None)
@@ -689,7 +650,6 @@ class Generator:
             self.negatives.append({"kind": "withdrawn_then_reenrolled", "members": [r["_uid"], d["_uid"]],
                                    "must_not_raise": ["E203", "E204"]})
             done += 1
-        # twins: same surname, DOB and guardian, different first names
         insts = self._role_insts("negative")
         for _ in range(neg["twins"]):
             opts = [(i, p) for i in insts for p in i["programmes"] if self._room(i, p, 2)]
@@ -708,7 +668,6 @@ class Generator:
                 x["_batch"], x["_neg"] = 1, True
             self.negatives.append({"kind": "twins", "members": [r1["_uid"], r2["_uid"]],
                                    "must_not_raise": ["E201", "E202", "E204"]})
-        # transliteration variants of the registry name: must not raise E104
         done = 0
         for r in self._source_rows("negative"):
             if done >= neg["transliteration_variants"]:
@@ -720,7 +679,6 @@ class Generator:
                                        "must_not_raise": ["E104"]})
                 done += 1
 
-    # ------------------------------------------------------------------ timing
     def assign_upload_times(self) -> None:
         rng = self.rng
         span = (self.up_end - self.up_start).days
@@ -739,7 +697,6 @@ class Generator:
                                                     "minutes_before_deadline": round((self.deadline - times[0]).total_seconds() / 60)}})
             inst["upload_times"] = times[: inst["n_batches"]]
 
-    # ------------------------------------------------------------------ write
     def _fmt_date(self, d: date | None, dia: dict) -> Any:
         if d is None:
             return ""
@@ -858,7 +815,6 @@ class Generator:
                     "dialect": {k: (list(v) if isinstance(v, tuple) else v) for k, v in dia.items()},
                 })
 
-    # ------------------------------------------------------------------ finalise truth
     def finalise_groups(self) -> None:
         by_uid = {r["_uid"]: r for r in self.rows}
         up = {b["file"]: b["upload_at"] for b in self.batches}
@@ -866,7 +822,7 @@ class Generator:
             members = sorted((by_uid[u] for u in g["members"]), key=lambda r: (up[r["_file"]], r["_row_no"]))
             later = members[-1]
             later["_codes"].append(g["code"])
-            for m in members:  # the blocked copy is now decided by order, not by creation
+            for m in members:
                 m.pop("_will_block", None)
             g["flagged_member"] = {"file": later["_file"], "row": later["_row_no"]}
 
@@ -920,7 +876,6 @@ class Generator:
                                        "at": at.isoformat(), **patch,
                                        "expected_codes": ["E501"] if kind == "post_deadline" else []})
 
-    # ------------------------------------------------------------------ outputs
     def dump(self, out: Path) -> dict:
         by_uid = {r["_uid"]: r for r in self.rows}
         ref = lambda u: {"file": by_uid[u]["_file"], "row": by_uid[u]["_row_no"]}  # noqa: E731
@@ -934,7 +889,6 @@ class Generator:
                     **({"variant": r["_variant"]} if "_variant" in r else {}),
                 })
         programme_faults = self.derive_programme_faults()
-        # sanity: every intended programme-level fault must be present in the derived truth
         derived_keys = {(f["code"], f["institution_id"], f.get("programme")) for f in programme_faults}
         missing = [f for f in self.intended if f["code"] in ("E301", "E302", "E303")
                    and (f["code"], f["institution_id"], f.get("programme")) not in derived_keys]
@@ -1035,13 +989,12 @@ class Generator:
 
 
 def _pin_zip_times(path: Path) -> None:
-    """Rewrite an .xlsx with fixed zip timestamps so the same seed gives byte-identical files."""
     import zipfile
     with zipfile.ZipFile(path) as zin:
         items = [(i, zin.read(i.filename)) for i in zin.infolist()]
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as zout:
         for info, data in items:
-            if info.filename == "docProps/core.xml":  # openpyxl stamps 'modified' with the save time
+            if info.filename == "docProps/core.xml":
                 data = re.sub(rb"(<dcterms:modified[^>]*>)[^<]*", rb"\g<1>2026-01-01T00:00:00Z", data)
             zi = zipfile.ZipInfo(info.filename, date_time=(2026, 1, 1, 0, 0, 0))
             zi.compress_type = zipfile.ZIP_DEFLATED

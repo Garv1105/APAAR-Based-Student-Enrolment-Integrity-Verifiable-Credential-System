@@ -1,4 +1,3 @@
-"""T5.1-T5.4: trust registry, Bitstring Status List, issuance and verification through the API."""
 import copy
 import csv
 from datetime import timedelta
@@ -17,7 +16,6 @@ def a_rows():
 
 
 def a_enrolment(client, dbconn, n=0):
-    """An active A enrolment that has an APAAR, plus its CSV row."""
     upload(client, "inst-a", "A1.csv")
     r = [r for r in a_rows() if r["apaar_id"]][n]
     e = client.get("/v1/enrolments", params={"apaar": r["apaar_id"]}, headers=login(client, "inst-a")).json()[0]
@@ -54,16 +52,13 @@ def test_enrolment_credential_lifecycle_valid_tampered_suspended_revoked(client,
     assert verify(client, vc)["result"] == "SUSPENDED"
     assert client.post("/v1/credentials/status", json=st | {"value": False}, headers=login(client, "inst-a")).status_code == 200
     assert verify(client, vc)["result"] == "VALID"
-    # another institution can't touch it, and revocation can't be undone
     assert client.post("/v1/credentials/status", json=st | {"value": True}, headers=login(client, "inst-b")).status_code == 404
     assert client.post("/v1/credentials/status", json=st | {"purpose": "revocation", "value": False},
                        headers=login(client, "inst-a")).status_code == 422
 
-    # PRD §11.7: withdrawal revokes automatically
     assert client.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "reason": "left"},
                         headers=login(client, "inst-a")).status_code == 200
     assert verify(client, vc)["result"] == "REVOKED"
-    # genuine verifications show up in the student's audit trail (D6); the TAMPERED one is not linked to them
     rows = dbconn.execute("SELECT actor, reason, student_id FROM audit_logs WHERE action='credential.verify' AND entity_id=%s ORDER BY id",
                           (vc["id"],)).fetchall()
     assert [r["reason"] for r in rows] == ["VALID", "TAMPERED", "SUSPENDED", "VALID", "REVOKED"]
@@ -104,7 +99,7 @@ def test_non_student_documents_are_not_reported_valid(client, dbconn):
     e, _ = a_enrolment(client, dbconn)
     vc = issue(client, "inst-a", e["id"], "EnrolmentCredential").json()["credential"]
     slc = client.get("/status/" + vc["credentialStatus"][0]["statusListCredential"].split("/status/")[1]).json()
-    assert slc["validUntil"] > slc["validFrom"]  # published lists expire (offline verifiers must refresh)
+    assert slc["validUntil"] > slc["validFrom"]
     assert verify(client, slc)["result"] == "MALFORMED"
     assert verify(client, client.get("/v1/registry/snapshot").json()["snapshot"])["result"] == "MALFORMED"
 
@@ -116,7 +111,7 @@ def test_status_list_credential_is_spec_shaped_and_signed(client, dbconn):
     idx = int(entry["statusListIndex"])
     client.patch(f"/v1/enrolments/{e['id']}", json={"status": "withdrawn", "reason": "left"}, headers=login(client, "inst-a"))
     path = entry["statusListCredential"].split("/status/")[1]
-    slc = client.get(f"/status/{path}").json()  # public, no auth
+    slc = client.get(f"/status/{path}").json()
     assert slc["type"] == ["VerifiableCredential", "BitstringStatusListCredential"]
     bits = credentials.decode_list(slc["credentialSubject"]["encodedList"])
     assert len(bits) * 8 >= 131_072 and credentials.bit_is_set(bits, idx) and sum(bin(b).count("1") for b in bits) == 1
@@ -127,25 +122,25 @@ def test_status_list_credential_is_spec_shaped_and_signed(client, dbconn):
 
 def test_status_list_bit_order_matches_spec():
     bits = bytearray(16384)
-    bits[0] = 0b1000_0000  # index 0 is the left-most bit
+    bits[0] = 0b1000_0000
     assert credentials.bit_is_set(bytes(bits), 0) and not credentials.bit_is_set(bytes(bits), 7)
     assert credentials.decode_list(credentials.encode_list(bytes(bits))) == bytes(bits)
 
 
 def test_degree_credential_by_affiliated_university_only(client, dbconn):
     e, row = a_enrolment(client, dbconn)
-    assert issue(client, "univ", e["id"], "DegreeCredential").status_code == 409   # not completed yet
+    assert issue(client, "univ", e["id"], "DegreeCredential").status_code == 409
     assert client.patch(f"/v1/enrolments/{e['id']}", json={"status": "completed", "reason": "graduated"},
                         headers=login(client, "inst-a")).status_code == 200
     r = issue(client, "univ", e["id"], "DegreeCredential")
     assert r.status_code == 201, r.text
     s = r.json()["credential"]["credentialSubject"]
-    assert s["apaarId"] == row["apaar_id"] and s["studentId"] == row["institution_student_id"]  # Req 10
+    assert s["apaarId"] == row["apaar_id"] and s["studentId"] == row["institution_student_id"]
     assert "validUntil" not in r.json()["credential"] and verify(client, r.json()["credential"])["result"] == "VALID"
     assert issue(client, "inst-a", e["id"], "DegreeCredential").status_code == 403
     assert issue(client, "univ", e["id"], "EnrolmentCredential").status_code == 403
-    assert issue(client, "inst-b", e["id"], "EnrolmentCredential").status_code == 404   # RLS: not B's enrolment
-    upload(client, "inst-c", "C1.csv")  # C is not affiliated to the university
+    assert issue(client, "inst-b", e["id"], "EnrolmentCredential").status_code == 404
+    upload(client, "inst-c", "C1.csv")
     c_row = next(r for r in csv.DictReader(open(SYN / "C1.csv", encoding="utf-8")) if r["apaar_id"] and r["institution_student_id"])
     c_e = client.get("/v1/enrolments", params={"apaar": c_row["apaar_id"]}, headers=login(client, "inst-c")).json()[0]
     assert issue(client, "univ", c_e["id"], "DegreeCredential").status_code == 404
@@ -153,7 +148,6 @@ def test_degree_credential_by_affiliated_university_only(client, dbconn):
 
 def test_untrusted_issuers_and_registry_window(client, dbconn):
     assert verify(client, client.get("/v1/demo/forged-credential", headers=login(client, "employer")).json())["result"] == "UNTRUSTED_ISSUER"
-    # a closed institution's credential issued after its approval window is untrusted; an earlier one still verifies
     base = {"@context": credentials.VC_CONTEXT, "id": "urn:uuid:00000000-0000-0000-0000-000000000004",
             "type": ["VerifiableCredential", "EnrolmentCredential"], "issuer": {"id": D_DID, "name": "Ram Lakhan Sinha Polytechnic, Darbhanga"},
             "credentialSubject": {"name": "X", "studentId": "D/1"}}
@@ -189,13 +183,12 @@ def test_student_login_needs_apaar_and_dob(client, dbconn):
     issue(client, "inst-a", e["id"], "EnrolmentCredential")
     wrong = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": "1999-01-01"})
     unknown = client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "dob": row["dob"]})
-    assert wrong.status_code == unknown.status_code == 401 and wrong.json() == unknown.json()  # same answer either way
+    assert wrong.status_code == unknown.status_code == 401 and wrong.json() == unknown.json()
     ok = client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": row["dob"]})
     assert ok.status_code == 200 and ok.json()["role"] == "student"
     hs = {"Authorization": f"Bearer {ok.json()['access_token']}"}
     mine = client.get("/v1/credentials", headers=hs).json()
     assert len(mine) == 1 and mine[0]["credential"]["credentialSubject"]["apaarId"] == row["apaar_id"]
-    # another student and another institution see none of it
     other = next(r for r in a_rows() if r["apaar_id"] and r["apaar_id"] != row["apaar_id"])
     assert client.get("/v1/credentials", headers=student_headers(client, other["apaar_id"])).json() == []
     assert client.get("/v1/credentials", headers=login(client, "inst-b")).json() == []
@@ -207,7 +200,6 @@ def test_student_login_locks_out_after_repeated_failures(client, dbconn):
     row = [r for r in a_rows() if r["apaar_id"]][5]
     for _ in range(5):
         assert client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": "1990-01-01"}).status_code == 401
-    # locked: even the right DOB is refused for now (guessing a DOB can't be brute-forced)
     assert client.post("/v1/auth/student-login", json={"apaar_id": row["apaar_id"], "dob": row["dob"]}).status_code == 429
 
 
@@ -222,8 +214,7 @@ def test_parallel_guesses_cannot_race_past_the_lockout(client, dbconn):
     ts = [threading.Thread(target=guess, args=(i,)) for i in range(20)]
     [t.start() for t in ts]
     [t.join() for t in ts]
-    assert sorted(codes) == [401] * 5 + [429] * 15   # exactly 5 attempts reach the DOB check
-    # an unknown APAAR is throttled the same way, so lock state reveals nothing about registration
+    assert sorted(codes) == [401] * 5 + [429] * 15
     for _ in range(5):
         client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "dob": "2000-01-01"})
     assert client.post("/v1/auth/student-login", json={"apaar_id": "999999999999", "dob": "2000-01-01"}).status_code == 429
